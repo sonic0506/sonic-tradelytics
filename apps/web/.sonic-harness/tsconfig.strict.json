@@ -1,0 +1,16 @@
+{
+  // 프로젝트 tsconfig(Vite는 tsconfig.app.json, Next는 tsconfig.json)에서 "extends"로 불러요.
+  // ${configDir}는 불러온 쪽 tsconfig 위치예요.
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": { "@/*": ["${configDir}/src/*"] }
+  }
+}

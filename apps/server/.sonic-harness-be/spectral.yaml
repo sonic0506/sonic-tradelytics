@@ -1,0 +1,43 @@
+# OpenAPI 규칙(harness.md 2절). CI: npx @stoplight/spectral-cli lint openapi.json --ruleset .sonic-harness-be/spectral.yaml
+extends: [[spectral:oas, recommended]]
+rules:
+  # Nest Swagger가 만들지 않는 항목이라 꺼요.
+  info-contact: off
+  info-description: off
+  oas3-api-servers: off
+  operation-description: off
+  operation-tag-defined: off
+  path-kebab-case:
+    description: 경로는 kebab-case 복수 명사예요.
+    message: '{{property}}: 경로는 kebab-case로 써요(예: /v1/order-items/{id}).'
+    severity: error
+    given: $.paths
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[a-zA-Z]+\}))+$'
+  post-returns-201:
+    description: 생성(POST)은 201이에요.
+    message: 'POST {{path}}: 생성이면 @HttpCode(HttpStatus.CREATED)로 201을 돌려줘요. 하위 동작이면 무시해도 돼요.'
+    severity: warn
+    given: $.paths[*].post.responses
+    then:
+      field: '201'
+      function: truthy
+  delete-returns-204:
+    description: 삭제(DELETE)는 204예요.
+    message: 'DELETE {{path}}: @HttpCode(HttpStatus.NO_CONTENT)로 204를 돌려줘요.'
+    severity: error
+    given: $.paths[*].delete.responses
+    then:
+      field: '204'
+      function: truthy
+  path-param-documents-404:
+    description: path 파라미터로 대상을 찾는 API는 404를 적어요.
+    message: '{{path}}: 대상이 없을 때의 예외를 @ApiErrors(XxxNotFoundException)로 적어요(harness.md 2절). 404가 날 수 없으면 무시해도 돼요.'
+    severity: warn
+    given: '$.paths[?(@property.match(/\{/))][get,put,patch,delete].responses'
+    then:
+      field: '404'
+      function: truthy

@@ -1,0 +1,37 @@
+# PR과 main push마다 하네스 규칙을 확인해요(사람이 고친 코드도 Claude hook과 같은 규칙으로).
+# 모노레포: apps/web과 루트 lock 파일이 바뀔 때만 돌고, 명령은 apps/web에서 실행해요. npm ci만 루트에서 해요.
+name: web
+
+on:
+  pull_request:
+    paths: ['apps/web/**', 'package-lock.json', '.github/workflows/web.yml']
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'package-lock.json', '.github/workflows/web.yml']
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/web
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --passWithNoTests
+      - run: npm run build

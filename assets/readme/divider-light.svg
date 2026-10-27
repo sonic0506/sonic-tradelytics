@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="28" viewBox="0 0 840 28"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7FBF9"/><stop offset="1" stop-color="#EDF6F2"/></linearGradient>
+<linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+  <stop offset="0" stop-color="#0FBF86"/><stop offset="0.5" stop-color="#0EA5A0"/><stop offset="1" stop-color="#0FBF86"/>
+  <animate attributeName="x1" values="-100%;0%;-100%" dur="6s" repeatCount="indefinite"/>
+  <animate attributeName="x2" values="0%;100%;0%" dur="6s" repeatCount="indefinite"/>
+</linearGradient>
+<linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0FBF86" stop-opacity="0.35"/><stop offset="1" stop-color="#0FBF86" stop-opacity="0"/></linearGradient>
+<linearGradient id="gLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0FBF86" stop-opacity="0"/><stop offset="0.5" stop-color="#0FBF86"/><stop offset="1" stop-color="#F07800" stop-opacity="0"/></linearGradient>
+<pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#0FBF86" stroke-opacity="0.10"/></pattern>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="36"/></filter>
+<filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+<filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.12"/></filter>
+<clipPath id="frame"><rect width="840" height="28" rx="20"/></clipPath>
+</defs><rect x="60" y="13" width="330" height="1.5" fill="url(#gLine)"/><rect x="450" y="13" width="330" height="1.5" fill="url(#gLine)" transform="rotate(180 615 13.75)"/><line x1="404.5" y1="5" x2="404.5" y2="23" stroke="#0FBF86"/><rect x="402" y="8" width="5" height="12" rx="1" fill="#0FBF86"><animate attributeName="opacity" values="1;0.4;1" dur="3s" begin="0.0s" repeatCount="indefinite"/></rect><line x1="418.5" y1="2" x2="418.5" y2="24" stroke="#E5484D"/><rect x="416" y="5" width="5" height="16" rx="1" fill="#E5484D"><animate attributeName="opacity" values="1;0.4;1" dur="3s" begin="0.5s" repeatCount="indefinite"/></rect><line x1="432.5" y1="0" x2="432.5" y2="26" stroke="#0FBF86"/><rect x="430" y="3" width="5" height="20" rx="1" fill="#0FBF86"><animate attributeName="opacity" values="1;0.4;1" dur="3s" begin="1.0s" repeatCount="indefinite"/></rect></svg>

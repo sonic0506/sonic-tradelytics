@@ -1,0 +1,131 @@
+# PR과 main push마다 하네스 규칙을 확인해요(사람이 고친 코드도 Claude hook과 같은 규칙으로).
+# job 이름이 branch protection의 필수 check 이름이에요: lint, test, e2e, openapi, migration, security
+# 모노레포: apps/server와 루트 lock 파일이 바뀔 때만 돌고, 명령은 apps/server에서 실행해요. npm ci만 루트에서 해요.
+name: server
+
+on:
+  pull_request:
+    paths: ['apps/server/**', 'package-lock.json', '.github/workflows/server.yml']
+  push:
+    branches: [main]
+    paths: ['apps/server/**', 'package-lock.json', '.github/workflows/server.yml']
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/server
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx prettier --check .
+      - run: npm run lint:cycles
+      - run: node scripts/harness-checks.mjs env e2e
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm run test:cov
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm run test:e2e
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      - run: npm run openapi:check
+      - run: npx -y @stoplight/spectral-cli@6 lint openapi.json --ruleset .sonic-harness-be/spectral.yaml --fail-severity error
+      # 호환되지 않는 변경(필드 삭제, 타입 변경 …)이면 실패해요. 꼭 필요하면 새 버전(/v2) 경로로 만들어요.
+      - name: breaking change
+        if: github.event_name == 'pull_request'
+        run: |
+          if git show "origin/${{ github.base_ref }}:./openapi.json" > /tmp/base.json 2>/dev/null; then
+            docker run --rm -v /tmp:/base -v "$PWD":/head tufin/oasdiff:v1.34.1 breaking /base/base.json /head/openapi.json --fail-on ERR
+          fi
+
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/app
+      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        working-directory: .
+      # migration을 모두 적용한 뒤 entity와 차이가 있으면(= migration 누락) 실패해요.
+      - run: npm run migration:check
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: secret scan
+        working-directory: .
+        run: docker run --rm -v "$PWD":/repo ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --no-banner
+      # 운영 의존성의 critical만 막아요. high는 Dependabot 보안 업데이트로 따라가요(Nest 12 자체 의존성에 아직 고칠 버전이 없는 high가 있어요).
+      - run: npm audit --omit=dev --audit-level=critical
+      - name: new dependency reason
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node scripts/harness-checks.mjs deps

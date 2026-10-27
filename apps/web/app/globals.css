@@ -1,0 +1,10 @@
+/* sonic은 preflight(base)보다 뒤, 이 프로젝트의 components/utilities보다 앞에 둬요(sonic-ui README). */
+@layer theme, base, sonic, components, utilities;
+@import 'tailwindcss';
+@import '@xonic0506/sonic-ui/styles.css';
+@import '@xonic0506/sonic-ui/tailwind.css';
+/* sonic-ui는 글꼴 이름 "IBM Plex Sans KR"/"IBM Plex Mono"를 찾아서, 이름을 바꾸는 next/font 대신 fontsource로 불러와요. */
+@import '@fontsource/ibm-plex-sans-kr/400.css';
+@import '@fontsource/ibm-plex-sans-kr/500.css';
+@import '@fontsource/ibm-plex-sans-kr/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
