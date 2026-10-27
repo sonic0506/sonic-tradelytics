@@ -1,6 +1,6 @@
 {
   "origin": "https://github.com/sonic0506/sonic-harness-be.git",
-  "ref": "2cdb66a2a1c8466e58c17b07830e801080fd7f47",
+  "ref": "92cd38b63bdc9f67dce8931ce4f11578160dfcfa",
   "checkedRef": "2cdb66a2a1c8466e58c17b07830e801080fd7f47",
   "files": {
     "commitlint.base.mjs": "19482207e6eae61445ab3c6938873ab4cb8c783c88fdb846198357bdc2dc383a",
@@ -62,5 +62,7 @@
     "vitest.config.e2e.ts",
     "vitest.config.ts"
   ],
-  "updatedAt": "2026-10-27T13:45:22.060Z"
+  "updatedAt": "2026-10-27T22:19:22.702Z",
+  "contributing": {},
+  "templateMerges": []
 }

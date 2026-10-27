@@ -1,6 +1,6 @@
 {
   "origin": "https://github.com/sonic0506/sonic-harness-fe.git",
-  "ref": "8b7c8e072253bd405ff2b4d5e0cadfcd82c7e130",
+  "ref": "90336f30ab3554ed4c4d0d3d30f29f587e17a6dd",
   "checkedRef": "8b7c8e072253bd405ff2b4d5e0cadfcd82c7e130",
   "files": {
     "commitlint.base.mjs": "19482207e6eae61445ab3c6938873ab4cb8c783c88fdb846198357bdc2dc383a",
@@ -45,5 +45,7 @@
     "src/shared/config/env.ts",
     "src/shared/config/index.ts"
   ],
-  "updatedAt": "2026-10-27T13:47:16.500Z"
+  "updatedAt": "2026-10-27T22:19:24.663Z",
+  "contributing": {},
+  "templateMerges": []
 }
