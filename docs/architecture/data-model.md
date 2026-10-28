@@ -196,7 +196,8 @@ erDiagram
 | time_in_force | text | not null, CHECK `DAY` `CLS` `OPG` | |
 | price | bigint | | 지정가. 시장가는 null |
 | quantity | integer | not null, CHECK > 0 | |
-| status | text | not null | `requested`(우리 쪽, 응답 전) 또는 토스 `OrderStatus` 값 그대로 (`PENDING`, `PARTIAL_FILLED`, `FILLED`, `CANCELED`, `REJECTED` 등) |
+| status | text | not null | 우리 쪽 `requested`(응답 전)·`request_failed`(4xx로 접수 안 됨), 또는 토스 `OrderStatus` 값 그대로. 전이는 [주문 흐름](./order-lifecycle.md#주문-상태-전이) |
+| reject_code | text | | `request_failed`일 때 토스 에러 코드 (예: `insufficient-buying-power`, `not_found`) |
 | filled_quantity | integer | not null, default 0 | 토스 `execution` 값 그대로 (NFR-05) |
 | avg_filled_price | numeric(18,4) | | |
 | filled_amount | bigint | | |
@@ -210,7 +211,8 @@ erDiagram
 | created_at, updated_at | timestamptz | not null | |
 
 - CHECK: `(origin = 'bot') = (decision_id is not null)`
-- CHECK: `status = 'requested' or broker_order_id is not null`
+- CHECK: `status in ('requested','request_failed') or broker_order_id is not null`
+- CHECK: `(status = 'request_failed') = (reject_code is not null)`
 - INDEX `(position_id)`, 부분 INDEX `(symbol) WHERE status IN ('requested','PENDING','PARTIAL_FILLED','PENDING_CANCEL','PENDING_REPLACE')` — 미체결 조회 (POL-FUND-05, POL-RISK-16)
 - 토스 주문 조회에는 `clientOrderId`가 없어요. AccountSync는 `broker_order_id`로 봇 주문을 찾고, 없는 주문은 `protective_order.triggered_order_id`와 맞춰 본 뒤 남은 것을 `manual`로 넣어요
 - 봇은 주문 정정을 쓰지 않아요 ([연동 문서 주문 규칙](../integrations/toss-securities-api.md#주문-규칙)). 그래서 `decision` 1개 = `broker_order` 1개이고, 정정 이력 컬럼이 없어요. 정정된 주문(`REPLACED`)이 보이면 직접 거래에서 생긴 것이에요
@@ -289,7 +291,7 @@ erDiagram
 | low_price | bigint | | 보유 중 최저가 |
 | opened_at | timestamptz | not null | |
 | closed_at | timestamptz | | |
-| exit_reason | text | CHECK `take_profit` `stop_loss` `time_exit` `market_close` `reeval` `manual` `kill_switch` | F2 청산 사유 |
+| exit_reason | text | CHECK `take_profit` `stop_loss` `time_exit` `market_close` `reeval` `manual` `kill_switch` `not_filled` | F2 청산 사유. `not_filled`는 한 주도 체결되지 않고 끝난 포지션 (F2에서 "취소") |
 | created_at, updated_at | timestamptz | not null | |
 
 - CHECK: `(status = 'closed') = (closed_at is not null)`, `status = 'open' or quantity = 0`
