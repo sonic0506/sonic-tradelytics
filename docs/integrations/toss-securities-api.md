@@ -97,7 +97,7 @@
 | **반대 방향 미체결** | 국내 주식은 같은 종목에 반대 방향 미체결 주문이 있으면 가격과 무관하게 `409 opposite-pending-order-exists` | 같은 종목을 여러 봇·직접 거래가 동시에 다루면 서로 막힘 → 종목 잠금 ([POL-RISK-16](../policy/risk-management.md#5-1-종목-잠금-pol-risk-16)) |
 | 고액 주문 | 1억 원 이상은 `confirmHighValueOrder: true` 필요 | 봇 주문은 이 플래그를 보내지 않아, 1억 원 이상 주문은 거부되게 둠 (안전장치) |
 | 주문 가능 시간 | 앱과 동일. 불가 시간에는 `422 order-hours-closed` | |
-| 정정 | 국내는 가격·수량 정정 가능 | |
+| 정정 | 국내는 가격·수량 정정 가능 | **봇은 정정하지 않아요.** 취소를 확인한 뒤 새 판단으로 새 주문을 내요. 판단 1개 = 주문 1개를 유지해요 ([Q-019](../project/open-questions.md#q-019)) |
 | 거래 제한 | `stock-restricted`, `price-out-of-range`, `insufficient-buying-power` 등 422 | 재시도하지 않고 판단을 건너뜀으로 기록 |
 
 ## 주문·체결 조회
