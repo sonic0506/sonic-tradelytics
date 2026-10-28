@@ -3,6 +3,7 @@
 //
 //   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs rest
 //   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs ws 005930,000660 3600
+//   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs prices 005930,000660 3600
 //
 // 주의: 클라이언트당 유효 토큰은 1개라 새로 발급하면 이전 토큰이 즉시 끊겨요.
 // 그래서 발급한 토큰을 .token.json에 저장해 rest·ws가 같이 써요. 운영 중인 키로는 돌리지 마세요.
@@ -117,10 +118,28 @@ async function ws(codes, seconds) {
   setTimeout(() => sock.close(1000, 'spike done'), seconds * 1000);
 }
 
+// 확인 항목: NXT 프리마켓(08:00~08:50) 체결이 통합 현재가에 반영되는지
+// → 08:00 전에 시작해 30초마다 조회. 08:00 뒤 timestamp·lastPrice가 바뀌면 반영돼요
+async function prices(codes, seconds) {
+  const token = await getToken();
+  const last = new Map();
+  const poll = async () => {
+    for (const { symbol, timestamp, lastPrice } of await api(token, `/api/v1/prices?symbols=${codes.join(',')}`)) {
+      const changed = last.has(symbol) && last.get(symbol) !== `${timestamp}/${lastPrice}`;
+      log(`${symbol} ${lastPrice}원 체결시각 ${timestamp}${changed ? ' ← 바뀜' : ''}`);
+      last.set(symbol, `${timestamp}/${lastPrice}`);
+    }
+  };
+  await poll();
+  const timer = setInterval(() => poll().catch((e) => log('에러', e.message)), 30_000);
+  setTimeout(() => clearInterval(timer), seconds * 1000);
+}
+
 const [cmd, codesArg = '005930', secondsArg = '3600'] = process.argv.slice(2);
 if (cmd === 'rest') await rest();
 else if (cmd === 'ws') await ws(codesArg.split(','), Number(secondsArg));
+else if (cmd === 'prices') await prices(codesArg.split(','), Number(secondsArg));
 else {
-  console.error('사용법: toss-spike.mjs rest | ws [종목코드,...] [초]');
+  console.error('사용법: toss-spike.mjs rest | ws [종목코드,...] [초] | prices [종목코드,...] [초]');
   process.exit(1);
 }
