@@ -52,7 +52,7 @@ erDiagram
     bot ||--o{ bot_daily_result : "일일 집계"
 ```
 
-참조만 하는 표: `market_calendar`, `fee_schedule`, `disclosure` (다른 표와 FK 없음).
+참조만 하는 표: `market_calendar`, `fee_schedule`, `disclosure`, `batch_run` (다른 표와 FK 없음).
 
 **포지션 중심 구조**: 거래 1줄 = `position` 1개 (FR-PERF-04). 진입 판단으로 첫 매수 주문을 낼 때 포지션을 만들고, 그 뒤의 분할 매수·매도 주문은 모두 같은 `position_id`를 가져요. 보유 수량이 0이 되면 닫아요. 직접 거래는 `bot_id`가 null인 포지션이에요(F4).
 
@@ -72,7 +72,7 @@ erDiagram
 | risk_profile | text | not null, CHECK `aggressive` `neutral` `conservative` | POL-RISK-01, 05 |
 | stage | text | not null, default `verifying`, CHECK `verifying` `released` | 검증 구간 (POL-RISK-13) |
 | status | text | not null, default `ready`, CHECK `ready` `running` `paused` `waiting_funds` `stopped` | `waiting_funds`는 POL-FUND-15 |
-| status_reason | text | | 정지·대기 사유 코드 (예: `daily_stop`, `streak_pause`, `insufficient_funds`) |
+| status_reason | text | | 정지·대기 사유 코드 (예: `daily_stop`, `streak_pause`, `insufficient_funds`, `bot_error`) |
 | budget_type | text | not null, CHECK `ratio` `fixed` | 정률·정액 (POL-FUND-13~15) |
 | budget_ratio | numeric(5,4) | CHECK 0 < x ≤ 1 | 정률일 때만 |
 | budget_amount | bigint | CHECK > 0 | 정액일 때만 |
@@ -169,7 +169,7 @@ erDiagram
 | target_price | bigint | | 예측 목표가 |
 | stop_price | bigint | | 예측 손절가 |
 | horizon_minutes | integer | | 예상 보유 시간 |
-| skip_reason | text | CHECK `entry_condition` `risk` `funds` `symbol_lock` `market_alert` `order_rejected` | 건너뛴 사유 (FR-RAT-03, 04) |
+| skip_reason | text | CHECK `entry_condition` `risk` `funds` `symbol_lock` `market_alert` `order_rejected` `rate_limit` | 건너뛴 사유 (FR-RAT-03, 04) |
 | created_at | timestamptz | not null | |
 
 - CHECK: `(kind = 'skip') = (skip_reason is not null)`
@@ -383,12 +383,29 @@ api → engine 명령 ([ADR-0004](./adr/0004-postgres-notify-for-commands.md)). 
 | --- | --- | --- | --- |
 | id | bigint | PK | |
 | bot_id | bigint | FK → bot | 전체 대상이면 null |
-| kind | text | not null, CHECK `daily_stop` `total_stop` `streak_pause` `rate_cap` `kill_switch` `batch_fail` `feed_stale` `record_fail` `order_rejected` `funds_waiting` | |
+| kind | text | not null, CHECK `daily_stop` `total_stop` `streak_pause` `rate_cap` `kill_switch` `batch_fail` `feed_stale` `record_fail` `order_rejected` `funds_waiting` `bot_error` | |
 | occurred_at | timestamptz | not null | |
 | detail | jsonb | not null | 기준값과 실제 값 (예: `{limit_pct: -4, actual_pct: -4.2}`) |
 | notified_at | timestamptz | | 텔레그램 발송 시각. 이 컬럼만 예외로 한 번 채워요 |
 
 - INDEX `(bot_id, occurred_at)`
+
+#### `batch_run`
+
+engine 배치 실행 기록 ([엔진 배치 스케줄](./engine.md#배치-스케줄)). engine 시작 시 놓친 배치를 찾는 데 써요.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| id | bigint | PK | |
+| job | text | not null, CHECK `pre_open` `open_snapshot` `open_check` `intraday_check` `post_close` `weekly_check` | |
+| trade_date | date | not null | |
+| slot | text | not null, default `''` | 하루 여러 번 도는 job의 회차 (예: `intraday_check`의 `11:00`) |
+| started_at | timestamptz | not null | |
+| finished_at | timestamptz | | |
+| result | text | CHECK `ok` `failed` `skipped` | `skipped`는 휴장일 |
+| error | text | | |
+
+- UNIQUE `(job, trade_date, slot)`: 같은 배치를 두 번 시작하지 않아요. 실패한 배치를 다시 돌리면 같은 행을 갱신해요
 
 #### `market_calendar`
 

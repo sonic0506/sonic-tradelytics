@@ -1,7 +1,7 @@
 # 시스템 개요
 
 > 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-27
-> 관련: [데이터 모델](./data-model.md) · [ADR](./adr/) · [토스 API 연동](../integrations/toss-securities-api.md)
+> 관련: [데이터 모델](./data-model.md) · [엔진 설계](./engine.md) · [주문 흐름](./order-lifecycle.md) · [ADR](./adr/) · [토스 API 연동](../integrations/toss-securities-api.md)
 
 ## 구성
 
