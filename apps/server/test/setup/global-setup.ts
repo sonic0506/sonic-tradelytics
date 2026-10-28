@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 import {
   PostgreSqlContainer,
@@ -20,7 +21,8 @@ export async function setup(): Promise<void> {
   execFileSync(
     'node',
     [
-      'node_modules/typeorm/cli.js',
+      // 모노레포에서는 typeorm이 루트 node_modules에 있어서 경로를 찾아요
+      createRequire(import.meta.url).resolve('typeorm/cli.js'),
       '-d',
       'dist/infra/database/data-source.js',
       'migration:run',

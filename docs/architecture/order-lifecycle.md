@@ -7,7 +7,7 @@
 
 ## 원칙
 
-1. **기록 먼저, 주문 나중**: 판단(`decision`)과 주문 행(`broker_order`, `requested`)을 한 트랜잭션으로 저장한 뒤에만 토스에 주문을 보내요. 저장이 실패하면 주문하지 않아요 ([ADR-0003](./adr/0003-record-decision-before-order.md))
+1. **기록 먼저, 주문 나중**: 판단(`decisions`)과 주문 행(`broker_orders`, `requested`)을 한 트랜잭션으로 저장한 뒤에만 토스에 주문을 보내요. 저장이 실패하면 주문하지 않아요 ([ADR-0003](./adr/0003-record-decision-before-order.md))
 2. **같은 판단은 같은 주문**: `clientOrderId = decision.id`. 재시도는 항상 같은 id로 해요 (POL-RISK-07)
 3. **정답은 REST 주문 조회**: 웹소켓 이벤트는 빠른 반영용이고, 합계가 다르면 `GET /api/v1/orders` 값으로 고쳐요
 4. **손절은 먼저 걸고 먼저 치운다**: 진입 체결 직후 손절 조건주문을 걸고, 봇이 팔기 전에는 먼저 취소를 확인해요 (POL-RISK-11, 14)
@@ -16,7 +16,7 @@
 
 ## 주문 상태 전이
 
-`broker_order.status`예요. `requested`와 `request_failed`는 우리 쪽 상태, 나머지는 토스 `OrderStatus` 값 그대로예요.
+`broker_orders.status`예요. `requested`와 `request_failed`는 우리 쪽 상태, 나머지는 토스 `OrderStatus` 값 그대로예요.
 
 ```mermaid
 stateDiagram-v2
@@ -51,7 +51,7 @@ stateDiagram-v2
 | `request_failed` | 아니오 | 끝. 토스에 주문이 생기지 않았어요. `reject_code`에 토스 에러 코드 |
 
 - "미체결"은 자금 한도 검사(POL-FUND-05)와 종목 잠금 해제 조건(POL-RISK-16)에 들어가요. 위 표에서 "예"인 상태를 모두 미체결로 계산해요
-- `CANCEL_REJECTED`는 토스가 별도 주문 레코드로 만들어요. 원주문은 이전 상태로 돌아가므로 AccountSync는 원주문 상태만 따라가고, 이 레코드는 `order_event.raw`에만 남겨요
+- `CANCEL_REJECTED`는 토스가 별도 주문 레코드로 만들어요. 원주문은 이전 상태로 돌아가므로 AccountSync는 원주문 상태만 따라가고, 이 레코드는 `order_events.raw`에만 남겨요
 - 직접 거래 주문(`origin = manual`)은 우리가 상태를 바꾸지 않고 조회 결과만 따라가요. `REPLACED`·`REPLACE_REJECTED`도 직접 거래에서만 나와요
 
 ## 진입: 판단 → 주문 → 체결
@@ -93,7 +93,7 @@ sequenceDiagram
 ```
 
 - **포지션은 주문 전에 만들어요.** 판단이 `position_id`를 가져야 해서 같은 트랜잭션에서 포지션을 먼저 넣어요. 주문이 하나도 체결되지 않고 끝나면 포지션을 `not_filled`로 닫아요. F2 내역에는 "취소"로 보여요
-- **손절은 첫 체결 직후 걸어요.** 체결이 이어져 보유 수량이 늘면, 기존 손절을 취소 확인한 뒤 새 수량으로 다시 걸어요(수정은 취소 후 재생성이라 새 id, [데이터 모델](./data-model.md#protective_order))
+- **손절은 첫 체결 직후 걸어요.** 체결이 이어져 보유 수량이 늘면, 기존 손절을 취소 확인한 뒤 새 수량으로 다시 걸어요(수정은 취소 후 재생성이라 새 id, [데이터 모델](./data-model.md#protective_orders))
 - **분할 매수**는 두 번째 주문부터 같은 포지션에 새 판단(`enter`) + 새 주문을 붙여요. 이미 잠금을 가지고 있으므로 잠금은 다시 잡지 않아요
 - 체결 이벤트를 놓쳐도 아래 [재동기화](#재동기화-accountsync)가 REST 값으로 채워요
 
@@ -134,12 +134,12 @@ sequenceDiagram
 
 ## 응답을 못 받았을 때
 
-주문을 보냈는데 응답 전에 타임아웃·네트워크 오류·engine 재시작이 나면 `broker_order`가 `requested`이고 `broker_order_id`가 비어 있어요. 이때 **같은 판단으로 새 주문을 만들지 않아요.**
+주문을 보냈는데 응답 전에 타임아웃·네트워크 오류·engine 재시작이 나면 `broker_orders`가 `requested`이고 `broker_order_id`가 비어 있어요. 이때 **같은 판단으로 새 주문을 만들지 않아요.**
 
 | 보낸 뒤 경과 | 처리 |
 | --- | --- |
 | 10분 안 | 같은 `clientOrderId`로 다시 보내요. 토스가 첫 결과(`orderId`)를 돌려줘요. `409 request-in-progress`면 잠시 뒤 다시 |
-| 10분 넘음 | 다시 보내지 않아요(멱등 만료라 이중 주문 위험). 주문 조회에는 `clientOrderId`가 없어서, 같은 종목·방향·수량·가격이고 `broker_order.created_at` 이후 접수됐으며 아직 어떤 `broker_order`에도 연결되지 않은 주문을 찾아요 |
+| 10분 넘음 | 다시 보내지 않아요(멱등 만료라 이중 주문 위험). 주문 조회에는 `clientOrderId`가 없어서, 같은 종목·방향·수량·가격이고 `broker_orders.created_at` 이후 접수됐으며 아직 어떤 `broker_orders`에도 연결되지 않은 주문을 찾아요 |
 
 | 10분 넘은 경우 찾은 결과 | 처리 |
 | --- | --- |
@@ -162,7 +162,7 @@ engine은 시작할 때마다 `requested` 상태 주문을 먼저 이 표대로 
 조회한 주문마다 이렇게 맞춰요.
 
 1. `broker_order_id`로 찾으면: 상태·체결 합계가 다르면 REST 값으로 갱신하고 `order_event(source=rest)`를 남겨요. 체결 수량이 늘었으면 포지션에도 반영해요
-2. 못 찾으면 `protective_order.triggered_order_id`로 찾아요: 있으면 `origin = protective`로 넣어요
+2. 못 찾으면 `protective_orders.triggered_order_id`로 찾아요: 있으면 `origin = protective`로 넣어요
 3. 그래도 없으면 [응답을 못 받은 주문](#응답을-못-받았을-때)의 후보인지 봐요. 아니면 직접 거래예요: `origin = manual`로 넣고, 같은 종목의 직접 거래 포지션(`bot_id` null)에 붙여요 (FR-MAN-01)
 
 `ORDER_HISTORY` 한도(초당 5)는 TossClient의 rate limiter가 지켜요.
@@ -187,10 +187,10 @@ engine은 시작할 때마다 `requested` 상태 주문을 먼저 이 표대로 
 | `409 opposite-pending-order-exists` | 재시도 없음 | `request_failed`. 청산이면 즉시 알림 (위 청산 절) |
 | `409 request-in-progress` | 잠시 뒤 같은 id로 재시도 | 상태 유지 (`requested`) |
 | `429` | `Retry-After`만큼 기다렸다가 같은 id로 재시도 | 상태 유지 |
-| `401 token-revoked` | 토큰 재발급 후 같은 id로 재시도. 반복되면 다른 곳이 같은 키로 발급 중이에요 (R-014) | 반복 시 `risk_event` + 전체 신규 진입 중단 |
+| `401 token-revoked` | 토큰 재발급 후 같은 id로 재시도. 반복되면 다른 곳이 같은 키로 발급 중이에요 (R-014) | 반복 시 `risk_events` + 전체 신규 진입 중단 |
 | `5xx`, 타임아웃 | [응답을 못 받았을 때](#응답을-못-받았을-때) | 상태 유지 |
 
-봇별 분당 주문 수, 계좌 일일 주문 수 상한(POL-RISK-08)은 `broker_order` INSERT 전에 검사해요. 넘으면 주문하지 않고 `risk_event(rate_cap)`로 봇을 일시 정지해요.
+봇별 분당 주문 수, 계좌 일일 주문 수 상한(POL-RISK-08)은 `broker_orders` INSERT 전에 검사해요. 넘으면 주문하지 않고 `risk_event(rate_cap)`로 봇을 일시 정지해요.
 
 ## 테스트로 고정할 시나리오
 

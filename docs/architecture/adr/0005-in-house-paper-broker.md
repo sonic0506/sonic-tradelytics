@@ -11,7 +11,7 @@
 
 - 규칙 평가는 `evaluate(type, params, snapshot)` 순수 함수로 만들고, 실전·개발 점검·백테스트가 그대로 같이 써요
 - 주문 집행만 `Broker` 구현 두 개로 나눠요: `TossBroker`(실전), `PaperBroker`(개발 점검, 사용자 화면에 노출하지 않음)
-- PaperBroker는 실시간 호가 기준으로 체결하고, 기본 슬리피지 1틱과 `fee_schedule`의 수수료·세금을 넣어요. 수수료율은 토스 `GET /api/v1/commissions` 값으로 채워요
+- PaperBroker는 실시간 호가 기준으로 체결하고, 기본 슬리피지 1틱과 `fee_schedules`의 수수료·세금을 넣어요. 수수료율은 토스 `GET /api/v1/commissions` 값으로 채워요
 - PaperBroker는 실제 계좌 잔고가 아니라 점검용으로 정한 금액 안에서만 체결하고, 기록은 운영 데이터와 섞지 않아요
 - PaperBroker도 실전 규칙을 흉내 내요: 같은 종목 반대 방향 미체결 시 거부, 상·하한가 밖 가격 거부, `DAY` 주문은 정규장 종료 시 미체결 취소
 

@@ -101,8 +101,8 @@ flowchart TD
 | --- | --- | --- |
 | 1 | DB 전용 연결을 열고 `pg_try_advisory_lock(ENGINE_LOCK)` | 이미 다른 engine이 있음 → 즉시 종료 |
 | 2 | 토큰 파일 읽기, 만료 임박이면 재발급 | 종료 + 알림 |
-| 3 | 오늘 `market_calendar` 확인, 없으면 토스에서 받기 | 종료 + 알림 |
-| 4 | `bot.status`·오늘 `risk_event`로 [정지 상태](#정지-상태-enginestate) 복원 | 종료 + 알림 |
+| 3 | 오늘 `market_calendars` 확인, 없으면 토스에서 받기 | 종료 + 알림 |
+| 4 | `bot.status`·오늘 `risk_events`로 [정지 상태](#정지-상태-enginestate) 복원 | 종료 + 알림 |
 | 5 | `requested` 주문 정리 ([응답을 못 받았을 때](./order-lifecycle.md#응답을-못-받았을-때)) | 해당 봇 신규 진입 중단 |
 | 6 | AccountSync 전체 재동기화 (OPEN 전량 + 오늘 CLOSED) | 종료 + 알림 |
 | 7 | 웹소켓 연결, 구독 선언 (`trade:kr`·`orderbook:kr`·`personal:order`) | 재시도. 계속 실패하면 `feed_stale`로 전체 신규 진입 중단 |
@@ -139,7 +139,7 @@ flowchart TD
 | 봇 | 봇 주기 예외 (`bot_error`) | BotRunner | 사람이 재개 |
 | 종목 | 시세 끊김 (`feed_stale`) | MarketCollector | 시세가 다시 들어오면 자동 |
 
-- 메모리 값이 기준이고, 같은 내용을 `bot.status`·`risk_event`에 남겨요. 재시작하면 시작 순서 4번에서 다시 채워요
+- 메모리 값이 기준이고, 같은 내용을 `bot.status`·`risk_events`에 남겨요. 재시작하면 시작 순서 4번에서 다시 채워요
 - 정지는 **신규 진입**만 막아요. 청산 매도, 손절 조건주문 취소·재등록, 미체결 취소는 막지 않아요. 손절 공백이나 청산 실패가 더 위험해서예요
 - `stopping`은 모든 주문 호출을 막아요. `kill`도 BotRunner가 내는 주문은 모두 막고, 킬 스위치의 "전량 청산"만 명령 처리가 직접 `OrderService`에 청산 표시를 달아 내요
 
@@ -150,7 +150,7 @@ flowchart TD
 - **주기**는 봇 버전 설정값이에요(유형별 기본값은 [F1](../product/features/f1-bot-setup.md)). 같은 봇의 주기는 겹치지 않아요. 이전 주기가 안 끝났으면 이번 주기는 건너뛰어요
 - **운영 시간**(`trading_start`~`trading_end`)과 캘린더의 정규장 안에서만 돌아요 (POL-RISK-15). 당일 청산 봇은 청산 시각에 [청산 순서](./order-lifecycle.md#청산-손절-취소--매도--포지션-종료)를 실행해요
 - **예외**는 봇 단위로 잡아요. 잡히지 않은 예외가 나면 그 봇을 `paused`(`status_reason = bot_error`)로 바꾸고 `risk_event(bot_error)`로 알려요. 같은 오류가 주기마다 주문을 반복하지 않게 하기 위해서예요
-- **봇 설정이 바뀌면** 다음 주기에 반영해요. api가 바꾼 설정은 `command`로 보내지 않고, BotRunner가 주기마다 `bot.updated_at`을 보고 다시 읽어요. 봇이 시작·종료되면 타이머를 다시 맞추고 MarketCollector의 구독 목록도 다시 선언해요. 진행 중인 포지션은 진입할 때의 `bot_version`을 계속 써요
+- **봇 설정이 바뀌면** 다음 주기에 반영해요. api가 바꾼 설정은 `command`로 보내지 않고, BotRunner가 주기마다 `bot.updated_at`을 보고 다시 읽어요. 봇이 시작·종료되면 타이머를 다시 맞추고 MarketCollector의 구독 목록도 다시 선언해요. 진행 중인 포지션은 진입할 때의 `bot_versions`을 계속 써요
 
 Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 평가는 메모리 계산이라 짧고, 기다리는 시간은 대부분 DB·HTTP예요. 무거운 계산(예: 긴 기간 지표)이 생기면 그때 나눠요.
 
@@ -174,8 +174,8 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 
 | 표 | 쓰는 것 | 출처 |
 | --- | --- | --- |
-| [`engine_status`](./data-model.md#engine_status) | 상태·전체 정지 사유·시세 끊긴 종목·heartbeat, 주문 가능 금액·평가금액 | `EngineState`, MarketCollector, AccountSync의 최근 잔고 조회 |
-| [`quote_cache`](./data-model.md#quote_cache) | 보유 종목의 최근 체결가 | MarketCollector 스냅샷 |
+| [`engine_statuses`](./data-model.md#engine_statuses) | 상태·전체 정지 사유·시세 끊긴 종목·heartbeat, 주문 가능 금액·평가금액 | `EngineState`, MarketCollector, AccountSync의 최근 잔고 조회 |
+| [`quote_caches`](./data-model.md#quote_caches) | 보유 종목의 최근 체결가 | MarketCollector 스냅샷 |
 
 - 이 쓰기가 실패해도 매매는 계속해요. 화면에서는 `heartbeat_at`이 30초 넘게 오래되면 "엔진 응답 없음"으로 보여요
 - 잔고는 이 용도로 따로 조회하지 않아요. AccountSync가 재동기화 때 받은 값을 써요
@@ -196,7 +196,7 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 | `expand_budget` | 보유 종목이 없을 때만 투자금을 반환하고 새로 확정 (POL-FUND-12) | — |
 
 - 취소·매도처럼 시간이 걸리는 일은 1초 기준에 넣지 않아요. 기준은 "신규 주문이 더 나가지 않는 것"이에요
-- 처리 결과는 `command.result`로 남고, 화면은 그 값을 보고 완료를 표시해요
+- 처리 결과는 `commands.result`로 남고, 화면은 그 값을 보고 완료를 표시해요
 
 ## 배치 스케줄
 
@@ -212,8 +212,8 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 | `weekly_check` | 금 장후 | 주간 점검 (스윙) |
 
 - 모든 job은 시작하자마자 캘린더로 거래일인지 보고, 휴장이면 끝내요. 개장 지연일은 캘린더의 `regular_open_at`을 기준으로 미뤄요
-- 실행 기록은 [`batch_run`](./data-model.md#batch_run)에 남겨요(거래일·job마다 한 행). **놓친 배치**는 engine 시작 시 이 표로 확인해요. 예를 들어 08:45에 다시 떴는데 오늘 `pre_open` 성공 기록이 없으면 바로 실행해요. 장이 끝난 뒤에야 의미 있는 job(`post_close`)은 그 시각 이후에만 따라잡아요
-- 실패하면 `batch_run.result = failed` + `risk_event(batch_fail)`. 재평가 배치가 실패한 이월 봇은 신규 진입을 멈춰요 (POL-RISK-11)
+- 실행 기록은 [`batch_runs`](./data-model.md#batch_runs)에 남겨요(거래일·job마다 한 행). **놓친 배치**는 engine 시작 시 이 표로 확인해요. 예를 들어 08:45에 다시 떴는데 오늘 `pre_open` 성공 기록이 없으면 바로 실행해요. 장이 끝난 뒤에야 의미 있는 job(`post_close`)은 그 시각 이후에만 따라잡아요
+- 실패하면 `batch_runs.result = failed` + `risk_event(batch_fail)`. 재평가 배치가 실패한 이월 봇은 신규 진입을 멈춰요 (POL-RISK-11)
 - 배치는 대부분 I/O라 BotRunner와 같이 돌아도 돼요. 대신 배치의 토스 호출은 판단용 호출보다 뒤로 밀려요 ([호출 한도](#호출-한도-tossclient))
 
 ## 호출 한도 (TossClient)

@@ -48,7 +48,7 @@
 | --- | --- |
 | 호출 지점 | engine의 `DartClient`만 호출해요 |
 | 비밀값 | `crtfc_key`는 환경변수, 저장소 금지 ([NFR-06](../product/prd.md#7-비기능-요구사항)) |
-| 저장 | 조회한 공시는 `disclosure` 테이블에 저장해 근거 카드에서 다시 볼 수 있게 해요 ([데이터 모델](../architecture/data-model.md)) |
+| 저장 | 조회한 공시는 `disclosures` 테이블에 저장해 근거 카드에서 다시 볼 수 있게 해요 ([데이터 모델](../architecture/data-model.md)) |
 | 판단 | 유형 코드와 개수만 판단에 써요. 보고서명·본문은 판단에 쓰지 않아요 ([ADR-0008](../architecture/adr/0008-external-data-numeric-only.md)) |
 
 ## 남은 확인

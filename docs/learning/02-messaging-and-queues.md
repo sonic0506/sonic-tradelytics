@@ -5,7 +5,7 @@
 
 ## 한 줄 요약
 
-화면에서 누른 정지·청산·킬 스위치는 `command` 테이블에 저장하고 Postgres `NOTIFY`로 engine을 깨워요. Redis나 메시지 큐는 쓰지 않아요.
+화면에서 누른 정지·청산·킬 스위치는 `commands` 테이블에 저장하고 Postgres `NOTIFY`로 engine을 깨워요. Redis나 메시지 큐는 쓰지 않아요.
 
 ## 먼저 알아둘 용어
 
@@ -41,7 +41,7 @@
 
 ## 선택과 이유
 
-1. api가 `command` 행 삽입 + `NOTIFY command`를 **같은 트랜잭션**에서 실행해요 (커밋돼야 알림이 가요)
+1. api가 `commands` 행 삽입 + `NOTIFY command`를 **같은 트랜잭션**에서 실행해요 (커밋돼야 알림이 가요)
 2. engine은 `LISTEN command`로 즉시 받아 처리하고 `handled_at`을 채워요
 3. engine은 시작할 때와 주기적으로 `handled_at is null`인 명령을 다시 읽어요 (놓친 알림 보완)
 

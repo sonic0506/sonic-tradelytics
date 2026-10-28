@@ -9,7 +9,7 @@
 
 ## 결정
 
-- api는 `command` 테이블에 행을 넣고 같은 트랜잭션에서 `NOTIFY command`를 보내요
+- api는 `commands` 테이블에 행을 넣고 같은 트랜잭션에서 `NOTIFY command`를 보내요
 - engine은 `LISTEN command`로 즉시 받고, 시작 시와 주기적으로 미처리 명령(`handled_at is null`)을 다시 읽어 놓친 알림을 보완해요
 - 처리 후 `handled_at`을 채워요
 
