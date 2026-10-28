@@ -1,6 +1,6 @@
 # API 명세
 
-> 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-28
+> 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-29
 > 관련: [데이터 모델](./data-model.md) · [엔진 설계](./engine.md) · [기능 명세 F1~F4](../product/features/) · [ADR-0002](./adr/0002-split-api-and-engine.md) · [ADR-0006](./adr/0006-network-level-access-control.md)
 
 web(Next.js)이 부르는 api 프로세스의 엔드포인트 목록이에요. **화면과 엔드포인트의 대응, 정책을 어디서 검사하는지, 엔진에 무엇을 넘기는지**를 정해요. 필드 하나하나는 코드의 DTO와 Swagger가 출처예요. 코드에서 만든 `apps/server/openapi.json`이 최종 명세이고, 이 문서와 다르면 이 문서를 고쳐요.
@@ -50,6 +50,8 @@ web(Next.js)이 부르는 api 프로세스의 엔드포인트 목록이에요. *
 | 공통 | `GET /v1/engine-status` | NFR-01, 07 | Must |
 | 공통 | `POST /v1/commands`, `GET /v1/commands/:id` | FR-BOT-04, 09, POL-RISK-10 | Must |
 | 홈 | `GET /v1/home` | FR-PERF-01 | Must |
+| 홈 | `GET /v1/daily-results` | FR-PERF-01, 03 | Must |
+| 홈 | `GET /v1/orders` | FR-PERF-01, 04 | Must |
 | 봇 만들기 | `GET /v1/bot-defaults` | FR-BOT-01, 07 | Must |
 | 봇 만들기 | `POST /v1/allocation-previews` | FR-BOT-05 | Must |
 | 봇 만들기 | `POST /v1/bots` | FR-BOT-01, 02 | Must |
@@ -103,16 +105,57 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 ### `GET /v1/home`
 
-여러 feature를 묶는 통합 API라 `src/compositions/home/`에 둬요 (하네스 13절).
+여러 feature를 묶는 통합 API라 `src/compositions/home/`에 둬요 (하네스 13절). 화면은 Figma `Home` 페이지(대시보드)예요.
 
 | 섹션 | 출처 |
 | --- | --- |
-| 계좌 | `engine_statuses`의 주문 가능 금액·평가금액·동기화 시각 |
+| 계좌 | `engine_statuses`의 주문 가능 금액·평가금액·동기화 시각, 보유 종목 수(`positions` 중 `open`·수량 > 0인 종목 수) |
 | 오늘 손익 | 오늘 청산 포지션 실현 손익 + 보유 포지션 평가 손익(`quote_caches`). 직접 거래 포함, 검증 구간 봇 포함 (FR-PERF-10) |
-| 봇 | 상태별 봇 수, 실행 중 봇 목록(이름·오늘 손익·상태) |
-| 거래 | 오늘 체결된 주문 수 |
+| 봇 | 상태별 봇 수, 봇 카드 목록(아래 표) |
+| 거래 | 오늘 체결된 주문 수와 매수·매도별 수 (`broker_orders.filled_at`이 오늘이고 `filled_quantity > 0`) |
+
+봇 카드는 `stopped`가 아닌 봇마다 한 줄이에요. 카드를 그릴 값을 한 번에 줘서 web이 봇마다 따로 부르지 않게 해요.
+
+| 필드 | 출처 |
+| --- | --- |
+| `id`, `name`, `type`, `status`, `stage`, `version` | `bots`, 현재 `bot_versions`. 캐릭터 이미지는 web이 `type`으로 골라요 |
+| `todayPnl` | 그 봇의 오늘 손익. 위 오늘 손익과 같은 계산을 봇으로 좁힌 값 |
+| `todayFills` | 그 봇의 오늘 체결 주문 수 |
+| `winRate30d` | 최근 30거래일에 청산한 포지션의 승률. 정의는 [F2 핵심 지표](../product/features/f2-performance.md#봇별-핵심-지표)의 승률을 따르고 `not_filled`는 빼요. 청산이 없으면 `null` |
+| `budget` | 살아 있는 `allocations.amount`(확정 투자금). 확정 전(`waiting_funds`·`ready`)이면 `null`이고 web은 설정값을 보여줘요 |
+| `last7Days` | 최근 7거래일 일별 손익 배열(오래된 순, 오늘 제외). `bot_daily_results`의 `realized_pnl + unrealized_pnl`. 기록이 없는 날은 빠져요 |
 
 킬 스위치 버튼은 `POST /v1/commands`(`kind = kill`)를 불러요. 홈은 5초마다 다시 불러요.
+
+홈의 나머지 카드는 각자 엔드포인트를 불러요. 하나가 실패해도 다른 카드와 킬 스위치는 그대로 보여요.
+
+| 카드 | 엔드포인트 | 갱신 |
+| --- | --- | --- |
+| 일별 손익 막대 | `GET /v1/daily-results?from&to` (최근 20거래일) + 오늘 막대는 `GET /v1/home`의 봇 카드 `todayPnl` 합계 | 처음 한 번. 오늘 막대만 5초 |
+| 오늘 체결 | `GET /v1/orders?from=오늘&to=오늘&size=5` | 5초 |
+| 리스크 이벤트 | `GET /v1/risk-events?from=오늘&to=오늘&size=3` | 5초 |
+
+### `GET /v1/daily-results?from&to`
+
+봇 전체의 일별 손익 합계 (FR-PERF-01, 03). `bot_daily_results`를 `trade_date`로 묶어 날짜순으로 줘요. 날짜마다 `pnl`(`realized_pnl + unrealized_pnl`의 합), `fees`, `closedTrades`예요.
+
+- 장후 배치(15:40) 전이라 오늘 행은 없어요. 오늘 값은 `GET /v1/home`에서 받아요. 두 값을 섞지 않아서, 배치가 끝나기 전후로 과거 막대가 바뀌지 않아요
+- 봇 하나의 일별 손익은 `GET /v1/bots/:id/daily-results`예요. 정의가 같아서 봇별 합이 이 값과 같아요
+- 직접 거래는 `bot_daily_results`에 없어서 빠져요. 화면 설명도 "봇 전체 합계"예요
+
+### `GET /v1/orders?from&to&botIds&origins`
+
+체결된 주문 목록 (FR-PERF-01, 04). `broker_orders` 중 `filled_quantity > 0`인 것을 마지막 체결 시각(`filled_at`) 최신순으로 줘요. 페이지 나눔.
+
+| 쿼리 | 설명 |
+| --- | --- |
+| `from`, `to` | `filled_at`의 거래일 기준 |
+| `botIds` | 여러 개. 없으면 전체 |
+| `origins` | `bot` `protective` `manual` 중 여러 개. 기본값 `bot,protective` (홈 카드는 봇이 낸 주문만 보여줘요) |
+
+- 한 줄: 체결 시각, 종목 코드·이름, 봇 이름(직접 거래면 `null`), 방향(`BUY`·`SELL`), 체결 수량, 평균 체결가, 출처, `positionId`
+- 행을 누르면 투자 내역의 그 포지션(`GET /v1/positions/:id`)으로 가요
+- 체결 이력은 바꾸거나 지우는 경로가 없어요 (원칙 4)
 
 ## 봇 (F1)
 
@@ -319,3 +362,6 @@ api가 토스를 부르지 않으므로, 화면에 필요한 실시간 값은 en
 8. `GET /v1/positions`는 보유 중 포지션을 첫 페이지 맨 위에 둔다
 9. 판단·주문·체결을 바꾸거나 지우는 경로가 없다 (`openapi.json` 경로 목록 검사)
 10. 토큰 없이 부르면 `GET /health`를 뺀 모든 경로가 401이다 (하네스 `auth-guard.e2e-spec.ts`)
+11. `GET /v1/daily-results`의 날짜별 `pnl`은 같은 기간 `GET /v1/bots/:id/daily-results`를 봇마다 더한 값과 같다
+12. 홈 봇 카드의 `winRate30d`는 `not_filled` 포지션을 세지 않고, 청산이 없으면 `null`이다
+13. `GET /v1/orders`는 기본으로 `manual` 주문을 빼고, 체결 수량이 0인 주문은 어떤 쿼리로도 나오지 않는다
