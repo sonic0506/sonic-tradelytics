@@ -20,9 +20,10 @@ engine 프로세스 안에서 **누가 무엇을 맡고, 어떤 순서로 켜지
 ```
 apps/server/src/
 ├─ main.ts            api 진입점 (AppModule)
-├─ engine.ts          engine 진입점 (EngineModule)
-├─ engine.module.ts
+├─ engine.ts          engine 진입점 (EngineAppModule, HTTP 없는 application context)
+├─ engine-app.module.ts
 ├─ infra/
+│  ├─ database/       EngineLock(단일 실행 잠금), data-source, migrations
 │  ├─ toss/           TossClient(REST·토큰·rate limiter), TossSocket(웹소켓 연결)
 │  ├─ dart/           DartClient
 │  └─ telegram/       TelegramClient
@@ -99,7 +100,7 @@ flowchart TD
 
 | # | 단계 | 실패하면 |
 | --- | --- | --- |
-| 1 | DB 전용 연결을 열고 `pg_try_advisory_lock(ENGINE_LOCK)` | 이미 다른 engine이 있음 → 즉시 종료 |
+| 1 | DB 전용 연결을 열고 `pg_try_advisory_lock(ENGINE_LOCK)` (`EngineLock`) | 이미 다른 engine이 있음 → 즉시 종료 (`ENGINE_ALREADY_RUNNING`) |
 | 2 | 토큰 파일 읽기, 만료 임박이면 재발급 | 종료 + 알림 |
 | 3 | 오늘 `market_calendars` 확인, 없으면 토스에서 받기 | 종료 + 알림 |
 | 4 | `bot.status`·오늘 `risk_events`로 [정지 상태](#정지-상태-enginestate) 복원 | 종료 + 알림 |
@@ -110,7 +111,7 @@ flowchart TD
 | 9 | 놓친 배치 확인 ([배치 스케줄](#배치-스케줄)) 후 필요하면 실행 | `batch_fail` |
 | 10 | 장중이면 BotRunner 시작 | — |
 
-- 1번 잠금은 **연결에 묶인 잠금**이에요. 이 연결이 끊기면 Postgres가 잠금을 풀어요. 그래서 이 연결은 TypeORM 풀과 따로 두고(`pg` 클라이언트), 끊김을 감지하면 [종료 순서](#종료-순서)로 바로 내려요. 다른 engine이 잠금을 가져가기 전에 이 engine이 매매를 멈춰야 해요
+- 1번 잠금은 **연결에 묶인 잠금**이에요. 이 연결이 끊기면 Postgres가 잠금을 풀어요. 그래서 TypeORM 풀에서 연결 하나를 따로 잡아 두고(`QueryRunner`), 5초마다 `SELECT 1`로 확인해 끊기면 스스로 SIGTERM을 보내 [종료 순서](#종료-순서)로 내려요. 다른 engine이 잠금을 가져가기 전에 이 engine이 매매를 멈춰야 해요
 - `LISTEN`도 같은 전용 연결을 써요. 풀 연결은 쿼리마다 바뀌어서 알림을 놓쳐요
 
 ## 종료 순서
@@ -224,9 +225,12 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 | 주문·취소·손절 조건주문 | 짧게(최대 2초) 기다려요. 넘으면 [에러별 처리](./order-lifecycle.md#에러별-처리)의 `429`와 같이 다뤄요 |
 | 재동기화·배치 | 기다려요 |
 
-- 그룹별 토큰 버킷 하나에 "기다림/즉시 실패" 두 가지 요청 방식을 둬요. 우선순위 큐는 두지 않아요 ([학습 07](../learning/07-rate-limiting.md))
+- 그룹별 토큰 버킷 하나에 "기다림/즉시 실패" 두 가지 요청 방식을 둬요. `TossClient.request`의 `waitMs`가 0이면 즉시 실패(`TossRateLimitedError`), 아니면 그 시간까지 기다려요. 우선순위 큐는 두지 않아요 ([학습 07](../learning/07-rate-limiting.md))
+- 응답 `result`는 호출마다 넘기는 zod 스키마로 검증해요. 토스가 문자열로 주는 숫자는 여기서 `z.coerce.number()`로 바꿔요
+- 오류는 세 가지예요: `TossApiError`(토스 에러 응답, `status`·`code`), `TossNoResponseError`(타임아웃·네트워크, 주문이면 [응답을 못 받았을 때](./order-lifecycle.md#응답을-못-받았을-때)), `TossRateLimitedError`(한도 부족으로 보내지 않음)
 - 응답 헤더 `X-RateLimit-*`로 남은 양을 맞추고, `429`면 `Retry-After`를 따라요
-- 토큰은 engine 볼륨 파일에 저장하고 만료 전에 재발급해요. 다른 프로세스는 토큰을 발급하지 않아요 (R-014)
+- 토큰은 engine 볼륨 파일(`TOSS_TOKEN_FILE`)에 저장하고 만료 5분 전부터 재발급해요. 동시에 여러 호출이 기다려도 발급은 한 번만 해요. `401`(`token-revoked`·`expired-token`·`invalid-token`)이면 한 번만 다시 발급해 재시도해요. 다른 프로세스는 토큰을 발급하지 않아요 (R-014)
+- `TOSS_*` 환경 변수는 engine에만 넣어요. api 프로세스에는 토스 비밀 값이 없어요
 
 ## 장애별 동작
 

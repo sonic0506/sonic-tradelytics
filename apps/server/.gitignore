@@ -5,3 +5,5 @@ coverage
 .env
 .env.*
 !.env.example
+# engine이 발급한 토스 토큰
+.toss-token.json

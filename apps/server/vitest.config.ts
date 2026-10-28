@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -12,6 +15,11 @@ export default defineConfig({
       NODE_ENV: 'test',
       DATABASE_URL: 'postgres://test:test@localhost:5432/test',
       JWT_SECRET: 'unit-test-secret-unit-test-secret-unit',
+      TOSS_CLIENT_ID: 'test-client-id',
+      TOSS_CLIENT_SECRET: 'test-client-secret',
+      TOSS_ACCOUNT_SEQ: '1',
+      TOSS_API_BASE_URL: 'https://toss.test',
+      TOSS_TOKEN_FILE: join(tmpdir(), 'tradelytics-unit-toss-token.json'),
     },
     coverage: {
       // compositions service는 위임만 해서 e2e로 확인해요.
