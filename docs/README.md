@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | [product/](./product/) | 무엇을, 왜 만드나 | [PRD](./product/prd.md), 기능 명세 [F1 봇 설정](./product/features/f1-bot-setup.md) · [F2 실적](./product/features/f2-performance.md) · [F3 근거 리포트](./product/features/f3-rationale-report.md) · [F4 직접 거래 추적](./product/features/f4-manual-trades.md) |
 | [policy/](./policy/) | 코드가 반드시 지켜야 할 도메인 규칙은 | [자금 배분](./policy/fund-allocation.md) · [리스크 관리](./policy/risk-management.md) · [포지션 재평가](./policy/position-reevaluation.md) |
-| [architecture/](./architecture/) | 어떻게 만드나 | [시스템 개요](./architecture/overview.md) · [데이터 모델](./architecture/data-model.md) · [주문 흐름](./architecture/order-lifecycle.md) · [엔진 설계](./architecture/engine.md) · [ADR](./architecture/adr/) |
+| [architecture/](./architecture/) | 어떻게 만드나 | [시스템 개요](./architecture/overview.md) · [데이터 모델](./architecture/data-model.md) · [주문 흐름](./architecture/order-lifecycle.md) · [엔진 설계](./architecture/engine.md) · [API 명세](./architecture/api.md) · [ADR](./architecture/adr/) |
 | [integrations/](./integrations/) | 외부 시스템은 어떻게 쓰나 | [토스증권 오픈API](./integrations/toss-securities-api.md) · [DART Open API](./integrations/dart-open-api.md) |
 | [project/](./project/) | 언제 하고, 무엇이 불확실한가 | [로드맵](./project/roadmap.md) · [미결정 사항](./project/open-questions.md) · [리스크](./project/risks.md) · [용어집](./project/glossary.md) |
 | [learning/](./learning/) | 왜 이 기술을 골랐나 | [기술 선택 학습 자료](./learning/README.md) (주제 13개, 대안과 트레이드오프) |

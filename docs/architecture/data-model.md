@@ -52,7 +52,7 @@ erDiagram
     bot ||--o{ bot_daily_result : "일일 집계"
 ```
 
-참조만 하는 표: `market_calendar`, `fee_schedule`, `disclosure`, `batch_run` (다른 표와 FK 없음).
+참조만 하는 표: `market_calendar`, `fee_schedule`, `disclosure`, `batch_run`, `engine_status`, `quote_cache` (다른 표와 FK 없음).
 
 **포지션 중심 구조**: 거래 1줄 = `position` 1개 (FR-PERF-04). 진입 판단으로 첫 매수 주문을 낼 때 포지션을 만들고, 그 뒤의 분할 매수·매도 주문은 모두 같은 `position_id`를 가져요. 보유 수량이 0이 되면 닫아요. 직접 거래는 `bot_id`가 null인 포지션이에요(F4).
 
@@ -406,6 +406,33 @@ engine 배치 실행 기록 ([엔진 배치 스케줄](./engine.md#배치-스케
 | error | text | | |
 
 - UNIQUE `(job, trade_date, slot)`: 같은 배치를 두 번 시작하지 않아요. 실패한 배치를 다시 돌리면 같은 행을 갱신해요
+
+#### `engine_status`
+
+engine이 화면용으로 5초마다 덮어쓰는 한 행 ([API 원칙 1](./api.md#원칙), [엔진 화면용 상태 쓰기](./engine.md#화면용-상태-쓰기)). api는 토스를 부르지 않으므로 계좌 잔고와 engine 상태를 여기서 읽어요.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| id | smallint | PK, CHECK `id = 1` | 행은 하나뿐 |
+| state | text | not null, CHECK `running` `stopping` `halted` | |
+| halt_reasons | text[] | not null, default `{}` | 전체 정지 사유 (`kill`, `token`, `record_fail`) |
+| stale_symbols | text[] | not null, default `{}` | 시세가 끊긴 종목 |
+| orderable_cash | bigint | | 토스 `cashBuyingPower` 최근 값 |
+| holdings_value | bigint | | 보유 종목 평가금액 합 |
+| account_synced_at | timestamptz | | 위 두 값의 토스 조회 시각 |
+| heartbeat_at | timestamptz | not null | engine 마지막 기록 시각 |
+
+- 배분 기준(`account_snapshot`)과 다르게 이력을 남기지 않아요. 지금 값만 있어요
+
+#### `quote_cache`
+
+보유 종목의 최근 가격 (FR-PERF-06). engine이 메모리 스냅샷에서 5초마다 덮어써요. 보유가 끝난 종목 행은 장후 배치에서 지워요.
+
+| 컬럼 | 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| symbol | text | PK | |
+| price | bigint | not null | 최근 체결가 |
+| received_at | timestamptz | not null | 시세 수신 시각 (화면의 기준 시각) |
 
 #### `market_calendar`
 

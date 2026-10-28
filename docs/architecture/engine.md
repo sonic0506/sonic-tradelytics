@@ -1,7 +1,7 @@
 # 엔진 내부 설계
 
 > 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-28
-> 관련: [시스템 개요](./overview.md) · [주문 흐름](./order-lifecycle.md) · [데이터 모델](./data-model.md) · [ADR-0002](./adr/0002-split-api-and-engine.md) · [ADR-0004](./adr/0004-postgres-notify-for-commands.md) · [ADR-0007](./adr/0007-single-market-collector.md)
+> 관련: [시스템 개요](./overview.md) · [주문 흐름](./order-lifecycle.md) · [API 명세](./api.md) · [데이터 모델](./data-model.md) · [ADR-0002](./adr/0002-split-api-and-engine.md) · [ADR-0004](./adr/0004-postgres-notify-for-commands.md) · [ADR-0007](./adr/0007-single-market-collector.md)
 
 engine 프로세스 안에서 **누가 무엇을 맡고, 어떤 순서로 켜지고 꺼지며, 서로 어떻게 부르는지**를 정해요. 주문 하나의 흐름은 [주문 흐름](./order-lifecycle.md), 무엇을 하는지(8단계, 일일 일정)는 [시스템 개요](./overview.md)에 있어요. 이 문서는 M1·M2 코드 구조의 기준이에요.
 
@@ -167,6 +167,18 @@ Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 
 | `personal:order` | 받은 이벤트를 AccountSync에 넘겨요. MarketCollector는 주문 내용을 해석하지 않아요 |
 
 웹소켓 메시지의 숫자는 문자열이에요(`"price":"230000"`). 스냅샷에 넣기 전에 숫자로 바꿔요 ([연동 문서 웹소켓](../integrations/toss-securities-api.md#웹소켓)).
+
+## 화면용 상태 쓰기
+
+api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 필요한 실시간 값은 engine이 5초마다 DB에 덮어써요.
+
+| 표 | 쓰는 것 | 출처 |
+| --- | --- | --- |
+| [`engine_status`](./data-model.md#engine_status) | 상태·전체 정지 사유·시세 끊긴 종목·heartbeat, 주문 가능 금액·평가금액 | `EngineState`, MarketCollector, AccountSync의 최근 잔고 조회 |
+| [`quote_cache`](./data-model.md#quote_cache) | 보유 종목의 최근 체결가 | MarketCollector 스냅샷 |
+
+- 이 쓰기가 실패해도 매매는 계속해요. 화면에서는 `heartbeat_at`이 30초 넘게 오래되면 "엔진 응답 없음"으로 보여요
+- 잔고는 이 용도로 따로 조회하지 않아요. AccountSync가 재동기화 때 받은 값을 써요
 
 ## 명령 처리 (command)
 
