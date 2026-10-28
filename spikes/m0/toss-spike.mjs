@@ -4,6 +4,7 @@
 //   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs rest
 //   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs ws 005930,000660 3600
 //   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs prices 005930,000660 3600
+//   node --env-file=spikes/m0/.env spikes/m0/toss-spike.mjs orders 3600
 //
 // 주의: 클라이언트당 유효 토큰은 1개라 새로 발급하면 이전 토큰이 즉시 끊겨요.
 // 그래서 발급한 토큰을 .token.json에 저장해 rest·ws가 같이 써요. 운영 중인 키로는 돌리지 마세요.
@@ -78,7 +79,8 @@ async function rest() {
   log(`성공. 설정에 저장할 accountSeq=${seq}`);
 }
 
-async function ws(codes, seconds) {
+// onMessage가 없으면 처음 3개만 원문을 찍어요(시세는 분당 수천 건이라)
+async function ws(declare, seconds, onMessage) {
   const token = await getToken();
   // Node 내장 WebSocket(undici)은 비표준 headers 옵션을 받아요
   const sock = new WebSocket(WS_URL, { headers: { Authorization: `Bearer ${token}` } });
@@ -87,7 +89,8 @@ async function ws(codes, seconds) {
 
   sock.onopen = () => {
     log('연결됨');
-    sock.send(JSON.stringify([{ type: 'trade:kr', codes, id: 'spike-1' }]));
+    // 선언은 배열 하나가 구독 전체예요. { id }는 ack·error에 그대로 돌아와요
+    sock.send(JSON.stringify([...declare, { id: 'spike-1' }]));
     // 서버는 클라이언트 송신이 180초 없으면 끊어요. 60초 간격 PING
     ping = setInterval(() => sock.send('PING'), 60_000);
   };
@@ -96,7 +99,8 @@ async function ws(codes, seconds) {
     const f = JSON.parse(data);
     if (f.type === 'message') {
       total++, perMin++;
-      if (shown++ < 3) log('샘플', JSON.stringify(f)); // 처음 3개만 원문 확인
+      if (onMessage) onMessage(f);
+      else if (shown++ < 3) log('샘플', JSON.stringify(f));
     } else {
       log(f.type, JSON.stringify(f));
     }
@@ -118,6 +122,25 @@ async function ws(codes, seconds) {
   setTimeout(() => sock.close(1000, 'spike done'), seconds * 1000);
 }
 
+// 확인 항목: personal:order 이벤트 형태, cashBuyingPower가 미체결 매수를 빼고 주는지
+// → 실행해 둔 채 앱에서 소액 지정가 매수 → 취소(또는 체결)를 하면, 이벤트 원문과
+//   이벤트 직후의 cashBuyingPower가 찍혀요. 시작 시 값과 비교해요
+async function orders(seconds) {
+  const token = await getToken();
+  const [{ accountSeq }] = await api(token, '/api/v1/accounts');
+  const buyingPower = async (when) => {
+    const { cashBuyingPower } = await api(token, '/api/v1/buying-power?currency=KRW', accountSeq);
+    log(`${when} cashBuyingPower=${cashBuyingPower}`);
+  };
+  await buyingPower('시작');
+  // codes에는 종목이 아니라 accountSeq를 문자열로 넣어요 (asyncapi realtime-order)
+  await ws([{ type: 'personal:order', codes: [String(accountSeq)] }], seconds, (f) => {
+    const { event, order } = f.data;
+    log(`주문 이벤트 ${event} status=${order.status}`, JSON.stringify(f));
+    buyingPower(`${event} 직후`).catch((e) => log('에러', e.message));
+  });
+}
+
 // 확인 항목: NXT 프리마켓(08:00~08:50) 체결이 통합 현재가에 반영되는지
 // → 08:00 전에 시작해 30초마다 조회. 08:00 뒤 timestamp·lastPrice가 바뀌면 반영돼요
 async function prices(codes, seconds) {
@@ -137,9 +160,11 @@ async function prices(codes, seconds) {
 
 const [cmd, codesArg = '005930', secondsArg = '3600'] = process.argv.slice(2);
 if (cmd === 'rest') await rest();
-else if (cmd === 'ws') await ws(codesArg.split(','), Number(secondsArg));
+else if (cmd === 'ws') await ws([{ type: 'trade:kr', codes: codesArg.split(',') }], Number(secondsArg));
 else if (cmd === 'prices') await prices(codesArg.split(','), Number(secondsArg));
+// orders는 종목 인자가 없어서 두 번째 인자가 초예요
+else if (cmd === 'orders') await orders(Number(process.argv[3] ?? 3600));
 else {
-  console.error('사용법: toss-spike.mjs rest | ws [종목코드,...] [초] | prices [종목코드,...] [초]');
+  console.error('사용법: toss-spike.mjs rest | ws [종목코드,...] [초] | prices [종목코드,...] [초] | orders [초]');
   process.exit(1);
 }

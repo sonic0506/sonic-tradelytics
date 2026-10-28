@@ -162,6 +162,8 @@ API로 받은 정보는 **투자자 본인의 매매 목적**으로만 쓸 수 �
   - 2026-10-28 장중: 60.0분 유지 후 우리 쪽 `close(1000)`로 정상 종료, 에러·끊김 0. 체결 132,878건(분당 약 1,500~2,100건) 수신
   - 체결 메시지 형태: `{"type":"message","topic":"trade:kr:005930","data":{"price":"230000","volume":"1","timestamp":"2026-10-28T09:00:30.574+09:00","currency":"KRW"}}`. `price`·`volume`은 문자열, `timestamp`는 밀리초까지 와요
 - [ ] `personal:order` 이벤트 형태를 소액 지정가 주문·취소로 확인 (M5 소액 실전 전)
+  - 2026-10-28 장 마감 후: 구독 선언 `[{"type":"personal:order","codes":["<accountSeq 문자열>"]}]` → `subscriptions` ack에 `personal:order:{accountSeq}` 확인 (`toss-spike.mjs orders`). 이벤트는 장중 주문으로 확인 필요
+  - [AsyncAPI](https://openapi.tossinvest.com/openapi-docs/latest/asyncapi.json) 기준: `data.event`는 `PENDING` `PARTIAL_FILL` `FILL` `CANCELING` `CANCELED` `REJECTED` 등으로 **`OrderStatus`와 이름이 달라요**(`PARTIAL_FILL` ≠ `PARTIAL_FILLED`). 모르는 값이 와도 받아야 해요. `data.order`는 REST 주문 상세와 같은 모양이고 `execution.filledAt`만 없어요. 수신이 2초 넘게 막히면 서버가 연결을 끊어요
 - [x] NXT 거래 종목의 08:00~08:50 프리마켓 체결이 통합 현재가(`prices`)에 반영되는지 확인 → **반영됨** (2026-10-28, `toss-spike.mjs prices 005930,000660`, 30초 간격 141회 호출, 에러 0). 장전 갭 추정을 쓸 수 있어요 ([POL-REEV-06](../policy/position-reevaluation.md#장전-점검과-개장-직후-점검-pol-reev-06))
   - 07:44~07:59에는 전날 애프터마켓 마지막 값(`timestamp` 10-27 19:59:59)이 그대로였고, 08:00:01 조회부터 `lastPrice`가 바뀌었어요 (005930 224500 → 227500원). 08:50 뒤에는 `timestamp` 08:49:59에서 멈춰요
   - 주의: 거래 중에는 `timestamp`가 조회 시각과 같게 와요(매 조회 :01·:31초). 마지막 체결 시각으로 쓰지 말고, 값이 갱신 중인지 판단할 때만 써요
