@@ -14,6 +14,7 @@ src/
 │  ├─ {feature}.service.ts                비즈니스 로직, 트랜잭션
 │  ├─ {feature}.repository.ts             DB 접근은 여기서만
 │  ├─ {feature}.exception.ts              AppException을 상속한 비즈니스 예외
+│  ├─ *.rule.ts                           순수 규칙 함수(판단·계산). Nest·DB·시계 없이 입력만으로 결과
 │  ├─ {feature}.constants.ts / .types.ts  상수, 타입
 │  ├─ dto/*.dto.ts                        요청·응답 DTO
 │  └─ entities/*.entity.ts                TypeORM entity
@@ -30,12 +31,13 @@ src/
 | 파일       | 가져올 수 있는 것                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------------ |
 | controller | 같은 feature의 service·dto·exception(`@ApiErrors`용)·constants, common, config                                     |
-| service    | 같은 feature의 service·repository·dto·entity·exception·constants, 다른 feature의 `index.ts`, common, config, infra |
+| service    | 같은 feature의 service·repository·dto·entity·exception·rule·constants, 다른 feature의 `index.ts`, common, config, infra |
 | repository | 같은 feature의 entity·constants, common, config, infra                                                             |
 | dto        | 같은 feature의 dto·entity·constants, 다른 feature의 `index.ts`, common                                             |
 | entity     | 같은 feature의 entity·constants, 다른 feature의 `index.ts`(relation), common                                       |
 | module     | 같은 feature의 controller·service·repository·entity·validator·constants, 다른 feature의 `index.ts`                 |
 | exception  | 같은 feature의 constants, 다른 feature의 `index.ts`(그 feature 예외를 다시 내보낼 때만), common                    |
+| rule       | 같은 feature의 rule·constants·types, common (Nest·TypeORM·CLS·`node:` 모듈은 못 가져와요)                          |
 | common     | common, config (feature를 가져오지 않아요)                                                                         |
 
 - 방향은 `controller → service → repository`예요. controller가 repository나 TypeORM을 직접 쓰지 않아요.
@@ -43,6 +45,21 @@ src/
 - ESM이라 import에 `.js`를 붙여요: feature 안은 `./user.service.js`, 밖은 `@/modules/user/index.js`.
 - 순환 의존이 생기면 `forwardRef`로 가리지 말고 방향을 바꾸거나 공통 부분을 다른 feature로 옮겨요(lint: `no-restricted-imports`).
 - Nest 객체(Service, Repository, Controller)는 생성자 주입으로 받아요. `new`로 만들지 않아요(lint: `sonic-be/no-manual-instantiation`).
+
+### rule (순수 규칙 함수)
+
+판단·계산처럼 입력만으로 결과가 정해지는 로직은 `*.rule.ts`에 함수로 둬요(예: `strategy/day-trading.rule.ts`, `fund/allocation.rule.ts`). 같은 feature의 service가 데이터를 모아 rule을 부르고 결과를 저장해요. 백테스트·테스트는 Nest 없이 rule을 바로 불러요.
+
+- 같은 입력이면 같은 결과예요. 지금 시각·난수는 인자로 받아요. `Date.now()`, 인자 없는 `new Date()`, `Math.random()`은 못 써요(lint: `no-restricted-syntax`).
+- Nest·TypeORM·CLS·`node:` 모듈을 가져오지 않아요(lint: `no-restricted-imports`). DB·외부 API는 service가 부르고 결과만 넘겨요.
+- 예외를 던지지 말고 결과 값(`{ ok: false, reason }` 같은 유니언)으로 돌려줘요. 예외로 바꾸는 일은 service가 해요.
+
+```ts
+// fund/allocation.rule.ts
+export function allocate(capital: number, ratio: number): number {
+  return Math.floor(capital * ratio);
+}
+```
 
 ## 2. API
 
@@ -252,6 +269,7 @@ export type Role = (typeof ROLES)[number];
 | API                | e2e(`test/{feature}.e2e-spec.ts`), supertest + 실제 Postgres(Testcontainers)                    | 성공 상태·본문, 검증 실패 400, 없음 404, 권한 403 |
 | 인증               | `auth-guard.e2e-spec.ts`가 자동으로                                                             | 토큰 없음·잘못된 토큰 401                         |
 | 검증기·도메인 규칙 | 단위 테스트                                                                                     | 통과·실패 경계, 장애                              |
+| rule               | 단위 테스트(`*.rule.spec.ts`), Nest 모듈 없이 함수를 바로 불러요                                | 경계값, 분기마다                                  |
 
 - `@Transactional()`이 붙은 service의 단위 테스트는 `test/setup/transactional.ts`의 `noOpTransactionalModule`을 imports에 더하고 호출을 `runInCls(moduleRef, () => ...)`로 감싸요. 트랜잭션이 실제로 묶이는지는 e2e에서 확인해요.
 - 다른 feature의 service에 기대는 service(예: `CommentService` → `PostService`)는 그 service도 `overrideProvider`로 바꾸고, 이 service가 부르는 메서드만 `vi.fn<PostService['assertExists']>()`로 채워요. 그 service의 실제 동작은 그 feature의 테스트와 e2e가 확인해요.

@@ -27,6 +27,8 @@ const FEATURE_FILES = {
   repository: '*.repository.ts',
   exception: '*.exception.ts',
   validator: '*.validator.ts',
+  // 순수 규칙 함수(판단·계산). Nest·DB·시계 없이 입력만으로 결과를 내요
+  rule: '*.rule.ts',
   model: '*.{constants,types}.ts',
   dto: 'dto/*.dto.ts',
   entity: 'entities/*.entity.ts',
@@ -85,6 +87,7 @@ const ALLOWED = {
     same('dto'),
     same('entity'),
     same('exception'),
+    same('rule'),
     same('model'),
     ANY_INDEX,
     COMMON,
@@ -97,6 +100,8 @@ const ALLOWED = {
   // 다른 feature의 예외를 다시 내보낼 때만 그 index.ts를 가져와요(그 service가 던져 이 API까지 오는 예외, @ApiErrors용).
   exception: [same('model'), ANY_INDEX, COMMON],
   validator: [same('service'), same('model'), COMMON],
+  // rule은 같은 feature의 constants·types와 다른 rule, common만 가져와요. service가 rule을 불러요
+  rule: [same('rule'), same('model'), COMMON],
   model: [same('model'), COMMON],
   module: [
     same('controller'),
@@ -403,6 +408,49 @@ export default tseslint.config(
   {
     files: ['src/**/*.validator.ts'],
     rules: { 'sonic-be/validator-no-swallow': 'error' },
+  },
+  // rule은 순수 함수예요. 같은 입력이면 같은 결과가 나와야 백테스트·테스트가 Nest 없이 그대로 불러요.
+  // 시각은 인자(snapshot)로 받아요.
+  {
+    files: ['src/**/*.rule.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: restricted(),
+          patterns: [
+            {
+              group: [
+                '@nestjs/*',
+                '@nestjs-cls/*',
+                'nestjs-*',
+                'typeorm',
+                'node:*',
+              ],
+              message:
+                'rule은 순수 함수예요. Nest·DB·Node API를 쓰는 일은 같은 feature의 service에서 하고, 결과만 인자로 넘겨요.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'rule은 시계를 읽지 않아요. 지금 시각은 인자로 받아요.',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'rule은 시계를 읽지 않아요. 지금 시각은 인자로 받아요.',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='Math'][callee.property.name='random']",
+          message: 'rule은 같은 입력이면 같은 결과를 내요. 난수는 인자로 받아요.',
+        },
+      ],
+    },
   },
   {
     files: ['src/compositions/**/*.ts'],
