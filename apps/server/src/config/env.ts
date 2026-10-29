@@ -36,6 +36,7 @@ const envSchema = z
     // GET /api/v1/accounts의 accountSeq
     TOSS_ACCOUNT_SEQ: optionalString,
     TOSS_API_BASE_URL: z.url().default('https://openapi.tossinvest.com'),
+    TOSS_WS_URL: z.url().default('wss://openapi-ws.tossinvest.com/ws/v1'),
     // 발급한 토큰을 저장하는 파일. 재시작해도 다시 발급하지 않게 engine 볼륨에 둬요
     TOSS_TOKEN_FILE: z.string().min(1).default('.toss-token.json'),
   })

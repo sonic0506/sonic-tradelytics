@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
+import { MarketCollectorService } from '@/modules/market-data/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
@@ -12,6 +13,10 @@ describe('EngineLifecycleService', () => {
     release: vi.fn<EngineLock['release']>(),
   };
   const toss = { ensureToken: vi.fn<TossClient['ensureToken']>() };
+  const marketCollector = {
+    start: vi.fn<MarketCollectorService['start']>(),
+    stop: vi.fn<MarketCollectorService['stop']>(),
+  };
   let service: EngineLifecycleService;
 
   beforeEach(async () => {
@@ -21,6 +26,7 @@ describe('EngineLifecycleService', () => {
         EngineLifecycleService,
         { provide: EngineLock, useValue: lock },
         { provide: TossClient, useValue: toss },
+        { provide: MarketCollectorService, useValue: marketCollector },
       ],
     }).compile();
     service = moduleRef.get(EngineLifecycleService);
@@ -33,14 +39,16 @@ describe('EngineLifecycleService', () => {
       EngineAlreadyRunningException,
     );
     expect(toss.ensureToken).not.toHaveBeenCalled();
+    expect(marketCollector.start).not.toHaveBeenCalled();
   });
 
-  it('잠금을 얻은 뒤에 토큰을 준비해요', async () => {
+  it('잠금을 얻은 뒤에 토큰을 준비하고 시세 수집을 시작해요', async () => {
     lock.acquire.mockResolvedValue(true);
 
     await service.onApplicationBootstrap();
 
     expect(toss.ensureToken).toHaveBeenCalledOnce();
+    expect(marketCollector.start).toHaveBeenCalledOnce();
   });
 
   it('잠금을 잃으면 스스로 SIGTERM을 보내 내려가요', async () => {
@@ -56,10 +64,11 @@ describe('EngineLifecycleService', () => {
   });
 
   it.each(['SIGTERM', undefined])(
-    '신호가 %s여도 종료할 때 잠금을 풀어요',
+    '신호가 %s여도 종료할 때 시세 수집을 멈추고 잠금을 풀어요',
     async (signal) => {
       await service.onApplicationShutdown(signal);
 
+      expect(marketCollector.stop).toHaveBeenCalledOnce();
       expect(lock.release).toHaveBeenCalledOnce();
     },
   );

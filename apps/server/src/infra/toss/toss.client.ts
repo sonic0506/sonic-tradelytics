@@ -151,7 +151,8 @@ export class TossClient {
     throw error;
   }
 
-  private async accessToken(): Promise<string> {
+  // 웹소켓 연결(TossSocket)도 같은 토큰을 써요. 토큰 값은 로그에 남기지 않아요
+  async accessToken(): Promise<string> {
     if (this.token && this.isFresh(this.token)) return this.token.accessToken;
     this.issuing ??= this.loadOrIssue().finally(() => {
       this.issuing = undefined;

@@ -11,6 +11,8 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
+    // 서버 코드라 DOM 타입을 빼요. WebSocket·fetch는 @types/node(undici) 타입을 써요
+    "lib": ["ES2023"],
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",

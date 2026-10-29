@@ -19,6 +19,7 @@ export default defineConfig({
       TOSS_CLIENT_SECRET: 'test-client-secret',
       TOSS_ACCOUNT_SEQ: '1',
       TOSS_API_BASE_URL: 'https://toss.test',
+      TOSS_WS_URL: 'wss://toss-ws.test/ws/v1',
       TOSS_TOKEN_FILE: join(tmpdir(), 'tradelytics-unit-toss-token.json'),
     },
     coverage: {
