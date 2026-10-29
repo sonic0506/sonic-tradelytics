@@ -409,8 +409,8 @@ export default tseslint.config(
     files: ['src/**/*.validator.ts'],
     rules: { 'sonic-be/validator-no-swallow': 'error' },
   },
-  // rule은 순수 함수예요. 같은 입력이면 같은 결과가 나와야 백테스트·테스트가 Nest 없이 그대로 불러요.
-  // 시각은 인자(snapshot)로 받아요.
+  // rule은 순수 함수예요. 같은 입력이면 같은 결과가 나와야 테스트·스크립트가 Nest 없이 그대로 불러요.
+  // 지금 시각·난수는 인자로 받아요.
   {
     files: ['src/**/*.rule.ts'],
     rules: {
@@ -447,7 +447,8 @@ export default tseslint.config(
         {
           selector:
             "CallExpression[callee.object.name='Math'][callee.property.name='random']",
-          message: 'rule은 같은 입력이면 같은 결과를 내요. 난수는 인자로 받아요.',
+          message:
+            'rule은 같은 입력이면 같은 결과를 내요. 난수는 인자로 받아요.',
         },
       ],
     },

@@ -28,17 +28,17 @@ src/
 
 ### import 규칙 (lint: `boundaries/dependencies`)
 
-| 파일       | 가져올 수 있는 것                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| controller | 같은 feature의 service·dto·exception(`@ApiErrors`용)·constants, common, config                                     |
+| 파일       | 가져올 수 있는 것                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| controller | 같은 feature의 service·dto·exception(`@ApiErrors`용)·constants, common, config                                          |
 | service    | 같은 feature의 service·repository·dto·entity·exception·rule·constants, 다른 feature의 `index.ts`, common, config, infra |
-| repository | 같은 feature의 entity·constants, common, config, infra                                                             |
-| dto        | 같은 feature의 dto·entity·constants, 다른 feature의 `index.ts`, common                                             |
-| entity     | 같은 feature의 entity·constants, 다른 feature의 `index.ts`(relation), common                                       |
-| module     | 같은 feature의 controller·service·repository·entity·validator·constants, 다른 feature의 `index.ts`                 |
-| exception  | 같은 feature의 constants, 다른 feature의 `index.ts`(그 feature 예외를 다시 내보낼 때만), common                    |
-| rule       | 같은 feature의 rule·constants·types, common (Nest·TypeORM·CLS·`node:` 모듈은 못 가져와요)                          |
-| common     | common, config (feature를 가져오지 않아요)                                                                         |
+| repository | 같은 feature의 entity·constants, common, config, infra                                                                  |
+| dto        | 같은 feature의 dto·entity·constants, 다른 feature의 `index.ts`, common                                                  |
+| entity     | 같은 feature의 entity·constants, 다른 feature의 `index.ts`(relation), common                                            |
+| module     | 같은 feature의 controller·service·repository·entity·validator·constants, 다른 feature의 `index.ts`                      |
+| exception  | 같은 feature의 constants, 다른 feature의 `index.ts`(그 feature 예외를 다시 내보낼 때만), common                         |
+| rule       | 같은 feature의 rule·constants·types, common (Nest·TypeORM·CLS·`node:` 모듈은 못 가져와요)                               |
+| common     | common, config (feature를 가져오지 않아요)                                                                              |
 
 - 방향은 `controller → service → repository`예요. controller가 repository나 TypeORM을 직접 쓰지 않아요.
 - 다른 feature는 **`index.ts`로만** 가져와요: `@/modules/user/index.js`는 되고 `@/modules/user/user.service.js`는 안 돼요. 다른 feature의 repository·테이블에는 직접 가지 않고 그 feature의 service를 써요.
@@ -48,16 +48,16 @@ src/
 
 ### rule (순수 규칙 함수)
 
-판단·계산처럼 입력만으로 결과가 정해지는 로직은 `*.rule.ts`에 함수로 둬요(예: `strategy/day-trading.rule.ts`, `fund/allocation.rule.ts`). 같은 feature의 service가 데이터를 모아 rule을 부르고 결과를 저장해요. 백테스트·테스트는 Nest 없이 rule을 바로 불러요.
+판단·계산처럼 입력만으로 결과가 정해지는 로직은 `*.rule.ts`에 함수로 둬요(예: `order-item/discount.rule.ts`). 같은 feature의 service가 데이터를 모아 rule을 부르고 결과를 저장해요. 테스트·스크립트는 Nest 없이 rule을 바로 불러요.
 
 - 같은 입력이면 같은 결과예요. 지금 시각·난수는 인자로 받아요. `Date.now()`, 인자 없는 `new Date()`, `Math.random()`은 못 써요(lint: `no-restricted-syntax`).
 - Nest·TypeORM·CLS·`node:` 모듈을 가져오지 않아요(lint: `no-restricted-imports`). DB·외부 API는 service가 부르고 결과만 넘겨요.
 - 예외를 던지지 말고 결과 값(`{ ok: false, reason }` 같은 유니언)으로 돌려줘요. 예외로 바꾸는 일은 service가 해요.
 
 ```ts
-// fund/allocation.rule.ts
-export function allocate(capital: number, ratio: number): number {
-  return Math.floor(capital * ratio);
+// order-item/discount.rule.ts
+export function discountedPrice(price: number, rate: number): number {
+  return Math.floor(price * (1 - rate));
 }
 ```
 

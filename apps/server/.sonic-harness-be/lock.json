@@ -1,12 +1,12 @@
 {
   "origin": "https://github.com/sonic0506/sonic-harness-be.git",
-  "ref": "34584bc1f4092a1353bd750f2ae05e31fbe21fb7",
+  "ref": "52a29d95ed3f0b17821731b0d89850e553e9a0f7",
   "checkedRef": "2cdb66a2a1c8466e58c17b07830e801080fd7f47",
   "files": {
     "commitlint.base.mjs": "19482207e6eae61445ab3c6938873ab4cb8c783c88fdb846198357bdc2dc383a",
     "eslint-plugin-sonic-be.mjs": "4bf39bd17518d3e9ea752324a4891570d45b925ccf1cb54583e795268afebdc5",
-    "eslint.base.mjs": "08952f12cfe9eead12b917f5e777021260bdf071c918c15307d9730f0c4b79a8",
-    "harness.md": "08a1f2f88c9e51c7df255a42275d86b883f1d02151e5cdb4a99897f10a8a82db",
+    "eslint.base.mjs": "ca07b4c5ddf13a3816059252dc74013f6f8611b09d11dbff5a3bc91e8a12b81a",
+    "harness.md": "c87b00da82919fc4fac92af776fef5805ab012b71b1d0f757aaf45bfc5e6e40c",
     "prettier.base.mjs": "34cb82dc9f744ff9bc384b7240ae30f91e3a685123c4985ee445f7e777c7b2ed",
     "spectral.yaml": "0ecd5373ad5d2a553aab6a13b53a5fb932ed9490bbbd3a86d3d0dcaf313473d4",
     "tsconfig.strict.json": "d0e04e8eb6bd777df8e8d0253f762143946711dc90c8a9c67a6a32b5291b22a0"
@@ -62,7 +62,16 @@
     "vitest.config.e2e.ts",
     "vitest.config.ts"
   ],
-  "updatedAt": "2026-10-28T22:26:01.342Z",
-  "contributing": {},
+  "updatedAt": "2026-10-29T11:11:15.271Z",
+  "contributing": {
+    "harness/rule-layer": {
+      "files": [
+        "eslint.base.mjs",
+        "harness.md"
+      ],
+      "templates": [],
+      "pr": "https://github.com/sonic0506/sonic-harness-be/pull/7"
+    }
+  },
   "templateMerges": []
 }
