@@ -11,6 +11,15 @@ module.exports = {
       from: {},
       to: { circular: true },
     },
+    // 이 프로젝트만의 규칙
+    {
+      name: 'api-no-toss',
+      severity: 'error',
+      comment:
+        'api(main.ts)에서 토스 클라이언트까지 가는 경로예요. 토스는 engine에서만 불러요(ADR-0002). engine 전용 모듈을 AppModule에 넣지 않아요.',
+      from: { path: '^src/main\\.ts$' },
+      to: { path: '^src/infra/toss/', reachable: true },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
