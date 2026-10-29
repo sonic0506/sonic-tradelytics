@@ -538,6 +538,19 @@ describe('OrderService', () => {
       expect(broker.listOrders).not.toHaveBeenCalled();
     });
 
+    it('8분이 지나면 10분 전이어도 다시 보내지 않고 조회로 확인해요', async () => {
+      // 지금 01:00, 보낸 시각 00:51 → 9분 경과
+      orders.findRequested.mockResolvedValue([
+        lost(new Date('2026-10-29T00:51:00Z')),
+      ]);
+      broker.listOrders.mockResolvedValue([]);
+
+      await recover();
+
+      expect(broker.place).not.toHaveBeenCalled();
+      expect(broker.listOrders).toHaveBeenCalledOnce();
+    });
+
     it('10분이 지나면 다시 보내지 않고, 연결되지 않은 같은 주문이 1건이면 연결해요', async () => {
       orders.findRequested.mockResolvedValue([
         lost(new Date('2026-10-29T00:20:00Z')),

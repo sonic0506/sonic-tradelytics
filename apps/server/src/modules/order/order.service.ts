@@ -16,8 +16,8 @@ import { OrderRepository } from './order.repository.js';
 import type { ApplyResult, OrderReport } from './order.types.js';
 import { TossBrokerService } from './toss-broker.service.js';
 
-// 토스의 clientOrderId 중복 방지는 10분만 유효해요 (POL-RISK-07)
-const IDEMPOTENCY_MS = 600_000;
+// 토스의 clientOrderId 중복 방지는 10분만 유효해요 (POL-RISK-07). 재전송은 여유를 두고 8분 안에서만 해요
+const RESEND_WINDOW_MS = 480_000;
 
 type DecisionRecord = Parameters<DecisionService['record']>[0];
 
@@ -116,19 +116,20 @@ export class OrderService {
   }
 
   // engine 시작 순서 5번: 응답을 못 받은 주문을 정리해요 (docs/architecture/order-lifecycle.md 응답을 못 받았을 때)
-  async recoverRequested(now: Date = new Date()): Promise<void> {
+  async recoverRequested(): Promise<void> {
     const requested = await this.orders.findRequested();
     await requested.reduce<Promise<void>>(
-      (previous, order) => previous.then(() => this.recover(order, now)),
+      (previous, order) => previous.then(() => this.recover(order)),
       Promise.resolve(),
     );
   }
 
-  private async recover(order: BrokerOrder, now: Date): Promise<void> {
+  private async recover(order: BrokerOrder): Promise<void> {
     const botId = order.position.botId;
     if (botId === null) return;
-    // 10분 안이면 같은 clientOrderId로 다시 보내요. 토스가 첫 결과를 돌려줘요
-    if (now.getTime() - order.createdAt.getTime() < IDEMPOTENCY_MS) {
+    // 8분 안이면 같은 clientOrderId로 다시 보내요. 토스가 첫 결과를 돌려줘요.
+    // 경과 시간은 주문마다 보내기 직전에 다시 재요(앞 주문을 정리하는 사이 10분이 지나 중복 주문이 나가지 않게)
+    if (Date.now() - order.createdAt.getTime() < RESEND_WINDOW_MS) {
       const canResend =
         this.engineState.canOrder() &&
         (order.side === 'SELL' || this.engineState.canEnter(botId));
