@@ -216,7 +216,7 @@ describe('AccountSyncService', () => {
   it('시작하면 30초마다 OPEN을 다시 맞추고, 멈추면 그만둬요', async () => {
     toss.request.mockResolvedValue(page([tossOrder()]));
 
-    sync.start();
+    sync.start(() => true);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(toss.request).toHaveBeenCalledTimes(2);
     expect(toss.request).toHaveBeenLastCalledWith(
@@ -233,10 +233,23 @@ describe('AccountSyncService', () => {
       .mockRejectedValueOnce(new Error('toss down'))
       .mockResolvedValue(page([]));
 
-    sync.start();
+    sync.start(() => true);
     await vi.advanceTimersByTimeAsync(60_000);
 
     expect(toss.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('장중이 아니면 주기 재동기화를 건너뛰어요', async () => {
+    let isTradingHours = false;
+    toss.request.mockResolvedValue(page([]));
+
+    sync.start(() => isTradingHours);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(toss.request).not.toHaveBeenCalled();
+
+    isTradingHours = true;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(toss.request).toHaveBeenCalledOnce();
   });
 
   it('재연결 뒤 재동기화는 실패해도 던지지 않아요', async () => {

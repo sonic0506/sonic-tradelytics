@@ -10,12 +10,15 @@ import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
 import { CommandService } from '@/modules/command/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
-import { MarketCollectorService } from '@/modules/market-data/index.js';
+import {
+  MarketCalendarService,
+  MarketCollectorService,
+} from '@/modules/market-data/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 
 // engine의 시작·종료 순서 (docs/architecture/engine.md 시작 순서·종료 순서).
-// 지금은 1번(단일 실행 잠금), 2번(토큰), 4번(정지 상태 복원), 6번(주문 재동기화), 7번(웹소켓), 8번(명령)만 있어요. 나머지는 그 기능을 만들 때 여기에 더해요.
+// 지금은 1~4번, 6~8번이 있어요. 5번(응답 유실 주문 정리)·9번(놓친 배치)·10번(BotRunner)은 그 기능을 만들 때 더해요.
 @Injectable()
 export class EngineLifecycleService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -29,6 +32,7 @@ export class EngineLifecycleService
     private readonly accountSync: AccountSyncService,
     private readonly engineState: EngineStateService,
     private readonly commands: CommandService,
+    private readonly calendar: MarketCalendarService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -37,6 +41,7 @@ export class EngineLifecycleService
     });
     if (!hasLock) throw new EngineAlreadyRunningException();
     await this.toss.ensureToken();
+    await this.calendar.ensureToday();
     await this.commands.restore();
     // 웹소켓을 먼저 열어 재동기화하는 동안 들어온 주문 이벤트도 받아요. 둘은 AccountSync 안에서 차례로 반영돼요
     this.marketCollector.start({
@@ -48,7 +53,7 @@ export class EngineLifecycleService
       },
     });
     await this.accountSync.syncAll();
-    this.accountSync.start();
+    this.accountSync.start(() => this.calendar.isRegularSession());
     await this.commands.start();
     this.logger.log('engine 시작');
   }

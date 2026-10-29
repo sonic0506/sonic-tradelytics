@@ -5,7 +5,10 @@ import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
 import { CommandService } from '@/modules/command/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
-import { MarketCollectorService } from '@/modules/market-data/index.js';
+import {
+  MarketCalendarService,
+  MarketCollectorService,
+} from '@/modules/market-data/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
@@ -32,6 +35,10 @@ describe('EngineLifecycleService', () => {
     start: vi.fn<CommandService['start']>(),
     stop: vi.fn<CommandService['stop']>(),
   };
+  const calendar = {
+    ensureToday: vi.fn<MarketCalendarService['ensureToday']>(),
+    isRegularSession: vi.fn<MarketCalendarService['isRegularSession']>(),
+  };
   let engineState: EngineStateService;
   let service: EngineLifecycleService;
 
@@ -45,6 +52,7 @@ describe('EngineLifecycleService', () => {
         { provide: MarketCollectorService, useValue: marketCollector },
         { provide: AccountSyncService, useValue: accountSync },
         { provide: CommandService, useValue: commands },
+        { provide: MarketCalendarService, useValue: calendar },
         EngineStateService,
       ],
     }).compile();
@@ -78,8 +86,29 @@ describe('EngineLifecycleService', () => {
 
     await service.onApplicationBootstrap();
 
+    expect(calendar.ensureToday).toHaveBeenCalledAfter(toss.ensureToken);
+    expect(commands.restore).toHaveBeenCalledAfter(calendar.ensureToday);
     expect(commands.restore).toHaveBeenCalledBefore(marketCollector.start);
     expect(commands.start).toHaveBeenCalledAfter(accountSync.syncAll);
+  });
+
+  it('주기 재동기화는 장 캘린더의 정규장 시간에만 돌아요', async () => {
+    lock.acquire.mockResolvedValue(true);
+    calendar.isRegularSession.mockReturnValue(false);
+    await service.onApplicationBootstrap();
+
+    const [isTradingHours] = accountSync.start.mock.lastCall ?? [];
+
+    expect(isTradingHours?.()).toBe(false);
+    expect(calendar.isRegularSession).toHaveBeenCalledOnce();
+  });
+
+  it('오늘 장 캘린더를 받지 못하면 시작을 멈춰요', async () => {
+    lock.acquire.mockResolvedValue(true);
+    calendar.ensureToday.mockRejectedValue(new Error('toss down'));
+
+    await expect(service.onApplicationBootstrap()).rejects.toThrow('toss down');
+    expect(marketCollector.start).not.toHaveBeenCalled();
   });
 
   it('주문 재동기화가 실패하면 시작을 멈춰요', async () => {

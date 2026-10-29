@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 
+import { kstDate } from '@/common/time/kst-date.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { type OrderReport, OrderService } from '@/modules/order/index.js';
 
@@ -51,7 +52,6 @@ export class AccountSyncService {
   private static readonly PAGE_SIZE = 100;
   // 재동기화는 판단용이 아니라 한도를 기다려도 돼요
   private static readonly WAIT_MS = 5000;
-  private static readonly TIME_ZONE = 'Asia/Seoul';
 
   private readonly logger = new Logger(AccountSyncService.name);
   private queue: Promise<unknown> = Promise.resolve();
@@ -63,10 +63,10 @@ export class AccountSyncService {
     private readonly orders: OrderService,
   ) {}
 
-  // ponytail: 장 캘린더가 없어서 장 밖에도 30초마다 OPEN을 조회해요. 캘린더를 만들면 장중에만 돌려요
-  start(): void {
+  // 장중에만 30초마다 OPEN을 맞춰요. 장중 여부는 engine이 장 캘린더로 알려 줘요
+  start(isTradingHours: () => boolean): void {
     this.timer = setInterval(() => {
-      if (this.isSyncing) return;
+      if (this.isSyncing || !isTradingHours()) return;
       this.isSyncing = true;
       this.enqueue(() => this.syncOpen())
         .catch((error: unknown) => {
@@ -126,9 +126,7 @@ export class AccountSyncService {
 
   // 오늘 CLOSED를 cursor로 끝까지 읽어요
   private async syncClosedToday(cursor?: string): Promise<void> {
-    const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: AccountSyncService.TIME_ZONE,
-    }).format(new Date());
+    const today = kstDate();
     const page = await this.fetch({
       status: 'CLOSED',
       from: today,

@@ -6,7 +6,7 @@ export class MarketCalendar {
   @PrimaryColumn('date')
   tradeDate: string;
 
-  // integrated가 null이면 false
+  // 정규장(integrated.regularMarket)이 null이면 false
   @Column('boolean')
   isOpen: boolean;
 
