@@ -55,6 +55,8 @@
 서버 하네스는 feature 안 파일 이름을 접미사로 제한해요(`*.service.ts`, `*.constants.ts`, `*.types.ts` 등, [하네스 1절](../../apps/server/.sonic-harness-be/harness.md)). 순수 함수용 레이어가 없어서, 그대로 두면 Nest 서비스 안에 넣어야 해요. 백테스트·PaperBroker가 Nest 없이 같은 함수를 부르려면 서비스 밖이 편해요 ([ADR-0005](../architecture/adr/0005-in-house-paper-broker.md), [엔진 설계](../architecture/engine.md#모듈-배치)).
 
 > **결정 (2026-10-28)**: A. 하네스에 `*.rule.ts` 레이어를 추가해요. rule 파일은 같은 feature의 `constants`·`types`와 `common`만 가져오고, 같은 feature의 service가 rule을 불러요. 하네스 원본에도 올려요 → [엔진 설계 모듈 배치](../architecture/engine.md#모듈-배치)
+>
+> **구현 (2026-10-29)**: 프로젝트 하네스에 추가했어요. lint가 rule 파일의 Nest·TypeORM·`node:` import와 `Date.now()`·인자 없는 `new Date()`·`Math.random()`을 막아요. 하네스 원본 반영은 남았어요
 
 | 선택지 | 장점 | 단점 |
 | --- | --- | --- |

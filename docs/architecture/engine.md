@@ -60,7 +60,7 @@ apps/server/src/
 | `notification` | ✔ | | 알림 발송, `notified_at` 기록 |
 
 - `EngineModule`과 `AppModule`은 feature 모듈을 골라 담아요. 같은 entity·repository를 쓰고, engine 전용 서비스(`bot-runner`, `account-sync`, `market-collector` 등)는 api 쪽 모듈에 넣지 않아요
-- **규칙 평가는 `*.rule.ts`에 순수 함수로 둬요** ([Q-020](../project/open-questions.md#q-020)). 예: `strategy/day-trading.rule.ts`. rule 파일은 같은 feature의 `constants`·`types`와 `common`만 가져올 수 있어서 Nest·DB·시계(`Date.now()`)에 기대지 않아요. 시각도 `snapshot`으로 받아요. `strategy.service.ts`가 유형에 맞는 rule을 골라 부르고, 백테스트·테스트는 rule을 Nest 없이 바로 불러요. 이 레이어는 M2 전에 하네스(`eslint.base.mjs`의 `FEATURE_FILES`와 import 규칙, `harness.md` 1절)에 추가하고 하네스 원본에도 올려요
+- **규칙 평가는 `*.rule.ts`에 순수 함수로 둬요** ([Q-020](../project/open-questions.md#q-020)). 예: `strategy/day-trading.rule.ts`. rule 파일은 같은 feature의 `constants`·`types`와 `common`만 가져올 수 있어서 Nest·DB·시계(`Date.now()`)에 기대지 않아요. 시각도 `snapshot`으로 받아요. `strategy.service.ts`가 유형에 맞는 rule을 골라 부르고, 백테스트·테스트는 rule을 Nest 없이 바로 불러요. 이 레이어는 프로젝트 하네스(`eslint.base.mjs`의 `FEATURE_FILES`·import 규칙·rule 파일 제한, `harness.md` 1·7절)에 추가했어요(2026-10-29). 하네스 원본에는 `/sonic-harness-be:contribute`로 올려요
 - **api가 토스를 부르지 않는다**(ADR-0002)는 `infra/toss`를 가져오는 서비스가 `AppModule` 그래프에 없다는 뜻이에요. dependency-cruiser 규칙 `api-no-toss`(`apps/server/.dependency-cruiser.cjs`)가 `src/main.ts`에서 `src/infra/toss`까지 가는 경로를 막아요. `npm run lint:cycles`와 CI에서 검사해요
 
 ### 의존 방향
