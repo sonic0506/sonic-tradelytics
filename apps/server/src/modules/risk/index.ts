@@ -2,3 +2,5 @@
 export { RiskEvent } from './entities/risk-event.entity.js';
 export { SymbolLock } from './entities/symbol-lock.entity.js';
 export * from './risk.constants.js';
+export { RiskModule } from './risk.module.js';
+export { RiskService } from './risk.service.js';

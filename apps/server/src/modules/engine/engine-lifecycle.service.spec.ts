@@ -3,6 +3,8 @@ import { Test } from '@nestjs/testing';
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
+import { CommandService } from '@/modules/command/index.js';
+import { EngineStateService } from '@/modules/engine-state/index.js';
 import { MarketCollectorService } from '@/modules/market-data/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
@@ -25,6 +27,12 @@ describe('EngineLifecycleService', () => {
     receive: vi.fn<AccountSyncService['receive']>(),
     resync: vi.fn<AccountSyncService['resync']>(),
   };
+  const commands = {
+    restore: vi.fn<CommandService['restore']>(),
+    start: vi.fn<CommandService['start']>(),
+    stop: vi.fn<CommandService['stop']>(),
+  };
+  let engineState: EngineStateService;
   let service: EngineLifecycleService;
 
   beforeEach(async () => {
@@ -36,9 +44,12 @@ describe('EngineLifecycleService', () => {
         { provide: TossClient, useValue: toss },
         { provide: MarketCollectorService, useValue: marketCollector },
         { provide: AccountSyncService, useValue: accountSync },
+        { provide: CommandService, useValue: commands },
+        EngineStateService,
       ],
     }).compile();
     service = moduleRef.get(EngineLifecycleService);
+    engineState = moduleRef.get(EngineStateService);
   });
 
   it('다른 engine이 잠금을 가지고 있으면 토큰을 건드리지 않고 시작을 멈춰요', async () => {
@@ -60,6 +71,15 @@ describe('EngineLifecycleService', () => {
     expect(marketCollector.start).toHaveBeenCalledOnce();
     expect(accountSync.syncAll).toHaveBeenCalledAfter(marketCollector.start);
     expect(accountSync.start).toHaveBeenCalledOnce();
+  });
+
+  it('정지 상태를 복원한 뒤 매매 준비를 하고, 명령 처리는 재동기화 뒤에 시작해요', async () => {
+    lock.acquire.mockResolvedValue(true);
+
+    await service.onApplicationBootstrap();
+
+    expect(commands.restore).toHaveBeenCalledBefore(marketCollector.start);
+    expect(commands.start).toHaveBeenCalledAfter(accountSync.syncAll);
   });
 
   it('주문 재동기화가 실패하면 시작을 멈춰요', async () => {
@@ -95,10 +115,12 @@ describe('EngineLifecycleService', () => {
   });
 
   it.each(['SIGTERM', undefined])(
-    '신호가 %s여도 종료할 때 재동기화·시세 수집을 멈추고 잠금을 풀어요',
+    '신호가 %s여도 종료할 때 주문을 막고 명령·재동기화·시세 수집을 멈춘 뒤 잠금을 풀어요',
     async (signal) => {
       await service.onApplicationShutdown(signal);
 
+      expect(engineState.state()).toBe('stopping');
+      expect(commands.stop).toHaveBeenCalledOnce();
       expect(accountSync.stop).toHaveBeenCalledOnce();
       expect(marketCollector.stop).toHaveBeenCalledOnce();
       expect(lock.release).toHaveBeenCalledOnce();

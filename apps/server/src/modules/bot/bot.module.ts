@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { BotRepository } from './bot.repository.js';
+import { BotService } from './bot.service.js';
+import { Bot } from './entities/bot.entity.js';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Bot])],
+  providers: [BotService, BotRepository],
+  exports: [BotService],
+})
+export class BotModule {}
