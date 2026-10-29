@@ -1,6 +1,6 @@
 # 엔진 내부 설계
 
-> 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-28
+> 상태: 초안 · 담당: @소닉 · 최종 수정: 2026-10-29
 > 관련: [시스템 개요](./overview.md) · [주문 흐름](./order-lifecycle.md) · [API 명세](./api.md) · [데이터 모델](./data-model.md) · [ADR-0002](./adr/0002-split-api-and-engine.md) · [ADR-0004](./adr/0004-postgres-notify-for-commands.md) · [ADR-0007](./adr/0007-single-market-collector.md)
 
 engine 프로세스 안에서 **누가 무엇을 맡고, 어떤 순서로 켜지고 꺼지며, 서로 어떻게 부르는지**를 정해요. 주문 하나의 흐름은 [주문 흐름](./order-lifecycle.md), 무엇을 하는지(8단계, 일일 일정)는 [시스템 개요](./overview.md)에 있어요. 이 문서는 M1·M2 코드 구조의 기준이에요.
@@ -40,7 +40,7 @@ apps/server/src/
    ├─ order/          OrderService, Broker(TossBroker·PaperBroker), broker_order, order_event, protective_order
    ├─ position/       position, prediction_score, bot_daily_result
    ├─ command/        command (api가 넣고 engine이 처리)
-   └─ notification/   Notifier (risk_event → 텔레그램)
+   └─ notification/   NotificationService (risk_events → 텔레그램)
 ```
 
 | feature | engine | api | 맡는 일 |
@@ -61,7 +61,7 @@ apps/server/src/
 
 - `EngineModule`과 `AppModule`은 feature 모듈을 골라 담아요. 같은 entity·repository를 쓰고, engine 전용 서비스(`bot-runner`, `account-sync`, `market-collector` 등)는 api 쪽 모듈에 넣지 않아요
 - **규칙 평가는 `*.rule.ts`에 순수 함수로 둬요** ([Q-020](../project/open-questions.md#q-020)). 예: `strategy/day-trading.rule.ts`. rule 파일은 같은 feature의 `constants`·`types`와 `common`만 가져올 수 있어서 Nest·DB·시계(`Date.now()`)에 기대지 않아요. 시각도 `snapshot`으로 받아요. `strategy.service.ts`가 유형에 맞는 rule을 골라 부르고, 백테스트·테스트는 rule을 Nest 없이 바로 불러요. 이 레이어는 M2 전에 하네스(`eslint.base.mjs`의 `FEATURE_FILES`와 import 규칙, `harness.md` 1절)에 추가하고 하네스 원본에도 올려요
-- **api가 토스를 부르지 않는다**(ADR-0002)는 `infra/toss`를 가져오는 서비스가 `AppModule` 그래프에 없다는 뜻이에요. dependency-cruiser 규칙으로 `src/main.ts`에서 `src/infra/toss`까지 가는 경로를 막아요(M1)
+- **api가 토스를 부르지 않는다**(ADR-0002)는 `infra/toss`를 가져오는 서비스가 `AppModule` 그래프에 없다는 뜻이에요. dependency-cruiser 규칙 `api-no-toss`(`apps/server/.dependency-cruiser.cjs`)가 `src/main.ts`에서 `src/infra/toss`까지 가는 경로를 막아요. `npm run lint:cycles`와 CI에서 검사해요
 
 ### 의존 방향
 
@@ -85,12 +85,13 @@ flowchart TD
     risk --> position
     fund --> position
     position --> notification
-    risk --> notification
+    notification --> risk
     order --> infra-toss[infra/toss]
     account --> infra-toss
     market-data --> infra-toss
 ```
 
+- 알림은 `notification`이 `risk_events` 중 알리지 않은 행을 읽어 보내요(outbox). 그래서 `risk`가 `notification`을 부르지 않고 반대 방향이에요. 기록이 먼저 커밋되고, 발송이 실패하거나 재시작해도 다음 주기에 다시 보내요
 - `AccountSync`가 체결을 발견하면 `OrderService.applyExecution()`을 불러요. 손절 조건주문 등록도 그 안에서 해요. 반대 방향(`order` → `account`)은 없어요
 - `EngineState`는 아무것도 가져오지 않는 작은 서비스라 `command`·`order`·`engine`이 모두 불러요. 그래서 `engine` feature와 따로 둬요
 
@@ -105,12 +106,14 @@ flowchart TD
 | 3 | 오늘 `market_calendars` 확인, 없으면 토스에서 받기 | 종료 + 알림 |
 | 4 | `bot.status`·오늘 `risk_events`로 [정지 상태](#정지-상태-enginestate) 복원 | 종료 + 알림 |
 | 5 | `requested` 주문 정리 ([응답을 못 받았을 때](./order-lifecycle.md#응답을-못-받았을-때)) | 해당 봇 신규 진입 중단 |
-| 6 | AccountSync 전체 재동기화 (OPEN 전량 + 오늘 CLOSED) | 종료 + 알림 |
-| 7 | 웹소켓 연결, 구독 선언 (`trade:kr`·`orderbook:kr`·`personal:order`) | 재시도. 계속 실패하면 `feed_stale`로 전체 신규 진입 중단 |
+| 6 | 웹소켓 연결, 구독 선언 (`trade:kr`·`orderbook:kr`·`personal:order`). 연결을 기다리지 않아요 | 재시도. 계속 실패하면 `feed_stale`로 전체 신규 진입 중단 |
+| 7 | AccountSync 전체 재동기화 (OPEN 전량 + 오늘 CLOSED), 장중 30초 재동기화 시작 | 종료 + 알림 |
 | 8 | `LISTEN command`, 미처리 명령 처리 | 종료 + 알림 |
-| 9 | 놓친 배치 확인 ([배치 스케줄](#배치-스케줄)) 후 필요하면 실행 | `batch_fail` |
+| 9 | `engine_statuses` 쓰기 시작, 놓친 배치 확인 ([배치 스케줄](#배치-스케줄)) 후 필요하면 실행 | `batch_fail` |
 | 10 | 장중이면 BotRunner 시작 | — |
 
+- 웹소켓(6번)을 재동기화(7번)보다 먼저 열어요. 재동기화하는 동안 들어온 체결 이벤트도 받기 위해서예요. 이벤트와 REST 조회는 AccountSync 안에서 한 줄로 차례로 반영돼서 같은 주문을 동시에 고치지 않아요
+- 알림(`NotificationService`)은 1번 직후에 켜요. 시작 중에 남은 `risk_events`도 알리기 위해서예요
 - 1번 잠금은 **연결에 묶인 잠금**이에요. 이 연결이 끊기면 Postgres가 잠금을 풀어요. 그래서 TypeORM 풀에서 연결 하나를 따로 잡아 두고(`QueryRunner`), 5초마다 `SELECT 1`로 확인해 끊기면 스스로 SIGTERM을 보내 [종료 순서](#종료-순서)로 내려요. 다른 engine이 잠금을 가져가기 전에 이 engine이 매매를 멈춰야 해요
 - `LISTEN`도 같은 전용 연결을 써요. 풀 연결은 쿼리마다 바뀌어서 알림을 놓쳐요
 
@@ -118,7 +121,7 @@ flowchart TD
 
 `SIGTERM`(재배포)이나 잠금 연결 끊김에서 같은 순서로 내려요.
 
-1. `EngineState`를 `stopping`으로 바꿔 신규 판단과 주문을 막아요 (원칙 1)
+1. `EngineState`를 `stopping`으로 바꿔 신규 판단과 주문을 막아요 (원칙 1). 배치 예약·명령 처리·재동기화를 멈추고, `engine_statuses`에 `stopping`을 한 번 더 써요
 2. 진행 중인 봇 주기와 이미 나간 주문 호출의 응답을 기다려요 (최대 10초). 응답을 못 받은 주문은 `requested`로 남고 다음 시작 때 정리해요
 3. 웹소켓을 닫고 `UNLISTEN`, 잠금을 풀어요
 4. **미체결 주문과 손절 조건주문은 그대로 둬요.** 손절은 서버가 없어도 증권사에서 작동해요 (POL-RISK-11)
@@ -175,11 +178,12 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 
 | 표 | 쓰는 것 | 출처 |
 | --- | --- | --- |
-| [`engine_statuses`](./data-model.md#engine_statuses) | 상태·전체 정지 사유·시세 끊긴 종목·heartbeat, 주문 가능 금액·평가금액 | `EngineState`, MarketCollector, AccountSync의 최근 잔고 조회 |
+| [`engine_statuses`](./data-model.md#engine_statuses) | 상태·전체 정지 사유·시세 끊긴 종목·heartbeat, 마지막 주문 재동기화 시각, 주문 가능 금액·평가금액 | `EngineState`, MarketCollector, AccountSync (`StatusReporter`가 모아서 써요) |
 | [`quote_caches`](./data-model.md#quote_caches) | 보유 종목의 최근 체결가 | MarketCollector 스냅샷 |
 
 - 이 쓰기가 실패해도 매매는 계속해요. 화면에서는 `heartbeat_at`이 30초 넘게 오래되면 "엔진 응답 없음"으로 보여요
 - 잔고는 이 용도로 따로 조회하지 않아요. AccountSync가 재동기화 때 받은 값을 써요
+- M1 현재: 잔고(`buying-power`)를 아직 조회하지 않아서 주문 가능 금액·평가금액은 null로 써요
 
 ## 명령 처리 (command)
 
@@ -196,12 +200,16 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 | `liquidate` | 봇 정지 → 미체결 취소 → 청산 순서로 시장가 매도 | 봇 정지 |
 | `rebudget` | 쉬는 중인지 다시 확인하고, 맞으면 투자금을 반환한 뒤 `commands.budget` 설정으로 새로 확정. 쉬는 중이 아니거나 돈이 모자라면 `failed`로 남기고 기존 투자금을 그대로 둬요 (POL-FUND-12) | — |
 
+- `resume`이 성공하면 그 봇의 정지와 함께 전체 `kill`도 풀어요. 재시작할 때는 마지막 `kill_switch` 뒤에 성공한 `resume`이 없으면 `kill`을 다시 걸어요
+- M1 현재: 주문·취소(`OrderService`)가 아직 없어서 미체결 취소와 청산은 하지 않아요. `kill`의 `liquidate_all`, `liquidate`, `rebudget`은 정지만 하고 `result = failed`와 이유(`error`)를 남겨요. M2 주문 흐름에서 붙여요
 - 취소·매도처럼 시간이 걸리는 일은 1초 기준에 넣지 않아요. 기준은 "신규 주문이 더 나가지 않는 것"이에요
 - 처리 결과는 `commands.result`로 남고, 화면은 그 값을 보고 완료를 표시해요
 
 ## 배치 스케줄
 
-[일일 일정](./overview.md#일일-일정-engine)과 [재평가 일정](../policy/position-reevaluation.md#실행-일정)을 `EngineSchedule`이 실행해요. `@nestjs/schedule`의 cron을 `timeZone: 'Asia/Seoul'`로 써요([학습 06](../learning/06-scheduling.md)). 아직 설치하지 않은 의존성이라 M1에서 설치 확인을 받아요.
+[일일 일정](./overview.md#일일-일정-engine)과 [재평가 일정](../policy/position-reevaluation.md#실행-일정)을 `EngineSchedule`이 실행해요. 시각은 KST(서머타임 없음, `+09:00` 고정)예요. 정해진 시각이 몇 개뿐이라 `@nestjs/schedule` 없이 `setTimeout`으로 다음 시각을 예약해요. 요일 조건(`weekly_check`)처럼 cron 표현이 필요해지면 그때 설치해요([학습 06](../learning/06-scheduling.md)).
+
+M1 현재 등록한 job은 할 일이 있는 `pre_open`(토큰·캘린더 확인)과 `post_close`(오늘 CLOSED로 체결 최종 확정)뿐이에요. 나머지는 그 기능을 만들 때 더해요.
 
 | job | 시각 | 하는 일 |
 | --- | --- | --- |
@@ -213,7 +221,7 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 | `weekly_check` | 금 장후 | 주간 점검 (스윙) |
 
 - 모든 job은 시작하자마자 캘린더로 거래일인지 보고, 휴장이면 끝내요. 개장 지연일은 캘린더의 `regular_open_at`을 기준으로 미뤄요
-- 실행 기록은 [`batch_runs`](./data-model.md#batch_runs)에 남겨요(거래일·job마다 한 행). **놓친 배치**는 engine 시작 시 이 표로 확인해요. 예를 들어 08:45에 다시 떴는데 오늘 `pre_open` 성공 기록이 없으면 바로 실행해요. 장이 끝난 뒤에야 의미 있는 job(`post_close`)은 그 시각 이후에만 따라잡아요
+- 실행 기록은 [`batch_runs`](./data-model.md#batch_runs)에 남겨요(거래일·job마다 한 행, 실패한 배치를 다시 돌리면 같은 행을 갱신). **놓친 배치**는 engine 시작 시 이 표로 확인해요. 오늘 시각이 지났는데 `ok`·`skipped` 기록이 없는 job만 따라잡아요(전날 것은 따라잡지 않아요). 예를 들어 08:45에 다시 떴는데 오늘 `pre_open` 성공 기록이 없으면 바로 실행해요. 장이 끝난 뒤에야 의미 있는 job(`post_close`)은 그 시각 이후에만 따라잡아요
 - 실패하면 `batch_runs.result = failed` + `risk_event(batch_fail)`. 재평가 배치가 실패한 이월 봇은 신규 진입을 멈춰요 (POL-RISK-11)
 - 배치는 대부분 I/O라 BotRunner와 같이 돌아도 돼요. 대신 배치의 토스 호출은 판단용 호출보다 뒤로 밀려요 ([호출 한도](#호출-한도-tossclient))
 

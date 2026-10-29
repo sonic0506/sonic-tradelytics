@@ -41,7 +41,7 @@
 | 원/달러 환율 (장전 점검) | `GET /api/v1/exchange-rate` | `MARKET_INFO` |
 | 종목 정보·거래정지 | `GET /api/v1/stocks` (`koreanMarketDetail.krxTradingSuspended`, `liquidationTrading`) | `STOCK` |
 | 매수 유의사항 (VI 등) | `GET /api/v1/stocks/{symbol}/warnings` | `STOCK` |
-| 장 운영 캘린더 | `GET /api/v1/market-calendar/KR` (`integrated`가 null이면 휴장) | `MARKET_INFO` |
+| 장 운영 캘린더 | `GET /api/v1/market-calendar/KR` (`integrated.regularMarket`이 null이면 정규장 휴장. `integrated`는 KRX+NXT 통합 기준이라 세 세션이 모두 휴장일 때만 null) | `MARKET_INFO` |
 | 보유 주식 | `GET /api/v1/holdings` | `ASSET` |
 | 매수 가능 금액 | `GET /api/v1/buying-power` (`cashBuyingPower`, 미수 미발생 기준) | `ORDER_INFO` |
 | 수수료율 | `GET /api/v1/commissions` | `ORDER_INFO` |

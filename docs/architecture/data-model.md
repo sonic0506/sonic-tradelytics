@@ -442,7 +442,7 @@ engine이 화면용으로 5초마다 덮어쓰는 한 행 ([API 원칙 1](./api.
 | 컬럼 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
 | trade_date | date | PK | |
-| is_open | boolean | not null | `integrated`가 null이면 false |
+| is_open | boolean | not null | 통합 정규장(`integrated.regularMarket`)이 null이면 false. 정규장 없이 NXT 시간외만 열리는 날도 휴장으로 봐요 |
 | regular_open_at | timestamptz | | 개장 지연일 대응 |
 | regular_close_at | timestamptz | | |
 | fetched_at | timestamptz | not null | |
