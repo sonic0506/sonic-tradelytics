@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '@xonic0506/sonic-ui';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -27,7 +28,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <MockStarter />
       <UrlStateAdapter>
         <QueryClientProvider client={queryClient}>
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </QueryClientProvider>
       </UrlStateAdapter>
     </ErrorBoundary>

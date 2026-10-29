@@ -3,6 +3,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 import { AppProviders } from '@/app/providers';
+import { AppShell } from '@/widgets/app-shell';
 
 export const metadata: Metadata = {
   title: 'sonic-tradelytics',
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     <html lang="ko" data-theme="light">
       <body className="bg-canvas font-sans text-default">
         <div className="isolate">
-          <AppProviders>{children}</AppProviders>
+          <AppProviders>
+            <AppShell>{children}</AppShell>
+          </AppProviders>
         </div>
       </body>
     </html>
