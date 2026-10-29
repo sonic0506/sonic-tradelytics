@@ -4,7 +4,7 @@ export const COMMAND_KINDS = [
   'resume',
   'liquidate',
   'kill',
-  'expand_budget',
+  'rebudget',
 ] as const;
 export type CommandKind = (typeof COMMAND_KINDS)[number];
 
