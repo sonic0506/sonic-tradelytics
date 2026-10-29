@@ -18,6 +18,7 @@ describe('MarketCollectorService', () => {
   };
   const toss = { request: vi.fn() };
   const quotes = { upsert: vi.fn<QuoteCacheRepository['upsert']>() };
+  const orderStream = { onOrder: vi.fn(), onReconnected: vi.fn() };
   let collector: MarketCollectorService;
 
   // start()가 TossSocket에 넘긴 수신 함수로 프레임을 흘려 넣어요
@@ -47,7 +48,7 @@ describe('MarketCollectorService', () => {
       ],
     }).compile();
     collector = moduleRef.get(MarketCollectorService);
-    collector.start();
+    collector.start(orderStream);
   });
 
   afterEach(() => {
@@ -66,9 +67,27 @@ describe('MarketCollectorService', () => {
     expect(declared?.map(({ type }) => type)).toEqual([
       'trade:kr',
       'orderbook:kr',
+      'personal:order',
     ]);
     expect(declared?.[0]?.codes).toHaveLength(50);
     expect(declared?.[0]?.codes[0]).toBe('999999');
+  });
+
+  it('시작하면 감시 종목이 없어도 계좌 주문 이벤트(personal:order)를 구독해요', () => {
+    expect(socket.declare).toHaveBeenLastCalledWith(
+      expect.arrayContaining([{ type: 'personal:order', codes: ['1'] }]),
+    );
+  });
+
+  it('주문 이벤트와 재연결은 해석하지 않고 그대로 넘겨요', () => {
+    const data = { event: 'FILL', order: { orderId: 'a' } };
+
+    frame('personal:order:1', data);
+    const [handlers] = socket.connect.mock.lastCall ?? [];
+    handlers?.onReconnected?.();
+
+    expect(orderStream.onOrder).toHaveBeenCalledExactlyOnceWith(data);
+    expect(orderStream.onReconnected).toHaveBeenCalledOnce();
   });
 
   it('체결·호가 프레임의 문자열 숫자를 숫자로 바꿔 스냅샷에 담아요', () => {

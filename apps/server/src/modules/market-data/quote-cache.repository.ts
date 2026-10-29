@@ -1,16 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
+import type { Repository } from 'typeorm';
 
 import { QuoteCache } from './entities/quote-cache.entity.js';
 
-// engine에는 요청 단위 트랜잭션(CLS)이 없어서 TypeORM Repository를 바로 받아요
 @Injectable()
 export class QuoteCacheRepository {
   constructor(
-    @InjectRepository(QuoteCache)
-    private readonly quotes: Repository<QuoteCache>,
+    private readonly txHost: TransactionHost<TransactionalAdapterTypeOrm>,
   ) {}
+
+  private get quotes(): Repository<QuoteCache> {
+    return this.txHost.tx.getRepository(QuoteCache);
+  }
 
   async upsert(
     rows: Pick<QuoteCache, 'symbol' | 'price' | 'receivedAt'>[],

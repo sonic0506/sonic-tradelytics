@@ -15,3 +15,11 @@ export interface MarketSnapshot {
   // 마지막 수신 시각(epoch ms). 웹소켓 프레임이나 REST 보정 때 바뀌어요
   receivedAt: number;
 }
+
+// MarketCollector가 받은 주문 이벤트를 넘길 곳(AccountSync). 웹소켓 수신을 막지 않게 짧게 처리해요
+export interface OrderStreamHandlers {
+  // personal:order 프레임의 data
+  onOrder: (data: unknown) => void;
+  // 다시 연결해 재선언한 뒤. 끊긴 동안의 주문 이벤트는 다시 오지 않아 재동기화가 필요해요
+  onReconnected: () => void;
+}

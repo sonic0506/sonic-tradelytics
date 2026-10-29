@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
+import { ClsPluginTransactional } from '@nestjs-cls/transactional';
+import { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
+import { ClsModule } from 'nestjs-cls';
 import { LoggerModule } from 'nestjs-pino';
 
 import { env } from './config/env.js';
@@ -24,6 +27,18 @@ import { EngineModule } from './modules/engine/index.js';
       entities: [],
       migrations: [],
       autoLoadEntities: true,
+    }),
+    // @Transactional()이 쓰는 컨텍스트예요. HTTP 요청이 없어서 미들웨어 없이 @Transactional()이 직접 열어요
+    ClsModule.forRoot({
+      global: true,
+      plugins: [
+        new ClsPluginTransactional({
+          imports: [TypeOrmModule],
+          adapter: new TransactionalAdapterTypeOrm({
+            dataSourceToken: getDataSourceToken(),
+          }),
+        }),
+      ],
     }),
     EngineLockModule,
     TossModule,

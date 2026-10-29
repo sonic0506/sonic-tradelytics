@@ -1,10 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 
+import { env } from '@/config/env.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { TossSocket } from '@/infra/toss/toss-socket.js';
 
-import type { MarketSnapshot } from './market-data.types.js';
+import type {
+  MarketSnapshot,
+  OrderStreamHandlers,
+} from './market-data.types.js';
 import { QuoteCacheRepository } from './quote-cache.repository.js';
 
 // 웹소켓 숫자는 문자열이에요("price":"230000")
@@ -40,6 +44,7 @@ export class MarketCollectorService {
   private readonly stale = new Set<string>();
   private held = new Set<string>();
   private watched: string[] = [];
+  private orderStream: OrderStreamHandlers | undefined;
   private timer: NodeJS.Timeout | undefined;
   private isTicking = false;
 
@@ -49,13 +54,19 @@ export class MarketCollectorService {
     private readonly quotes: QuoteCacheRepository,
   ) {}
 
-  // engine 시작 순서 7번. 연결이 늦어져도 기다리지 않아요(그동안은 REST 보정)
-  start(): void {
+  // engine 시작 순서 7번. 연결이 늦어져도 기다리지 않아요(그동안은 REST 보정).
+  // personal:order는 해석하지 않고 AccountSync에 넘겨요 (docs/architecture/engine.md 시세 스냅샷)
+  start(orderStream: OrderStreamHandlers): void {
+    this.orderStream = orderStream;
     this.socket.connect({
       onMessage: (topic, data) => {
         this.receive(topic, data);
       },
+      onReconnected: () => {
+        orderStream.onReconnected();
+      },
     });
+    this.declare();
     this.timer = setInterval(() => {
       void this.tick();
     }, MarketCollectorService.TICK_MS);
@@ -75,14 +86,7 @@ export class MarketCollectorService {
     for (const symbol of this.stale)
       if (!this.watched.includes(symbol)) this.stale.delete(symbol);
 
-    const codes = this.watched.slice(
-      0,
-      MarketCollectorService.MAX_SUBSCRIBED_SYMBOLS,
-    );
-    this.socket.declare([
-      { type: 'trade:kr', codes },
-      { type: 'orderbook:kr', codes },
-    ]);
+    this.declare();
   }
 
   // 시세가 없거나 끊긴(feed_stale) 종목은 undefined예요. 봇은 그 종목 판단을 건너뛰어요
@@ -96,9 +100,27 @@ export class MarketCollectorService {
     return [...this.stale];
   }
 
+  // 시세 구독 + 주문 이벤트(personal:order, codes에 accountSeq)
+  private declare(): void {
+    const codes = this.watched.slice(
+      0,
+      MarketCollectorService.MAX_SUBSCRIBED_SYMBOLS,
+    );
+    const account = env.TOSS_ACCOUNT_SEQ ? [env.TOSS_ACCOUNT_SEQ] : [];
+    this.socket.declare([
+      { type: 'trade:kr', codes },
+      { type: 'orderbook:kr', codes },
+      { type: 'personal:order', codes: account },
+    ]);
+  }
+
   private receive(topic: string, data: unknown): void {
-    // topic: trade:kr:005930, orderbook:kr:005930
+    // topic: trade:kr:005930, orderbook:kr:005930, personal:order:{accountSeq}
     const [channel, , symbol] = topic.split(':');
+    if (channel === 'personal') {
+      this.orderStream?.onOrder(data);
+      return;
+    }
     if (symbol === undefined || !this.watched.includes(symbol)) return;
 
     if (channel === 'trade') {
