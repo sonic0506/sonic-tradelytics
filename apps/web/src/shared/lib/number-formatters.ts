@@ -27,6 +27,11 @@ export function formatSignedPercent(value: number) {
   return `${value > 0 ? '+' : MINUS}${fixed}%`;
 }
 
+// MDD·한도처럼 항상 음수로 읽는 % 값. 2.1 → "−2.1%"
+export function formatNegativePercent(value: number, digits = 1) {
+  return `${MINUS}${Math.abs(value).toFixed(digits)}%`;
+}
+
 // 0~1 비율을 정수 %로 써요. 0.58 → "58%"
 export function formatRatio(value: number) {
   return `${Math.round(value * 100)}%`;
@@ -37,9 +42,13 @@ export function formatManWon(value: number) {
   return `${formatNumber(value / 10_000)}만 원`;
 }
 
-// 차트 축처럼 짧게 써요. 200000 → "+20만", -200000 → "−20만"
-export function formatSignedManWon(value: number) {
+// 차트 축처럼 짧게 써요. 200000 → "+20만", 2000 → "+2천", 0 → "0"
+export function formatSignedShortWon(value: number) {
   if (value === 0) return '0';
-  const man = Math.round(Math.abs(value) / 10_000);
-  return `${value > 0 ? '+' : MINUS}${formatNumber(man)}만`;
+  const abs = Math.abs(value);
+  const text =
+    abs >= 10_000
+      ? `${formatNumber(abs / 10_000)}만`
+      : `${formatNumber(abs / 1_000)}천`;
+  return `${value > 0 ? '+' : MINUS}${text}`;
 }

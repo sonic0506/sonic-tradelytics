@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatNegativePercent,
   formatRatio,
-  formatSignedManWon,
   formatSignedPercent,
+  formatSignedShortWon,
   formatSignedWon,
 } from './number-formatters';
 
@@ -29,16 +30,24 @@ describe('formatSignedPercent', () => {
   });
 });
 
+describe('formatNegativePercent', () => {
+  it('항상 마이너스 기호를 붙여요', () => {
+    expect(formatNegativePercent(2.1)).toBe('−2.1%');
+    expect(formatNegativePercent(10, 0)).toBe('−10%');
+  });
+});
+
 describe('formatRatio', () => {
   it('0~1 비율을 정수 %로 바꿔요', () => {
     expect(formatRatio(0.58)).toBe('58%');
   });
 });
 
-describe('formatSignedManWon', () => {
-  it('만 원 단위로 줄여 써요', () => {
-    expect(formatSignedManWon(200000)).toBe('+20만');
-    expect(formatSignedManWon(-200000)).toBe('−20만');
-    expect(formatSignedManWon(0)).toBe('0');
+describe('formatSignedShortWon', () => {
+  it('만 원 이상은 만, 그보다 작으면 천 단위로 줄여 써요', () => {
+    expect(formatSignedShortWon(200000)).toBe('+20만');
+    expect(formatSignedShortWon(-200000)).toBe('−20만');
+    expect(formatSignedShortWon(2000)).toBe('+2천');
+    expect(formatSignedShortWon(0)).toBe('0');
   });
 });

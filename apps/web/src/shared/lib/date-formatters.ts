@@ -16,6 +16,28 @@ const hourMinuteFormat = new Intl.DateTimeFormat('ko-KR', {
   hourCycle: 'h23',
 });
 
+const dateTimeFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+function dateTimeParts(iso: string) {
+  const parts = dateTimeFormat.formatToParts(new Date(iso));
+  const part = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+    time: `${part('hour')}:${part('minute')}`,
+  };
+}
+
 // "14:32:05"
 export function formatTime(iso: string) {
   return timeFormat.format(new Date(iso));
@@ -30,4 +52,16 @@ export function formatHourMinute(iso: string) {
 export function formatMonthDay(tradeDate: string) {
   const [, month, day] = tradeDate.split('-');
   return `${Number(month)}/${Number(day)}`;
+}
+
+// "10/28 15:18"
+export function formatMonthDayTime(iso: string) {
+  const { month, day, time } = dateTimeParts(iso);
+  return `${Number(month)}/${Number(day)} ${time}`;
+}
+
+// "2026-10-01 15:00"
+export function formatDateTime(iso: string) {
+  const { year, month, day, time } = dateTimeParts(iso);
+  return `${year}-${month}-${day} ${time}`;
 }
