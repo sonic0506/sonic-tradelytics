@@ -1,7 +1,18 @@
 'use client';
 
-import { EmptyState, Skeleton, Tooltip } from '@xonic0506/sonic-ui';
+import { EmptyState, Skeleton } from '@xonic0506/sonic-ui';
 import { Inbox } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  type BarShapeProps,
+  Rectangle,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import {
   type DailyResult,
@@ -12,6 +23,8 @@ import {
   formatMonthDay,
   formatSignedManWon,
   formatSignedWon,
+  getPnlDirection,
+  PNL_COLOR,
 } from '@/shared/lib';
 import { QueryBoundary } from '@/shared/ui';
 
@@ -19,10 +32,19 @@ import { getAxisMax } from '../lib/chart-scale';
 
 // 최근 20거래일: 지난 19일(daily-results) + 오늘(봇 카드 오늘 손익 합계)
 const BAR_COUNT = 20;
-// 축 라벨은 다섯 막대마다 하나씩 써요
+// 축 라벨은 다섯 막대마다 하나씩, 그리고 마지막(오늘)에 써요
 const LABEL_EVERY = 5;
+// Figma: 위 여백 8 + 막대 160 + X축 24
+const PLOT_HEIGHT = 192;
+const X_AXIS_HEIGHT = 24;
+// 데스크톱 일별 손익 카드 안쪽 너비(Figma 566)
+const INITIAL_WIDTH = 566;
+// 축 글자: mono-caption + text/muted (Figma Chart / DailyPnlBars)
+const AXIS_TICK = {
+  className: 'fill-(--sn-color-text-muted) font-mono text-caption',
+};
 
-type Bar = { key: string; label: string; pnl: number };
+type PnlDatum = { key: string; label: string; pnl: number };
 
 export function DailyPnlChart() {
   const { data } = useRecentDailyResultsQuery();
@@ -61,74 +83,84 @@ type DailyPnlBarsProps = {
 };
 
 function DailyPnlBars({ history, todayPnl }: DailyPnlBarsProps) {
-  const bars: Bar[] = history.map((result) => ({
+  const data: PnlDatum[] = history.map((result) => ({
     key: result.tradeDate,
     label: formatMonthDay(result.tradeDate),
     pnl: result.pnl,
   }));
   if (todayPnl !== null)
-    bars.push({ key: 'today', label: '오늘', pnl: todayPnl });
-  const axisMax = getAxisMax(bars.map((bar) => bar.pnl));
+    data.push({ key: 'today', label: '오늘', pnl: todayPnl });
+  const axisMax = getAxisMax(data.map((datum) => datum.pnl));
+  const labelKeys = data
+    .filter(
+      (_, index) => index % LABEL_EVERY === 0 || index === data.length - 1,
+    )
+    .map((datum) => datum.key);
+  const findDatum = (key: string | number | undefined) =>
+    data.find((datum) => datum.key === key);
 
   return (
-    <figure
-      aria-label={`최근 ${bars.length}거래일 일별 손익`}
-      className="m-0 flex flex-col gap-2"
-    >
-      <div className="flex h-40 gap-2">
-        <div
-          aria-hidden
-          className="flex w-10 shrink-0 flex-col justify-between text-right font-mono text-caption text-muted"
-        >
-          <span>{formatSignedManWon(axisMax)}</span>
-          <span>0</span>
-          <span>{formatSignedManWon(-axisMax)}</span>
-        </div>
-        <div className="relative flex flex-1 gap-2">
-          <span
-            aria-hidden
-            className="absolute inset-x-0 top-1/2 border-t border-default"
-          />
-          {bars.map((bar) => (
-            <PnlBar key={bar.key} bar={bar} axisMax={axisMax} />
-          ))}
-        </div>
-      </div>
-      <div
-        aria-hidden
-        className="flex gap-2 pl-12 font-mono text-caption text-muted"
+    <figure aria-label={`최근 ${data.length}거래일 일별 손익`} className="m-0">
+      {/* 서버 렌더링에서는 너비를 몰라서, 데스크톱 카드 너비로 먼저 그린 뒤 실제 너비로 맞춰요 */}
+      <ResponsiveContainer
+        width="100%"
+        height={PLOT_HEIGHT}
+        initialDimension={{ width: INITIAL_WIDTH, height: PLOT_HEIGHT }}
       >
-        {bars.map((bar, index) => (
-          <span key={bar.key} className="flex-1 text-center whitespace-nowrap">
-            {index % LABEL_EVERY === 0 || index === bars.length - 1
-              ? bar.label
-              : ''}
-          </span>
-        ))}
-      </div>
+        <BarChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+          <YAxis
+            domain={[-axisMax, axisMax]}
+            ticks={[axisMax, 0, -axisMax]}
+            interval={0}
+            tickFormatter={formatSignedManWon}
+            tick={AXIS_TICK}
+            axisLine={false}
+            tickLine={false}
+            width={40}
+          />
+          <XAxis
+            dataKey="key"
+            ticks={labelKeys}
+            interval={0}
+            height={X_AXIS_HEIGHT}
+            tickFormatter={(key: string) => findDatum(key)?.label ?? ''}
+            tick={AXIS_TICK}
+            axisLine={false}
+            tickLine={false}
+          />
+          <ReferenceLine y={0} stroke="var(--sn-color-border-default)" />
+          <Tooltip
+            cursor={{ fill: 'var(--sn-color-bg-subtle)' }}
+            isAnimationActive={false}
+            content={({ active, label }) => {
+              const datum = active ? findDatum(label) : undefined;
+              return datum ? <PnlTooltip datum={datum} /> : null;
+            }}
+          />
+          {/* 움직임은 사용자 행동에만 써요(DESIGN.md §1). 막대가 자라는 애니메이션은 꺼요. */}
+          <Bar
+            dataKey="pnl"
+            isAnimationActive={false}
+            shape={(props: BarShapeProps) => (
+              <Rectangle
+                {...props}
+                fill={PNL_COLOR[getPnlDirection(data[props.index]?.pnl ?? 0)]}
+              />
+            )}
+          />
+        </BarChart>
+      </ResponsiveContainer>
     </figure>
   );
 }
 
-function PnlBar({ bar, axisMax }: { bar: Bar; axisMax: number }) {
-  const summary = `${bar.label} ${formatSignedWon(bar.pnl)}`;
-  // 0선 위아래로 반씩 써요
-  const heightPercent = Math.min(Math.abs(bar.pnl) / axisMax, 1) * 50;
+// sonic Tooltip과 같은 모양: bg/inverse + text/inverse, caption, radius/md
+function PnlTooltip({ datum }: { datum: PnlDatum }) {
   return (
-    <Tooltip content={summary}>
-      <span
-        role="img"
-        aria-label={summary}
-        tabIndex={0}
-        className="relative flex-1 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-      >
-        <span
-          aria-hidden
-          className={`absolute inset-x-0 ${bar.pnl >= 0 ? 'bottom-1/2 bg-pnl-up' : 'top-1/2 bg-pnl-down'}`}
-          style={{ height: `${heightPercent}%` }}
-        />
-      </span>
-    </Tooltip>
+    <div className="rounded-md bg-inverse px-2 py-1 text-caption text-inverse">
+      {datum.label}{' '}
+      <span className="font-mono">{formatSignedWon(datum.pnl)}</span>
+    </div>
   );
 }
 

@@ -1,4 +1,8 @@
-import { getPnlDirection, PNL_TEXT_CLASS } from '@/shared/lib';
+'use client';
+
+import { Line, LineChart, YAxis } from 'recharts';
+
+import { getPnlDirection, PNL_COLOR } from '@/shared/lib';
 
 const WIDTH = 96;
 const HEIGHT = 32;
@@ -10,23 +14,27 @@ export function Sparkline({ values }: { values: number[] }) {
   if (first === undefined || last === undefined || values.length < 2) {
     return <span aria-hidden className="h-8 w-24 shrink-0" />;
   }
-  const min = Math.min(...values);
-  const range = Math.max(...values) - min || 1;
-  const points = values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * WIDTH;
-      const y = HEIGHT - 1 - ((value - min) / range) * (HEIGHT - 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+  const data = values.map((pnl, index) => ({ index, pnl }));
   return (
-    <svg
-      aria-hidden
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      className={`h-8 w-24 shrink-0 ${PNL_TEXT_CLASS[getPnlDirection(last - first)]}`}
-      fill="none"
-    >
-      <polyline points={points} stroke="currentColor" strokeWidth={1} />
-    </svg>
+    <div aria-hidden className="h-8 w-24 shrink-0">
+      <LineChart
+        width={WIDTH}
+        height={HEIGHT}
+        data={data}
+        margin={{ top: 1, right: 1, bottom: 1, left: 1 }}
+        accessibilityLayer={false}
+      >
+        <YAxis hide domain={['dataMin', 'dataMax']} />
+        <Line
+          dataKey="pnl"
+          type="linear"
+          stroke={PNL_COLOR[getPnlDirection(last - first)]}
+          strokeWidth={1}
+          dot={false}
+          activeDot={false}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </div>
   );
 }
