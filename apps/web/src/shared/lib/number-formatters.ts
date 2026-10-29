@@ -32,6 +32,11 @@ export function formatRatio(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+// 상한처럼 만 원 단위로 떨어지는 금액. 100000 → "10만 원"
+export function formatManWon(value: number) {
+  return `${formatNumber(value / 10_000)}만 원`;
+}
+
 // 차트 축처럼 짧게 써요. 200000 → "+20만", -200000 → "−20만"
 export function formatSignedManWon(value: number) {
   if (value === 0) return '0';

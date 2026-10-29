@@ -23,7 +23,8 @@ export function NavList({ onNavigate }: NavListProps) {
                 href={href}
                 {...(onNavigate ? { onClick: onNavigate } : {})}
                 {...(isCurrent ? { 'aria-current': 'page' as const } : {})}
-                className={`flex h-10 items-center gap-3 rounded-md px-3 text-body text-default transition-colors duration-(--sn-duration-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${isCurrent ? 'bg-selected' : 'hover:bg-subtle'}`}
+                // Figma App / NavItem: 선택 bg/selected + text/default + body-strong, 나머지 text/muted + body
+                className={`flex h-10 items-center gap-3 rounded-md px-3 transition-colors duration-(--sn-duration-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${isCurrent ? 'bg-selected text-body-strong text-default' : 'text-body text-muted hover:bg-subtle hover:text-default'}`}
               >
                 <Icon className="size-4" aria-hidden />
                 {label}

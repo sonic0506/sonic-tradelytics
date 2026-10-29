@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'msw';
 
+import { botHandlers } from '@/entities/bot';
 import { dailyResultHandlers } from '@/entities/daily-result';
 import { engineStatusHandlers } from '@/entities/engine-status';
 import { homeHandlers } from '@/entities/home';
@@ -13,6 +14,7 @@ import { killSwitchHandlers } from '@/features/engine/kill-switch';
 export const handlers: RequestHandler[] = [
   ...engineStatusHandlers,
   ...homeHandlers,
+  ...botHandlers,
   ...dailyResultHandlers,
   ...positionHandlers,
   ...orderHandlers,
