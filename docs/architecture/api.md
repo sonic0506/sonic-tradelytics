@@ -8,8 +8,8 @@ web(Next.js)이 부르는 api 프로세스의 엔드포인트 목록이에요. *
 ## 원칙
 
 1. **api는 토스를 부르지 않아요**: 계좌·시세처럼 토스에서 오는 값은 engine이 DB에 쓴 값을 읽어요. 그래서 몇 초 늦을 수 있고, 화면에 기준 시각을 같이 보여줘요 ([ADR-0002](./adr/0002-split-api-and-engine.md))
-2. **매매에 영향을 주는 동작은 명령으로 보내요**: 정지·청산·킬 스위치·투자금 확대는 api가 직접 처리하지 않고 `commands` 행을 넣어요. 실행과 결과는 engine이 정해요 ([ADR-0004](./adr/0004-postgres-notify-for-commands.md))
-3. **검사는 두 번 해요**: api는 저장할 때 입력과 정책을 검사하고, engine은 실행 직전에 다시 검사해요. 사이에 상태가 바뀔 수 있어서예요. 예) 투자금 확대는 api가 보유 종목이 없음을 확인하고, engine이 처리할 때 한 번 더 확인해요
+2. **매매에 영향을 주는 동작은 명령으로 보내요**: 정지·청산·킬 스위치·투자금 다시 정하기는 api가 직접 처리하지 않고 `commands` 행을 넣어요. 실행과 결과는 engine이 정해요 ([ADR-0004](./adr/0004-postgres-notify-for-commands.md))
+3. **검사는 두 번 해요**: api는 저장할 때 입력과 정책을 검사하고, engine은 실행 직전에 다시 검사해요. 사이에 상태가 바뀔 수 있어서예요. 예) 투자금 다시 정하기는 api가 봇이 쉬는 중인지 확인하고, engine이 처리할 때 한 번 더 확인해요
 4. **기록은 화면에서도 고칠 수 없어요**: 판단·주문·체결·리스크 이벤트는 조회 API만 있어요 (NFR-04)
 5. **실시간은 폴링으로 해요**: 웹소켓·SSE를 두지 않아요. 1인용이고 화면 갱신은 몇 초면 충분해요
 
@@ -87,7 +87,7 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 ### `POST /v1/commands`
 
-봇 정지·재개·청산, 킬 스위치, 투자금 확대를 engine에 보내요. `commands` 행을 넣고 같은 트랜잭션에서 `NOTIFY command`를 보내요 (201).
+봇 정지·재개·청산, 킬 스위치, 투자금 다시 정하기를 engine에 보내요. `commands` 행을 넣고 같은 트랜잭션에서 `NOTIFY command`를 보내요 (201).
 
 | `kind` | `botId` | 그 밖 | api가 먼저 막는 것 |
 | --- | --- | --- | --- |
@@ -95,7 +95,9 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 | `resume` | 필수 | | 누적 손실 한도로 끝난 봇(POL-RISK-03). `waiting_funds` 봇의 `resume`은 지금 운용 자산으로 다시 확정을 시도해요 (POL-FUND-15, FR-BOT-10) |
 | `liquidate` | 필수 | | `stopped` 봇 |
 | `kill` | 없음 | `liquidateAll` | 없음. 언제나 받아요 |
-| `expand_budget` | 필수 | | `stage ≠ released`, 보유 종목 있음 (POL-FUND-12) |
+| `rebudget` | 필수 | `budget`(방식·금액·1회 주문 금액) | `running`·`paused`가 아닌 봇(`ready`·`waiting_funds`는 `PATCH`로 바꿔요), 쉬는 중이 아님(`BOT_NOT_RESTING`), 새 금액을 확정할 운용 자산 부족(`BUDGET_INSUFFICIENT`, 배분 미리보기와 같은 계산) (POL-FUND-12) |
+
+- **쉬는 중**(`resting`)은 봇 상태가 아니라 계산값이에요: `running`·`paused`이고, 보유 종목·미체결 주문이 없고, 운영 시간 밖(장 마감 뒤·휴장일·하루 한도로 신규 진입 중단)일 때 참이에요. `GET /v1/bots/:id`와 같은 함수로 계산해요
 
 - 응답은 넣은 `commands` 행이에요(`id`, `handledAt: null`). web은 `GET /v1/commands/:id`를 0.5초 간격으로 불러 `handledAt`·`result`를 확인해요. 킬 스위치는 1초 안에 `handledAt`이 차는 것이 정상이에요 (NFR-02)
 - 같은 버튼을 두 번 눌러도 engine이 같은 결과를 내요([엔진 명령 처리](./engine.md#명령-처리-command)). api는 중복을 막지 않아요
@@ -166,7 +168,7 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 ### `POST /v1/allocation-previews`
 
-저장 전에 예상 배분을 보여줘요 (FR-BOT-05). 몸체는 만들려는 봇의 투자금 설정, 응답은 같은 시각에 시작하는 봇 전체의 예상 확정 금액·보류 예정·미배분이에요.
+저장 전에 예상 배분을 보여줘요 (FR-BOT-05). 몸체는 만들려는 봇의 투자금 설정, 응답은 같은 시각에 시작하는 봇 전체의 예상 확정 금액·보류 예정·미배분이에요. 투자금 다시 정하기(POL-FUND-12)는 몸체에 `botId`를 넣어 그 봇의 기존 투자금을 반환한 것으로 보고 계산해요.
 
 - 운용 자산은 `engine_statuses`의 주문 가능 금액으로 [POL-FUND-02](../policy/fund-allocation.md#기본)를 계산해요. 실제 확정은 시작 시각 스냅샷으로 engine이 하므로 결과가 다를 수 있어서, 응답에 기준 시각을 넣어요
 - 계산은 `fund` feature의 순수 함수(`*.rule.ts`)를 engine과 같이 써요. 미리보기와 실제 확정이 같은 계산이에요
@@ -187,8 +189,9 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 ### `GET /v1/bots`, `GET /v1/bots/:id`
 
-목록은 이름·유형·성향·상태(사유 포함)·단계·확정 투자금·오늘 손익이에요. 상세는 여기에 더해 아래를 줘요.
+목록은 이름·유형·성향·상태(사유 포함)·단계·확정 투자금·오늘 손익·오늘 운영 상황이에요. 상세는 여기에 더해 아래를 줘요.
 
+- 오늘 운영 상황 (FR-BOT-12): `activity`(`trading` 운영 시간 안 · `off_hours` 운영 시간 밖 · `limit_reached` 하루 한도로 신규 진입 중단 · `market_closed` 휴장일), 다음 운영 시각 `nextRunAt`, 쉬는 중 여부 `resting`과 쉬는 중이 아닌 이유(`holding`·`pending_order`·`trading_hours`). 봇 상태(`status`)는 바꾸지 않아요
 - 현재 버전과 적용 대기 버전 (`applied_at` null)
 - 자금: 확정 투자금, 사용 중 금액, 남은 한도, 누적 손익, 손실 중지까지 남은 여유 ([자금 정보 표시](../policy/fund-allocation.md#봇-화면에-표시할-자금-정보))
 - 검증 구간이면 [상한 해제 기준](../policy/risk-management.md#9-검증-구간과-상한-해제-pol-risk-13)별 현재 값과 통과 여부 (FR-BOT-06)
@@ -196,22 +199,22 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 ### `PATCH /v1/bots/:id`
 
-판단에 쓰이지 않는 설정만 바꿔요: 이름, 운용 종료일, 종료 시 처리, 시작 우선순위, 운영 시간. 투자금 설정(`budget_*`)은 `ready`·`waiting_funds`일 때만 바꿀 수 있어요 (`BOT_BUDGET_LOCKED`, F1 수용 기준). 운영 시간은 POST와 같이 검사해요. engine은 다음 주기에 `updated_at`을 보고 다시 읽어요.
+판단에 쓰이지 않는 설정만 바꿔요: 이름, 운용 종료일, 종료 시 처리, 시작 우선순위, 운영 시간. 투자금 설정(`budget_*`)은 `ready`·`waiting_funds`일 때만 `PATCH`로 바꿀 수 있어요 (`BOT_BUDGET_LOCKED`, F1 수용 기준). `running`·`paused` 봇은 쉬는 중일 때 `rebudget` 명령으로 반환 후 다시 확정해요 (POL-FUND-12). 운영 시간은 POST와 같이 검사해요. engine은 다음 주기에 `updated_at`을 보고 다시 읽어요.
 
 ### 규칙 값 버전
 
 | 엔드포인트 | 하는 일 |
 | --- | --- |
 | `GET /v1/bots/:id/versions` | 버전 목록 (버전 번호, 변경 종류, 저장·적용 시각, 바뀐 값) |
-| `POST /v1/bots/:id/version-previews` | 바꾸려는 값을 보내면 `change_kind`(`decision_change`·`risk_only`)와 그 결과(검증 구간 재시작 여부, 상한으로 다시 확정되는지)를 돌려줘요. 저장하지 않아요 (FR-BOT-11, 200) |
-| `POST /v1/bots/:id/versions` | 새 버전을 `applied_at = null`로 추가해요 (201). 적용은 engine이 보유 종목이 없을 때 해요 (POL-RISK-13) |
+| `POST /v1/bots/:id/version-previews` | 바꾸려는 값을 보내면 `change_kind`(`decision_change`·`risk_only`)와 그 결과(검증 구간 재시작 여부, 상한으로 다시 확정되는지, 적용 시점 `applyTiming`: `now` 쉬는 중이라 바로 · `when_resting` 쉬는 중이 된 뒤)를 돌려줘요. 저장하지 않아요 (FR-BOT-11, 200) |
+| `POST /v1/bots/:id/versions` | 새 버전을 추가해요 (201). 봇이 쉬는 중이면 engine이 바로 적용해 `applied_at`이 차고, 아니면 `null`로 두었다가 쉬는 중이 되는 첫 시점에 적용해요 (POL-RISK-13) |
 
 - `change_kind`는 서버가 정해요. 손실 한도 조이기, 연속 손절 횟수 줄이기, 1회 주문 금액 줄이기**만** 바뀌면 `risk_only`, 그 밖에 하나라도 바뀌면 `decision_change`예요. 위험을 늘리는 쪽으로 바꾸는 것도 `decision_change`예요
 - 적용 대기 버전이 있으면 새 버전을 더 넣지 않아요 (`BOT_VERSION_PENDING`). 대기 버전이 적용된 뒤에 다시 저장해요
 
 ### `POST /v1/bots/:id/release`
 
-상한 해제 (FR-BOT-06). api가 기준을 계산해 모두 통과할 때만 `stage = released`로 바꿔요 (`RELEASE_CRITERIA_NOT_MET`). 투자금은 그대로이고, 늘리려면 이어서 `expand_budget` 명령을 보내요 (POL-FUND-12). 기준 계산은 `GET /v1/bots/:id`와 같은 함수예요.
+상한 해제 (FR-BOT-06). api가 기준을 계산해 모두 통과할 때만 `stage = released`로 바꿔요 (`RELEASE_CRITERIA_NOT_MET`). 투자금은 그대로이고, 늘리려면 쉬는 중에 `rebudget` 명령을 보내요 (POL-FUND-12). 기준 계산은 `GET /v1/bots/:id`와 같은 함수예요.
 
 ### `GET /v1/bots/options`
 
@@ -322,7 +325,9 @@ Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중�
 | `COMMAND_NOT_FOUND` | 404 | 없는 명령 |
 | `BUDGET_RATIO_EXCEEDED` | 422 | 정률 합 100% 초과 (POL-FUND-03) |
 | `TRADING_HOURS_OUT_OF_RANGE` | 422 | 운영 시간이 정규장 밖 (POL-RISK-15) |
-| `BOT_BUDGET_LOCKED` | 409 | 실행 중 봇의 투자금 수정 |
+| `BOT_BUDGET_LOCKED` | 409 | `running`·`paused` 봇의 투자금을 `PATCH`로 수정 (`rebudget` 명령을 써요) |
+| `BOT_NOT_RESTING` | 409 | 쉬는 중이 아닌 봇의 `rebudget`. 이유(`holding`·`pending_order`·`trading_hours`)를 `detail`에 |
+| `BUDGET_INSUFFICIENT` | 422 | `rebudget`의 새 금액을 확정할 운용 자산이 모자람 (POL-FUND-12). 기존 투자금은 그대로 |
 | `BOT_VERSION_PENDING` | 409 | 적용 대기 버전이 이미 있음 |
 | `RELEASE_CRITERIA_NOT_MET` | 422 | 상한 해제 기준 미달 (POL-RISK-13). 미달 기준 목록을 `detail`에 |
 | `COMMAND_NOT_ALLOWED` | 409 | 지금 봇 상태에서 받을 수 없는 명령 ([명령 표](#post-v1commands)) |
@@ -359,10 +364,12 @@ api가 토스를 부르지 않으므로, 화면에 필요한 실시간 값은 en
 4. 손실 한도만 낮춘 버전 미리보기는 `risk_only`, 진입 값 하나라도 바꾸면 `decision_change`다. 손실 한도를 높여도 `decision_change`다
 5. 기준 하나라도 미달인 봇의 `release`는 422이고 `stage`가 바뀌지 않는다
 6. `POST /v1/commands`(`kill`)는 `commands` 행과 `NOTIFY`를 한 트랜잭션으로 남긴다. 롤백되면 둘 다 없다
-7. 보유 종목이 있는 봇의 `expand_budget`은 409 `COMMAND_NOT_ALLOWED`다
+7. 보유 종목이 있거나 운영 시간 안인 봇의 `rebudget`은 409 `BOT_NOT_RESTING`이다
 8. `GET /v1/positions`는 보유 중 포지션을 첫 페이지 맨 위에 둔다
 9. 판단·주문·체결을 바꾸거나 지우는 경로가 없다 (`openapi.json` 경로 목록 검사)
 10. 토큰 없이 부르면 `GET /health`를 뺀 모든 경로가 401이다 (하네스 `auth-guard.e2e-spec.ts`)
 11. `GET /v1/daily-results`의 날짜별 `pnl`은 같은 기간 `GET /v1/bots/:id/daily-results`를 봇마다 더한 값과 같다
-12. 홈 봇 카드의 `winRate30d`는 `not_filled` 포지션을 세지 않고, 청산이 없으면 `null`이다
-13. `GET /v1/orders`는 기본으로 `manual` 주문을 빼고, 체결 수량이 0인 주문은 어떤 쿼리로도 나오지 않는다
+12. 쉬는 중인 봇의 버전 미리보기는 `applyTiming = now`이고, 저장하면 `applied_at`이 바로 찬다. 보유 종목이 있으면 `when_resting`이고 `applied_at`은 `null`이다
+13. 새 금액을 확정할 운용 자산이 모자란 `rebudget`은 422 `BUDGET_INSUFFICIENT`이고 기존 배분 행이 그대로다
+14. 홈 봇 카드의 `winRate30d`는 `not_filled` 포지션을 세지 않고, 청산이 없으면 `null`이다
+15. `GET /v1/orders`는 기본으로 `manual` 주문을 빼고, 체결 수량이 0인 주문은 어떤 쿼리로도 나오지 않는다

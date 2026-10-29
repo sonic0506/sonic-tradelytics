@@ -107,7 +107,7 @@ erDiagram
 | total_loss_pct | numeric(5,2) | not null, CHECK > 0 | 누적 손실 중지 % |
 | stop_streak | integer | not null, default 3 | 연속 손절 일시정지 횟수 (POL-RISK-04) |
 | on_daily_limit | text | not null, CHECK `liquidate` `hold` | 하루 한도 도달 시 보유분 처리 (POL-RISK-02) |
-| applied_at | timestamptz | | 실제 적용 시각. 보유 종목이 없을 때 적용되므로 저장 시각과 다를 수 있어요. null이면 적용 대기 |
+| applied_at | timestamptz | | 실제 적용 시각. 쉬는 중에 저장하면 저장 시각과 같고, 아니면 쉬는 중이 된 뒤 적용돼 늦어요 (POL-RISK-13). null이면 적용 대기 |
 | created_at | timestamptz | not null | |
 
 - UNIQUE `(bot_id, version)`
@@ -144,7 +144,7 @@ erDiagram
 
 - 부분 UNIQUE `(bot_id) WHERE released_at IS NULL`: 봇당 살아 있는 배분은 1개
 - CHECK: `(released_at is null) = (released_amount is null)`
-- 상한 해제 후 투자금 확대(POL-FUND-12)는 기존 행을 반환 처리하고 새 행을 추가해요
+- 투자금 다시 정하기(POL-FUND-12)는 기존 행을 반환 처리하고 새 행을 추가해요. 새 금액을 확정할 수 없으면 둘 다 하지 않아요
 - 자금 부족 보류(POL-FUND-15)는 행을 만들지 않고 `bot.status = waiting_funds`로 남겨요
 
 ### 판단과 주문
@@ -364,7 +364,8 @@ api → engine 명령 ([ADR-0004](./adr/0004-postgres-notify-for-commands.md)). 
 | 컬럼 | 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
 | id | bigint | PK | |
-| kind | text | not null, CHECK `pause` `resume` `liquidate` `kill` `expand_budget` | POL-RISK-10, FR-BOT-09 |
+| kind | text | not null, CHECK `pause` `resume` `liquidate` `kill` `rebudget` | POL-RISK-10, FR-BOT-09 |
+| budget | jsonb | | `rebudget`의 새 투자금 설정(방식·금액·1회 주문 금액). 다른 명령은 null |
 | bot_id | bigint | FK → bots | `kill`은 null (모든 봇) |
 | liquidate_all | boolean | not null, default false | 킬 스위치의 "전량 청산" 선택 |
 | requested_at | timestamptz | not null | |
