@@ -13,6 +13,13 @@ import type { ApplyResult, OrderReport } from './order.types.js';
 
 const OPEN_STATUSES: readonly string[] = OPEN_ORDER_STATUSES;
 
+// 봇 하나의 미체결 주문 (POL-FUND-05, 12)
+export interface BotOpenOrders {
+  // 미체결 매수 주문 금액 = 남은 수량 × 지정가
+  openBuyAmount: number;
+  hasOpenOrders: boolean;
+}
+
 type Filled = Pick<
   BrokerOrder,
   'filledQuantity' | 'filledAmount' | 'commission' | 'tax'
@@ -34,6 +41,29 @@ export class OrderService {
     private readonly orders: OrderRepository,
     private readonly positions: PositionService,
   ) {}
+
+  // ponytail: 시장가 매수는 가격을 몰라 0원으로 봐요. 봇은 지정가로 사고, 시장가는 손절·청산 매도에만 써요
+  async openOrdersByBot(botIds: number[]): Promise<Map<number, BotOpenOrders>> {
+    const result = new Map<number, BotOpenOrders>(
+      botIds.map((botId) => [
+        botId,
+        { openBuyAmount: 0, hasOpenOrders: false },
+      ]),
+    );
+    if (botIds.length === 0) return result;
+    for (const order of await this.orders.findOpenForBots(botIds)) {
+      const open =
+        order.position.botId === null
+          ? undefined
+          : result.get(order.position.botId);
+      if (!open) continue;
+      open.hasOpenOrders = true;
+      if (order.side === 'BUY')
+        open.openBuyAmount +=
+          (order.quantity - order.filledQuantity) * (order.price ?? 0);
+    }
+    return result;
+  }
 
   // 토스가 알려 준 주문 1건을 반영해요. 같은 값을 여러 번 받아도 결과가 같아요
   @Transactional()

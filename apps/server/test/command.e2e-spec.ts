@@ -12,6 +12,7 @@ import {
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { RiskEvent } from '@/modules/risk/index.js';
 
+import { FakeTossModule } from './setup/fake-toss.js';
 import { createTestApp, resetDatabase } from './setup/test-app.js';
 
 // api가 commands에 넣고 같은 트랜잭션에서 NOTIFY하면 engine이 바로 처리하는지 실제 Postgres로 확인해요 (ADR-0004, NFR-02).
@@ -33,7 +34,11 @@ describe('명령 처리 (e2e)', () => {
     dataSource.getRepository(Command).findOneByOrFail({ id });
 
   beforeAll(async () => {
-    app = await createTestApp([EngineLockModule, CommandModule]);
+    app = await createTestApp([
+      FakeTossModule,
+      EngineLockModule,
+      CommandModule,
+    ]);
     dataSource = app.get(DataSource);
     engineState = app.get(EngineStateService);
     await resetDatabase(app);

@@ -21,3 +21,13 @@ export function kstDateTime(at: Date): string {
 export function kstAt(date: string, time: string): Date {
   return new Date(`${date}T${time}:00+09:00`);
 }
+
+const kstClockFormat = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul',
+  timeStyle: 'medium',
+});
+
+// HH:mm:ss (KST). Postgres time 컬럼 값('09:00:00')과 문자열로 비교할 수 있어요
+export function kstTime(at: Date = new Date()): string {
+  return kstClockFormat.format(at);
+}

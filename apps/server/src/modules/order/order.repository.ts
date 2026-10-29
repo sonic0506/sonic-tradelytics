@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import { IsNull, LessThanOrEqual, type Repository } from 'typeorm';
+import { In, IsNull, LessThanOrEqual, type Repository } from 'typeorm';
 
 import { BrokerOrder } from './entities/broker-order.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
 import { ProtectiveOrder } from './entities/protective-order.entity.js';
-import type { OrderSide } from './order.constants.js';
+import { OPEN_ORDER_STATUSES, type OrderSide } from './order.constants.js';
 
 export type BrokerOrderFields = Omit<
   BrokerOrder,
@@ -26,6 +26,9 @@ export type OrderEventFields = Pick<
 
 @Injectable()
 export class OrderRepository {
+  // 봇들의 미체결 주문은 많아야 수십 건이에요
+  private static readonly MAX_OPEN_ORDERS = 1000;
+
   constructor(
     private readonly txHost: TransactionHost<TransactionalAdapterTypeOrm>,
   ) {}
@@ -40,6 +43,18 @@ export class OrderRepository {
 
   private get protectives(): Repository<ProtectiveOrder> {
     return this.txHost.tx.getRepository(ProtectiveOrder);
+  }
+
+  // 봇들의 미체결 주문 (POL-FUND-05, 12). 포지션으로 봇을 알아요
+  findOpenForBots(botIds: number[]): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      relations: { position: true },
+      where: {
+        status: In([...OPEN_ORDER_STATUSES]),
+        position: { botId: In(botIds) },
+      },
+      take: OrderRepository.MAX_OPEN_ORDERS,
+    });
   }
 
   findByBrokerOrderId(brokerOrderId: string): Promise<BrokerOrder | null> {

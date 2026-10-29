@@ -14,11 +14,55 @@ export interface Fill {
   at: Date;
 }
 
+// 봇 하나의 보유·실현 손익 (POL-FUND-02, 05)
+export interface BotHoldings {
+  // 열린 포지션의 매수 금액 합
+  holdingsCost: number;
+  // since 이후에 연 포지션의 실현 손익 합(수수료·세금 차감)
+  realizedPnl: number;
+  hasHoldings: boolean;
+}
+
 @Injectable()
 export class PositionService {
   private readonly logger = new Logger(PositionService.name);
 
   constructor(private readonly positions: PositionRepository) {}
+
+  // 봇마다 since(그 배분의 확정 시각) 이후 실현 손익과 지금 보유분을 모아요
+  async botHoldings(
+    bots: { botId: number; since: Date }[],
+  ): Promise<Map<number, BotHoldings>> {
+    const result = new Map<number, BotHoldings>(
+      bots.map(({ botId }) => [
+        botId,
+        { holdingsCost: 0, realizedPnl: 0, hasHoldings: false },
+      ]),
+    );
+    if (bots.length === 0) return result;
+    const sinceByBot = new Map(bots.map(({ botId, since }) => [botId, since]));
+    const earliest = new Date(
+      Math.min(...bots.map(({ since }) => since.getTime())),
+    );
+    const positions = await this.positions.findForFunds(
+      bots.map(({ botId }) => botId),
+      earliest,
+    );
+    for (const position of positions) {
+      const holdings =
+        position.botId === null ? undefined : result.get(position.botId);
+      const since =
+        position.botId === null ? undefined : sinceByBot.get(position.botId);
+      if (!holdings || !since) continue;
+      if (position.status === 'open') {
+        holdings.holdingsCost += position.costBasis;
+        holdings.hasHoldings ||= position.quantity > 0;
+      }
+      if (position.openedAt >= since)
+        holdings.realizedPnl += position.realizedPnl;
+    }
+    return result;
+  }
 
   // 직접 거래 주문을 붙일 포지션 (FR-MAN-01). 같은 종목에 열린 것이 있으면 그걸 써요
   async openManual(symbol: string, openedAt: Date): Promise<Position> {

@@ -4,9 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BotRepository } from './bot.repository.js';
 import { BotService } from './bot.service.js';
 import { Bot } from './entities/bot.entity.js';
+import { BotVersion } from './entities/bot-version.entity.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Bot])],
+  imports: [TypeOrmModule.forFeature([Bot, BotVersion])],
   providers: [BotService, BotRepository],
   exports: [BotService],
 })

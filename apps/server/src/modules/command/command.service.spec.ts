@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { type Bot, BotService } from '@/modules/bot/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
+import { FundService } from '@/modules/fund/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { noOpTransactionalModule } from '../../../test/setup/transactional.js';
@@ -28,6 +29,7 @@ describe('CommandService', () => {
     record: vi.fn<RiskService['record']>(),
     latestAt: vi.fn<RiskService['latestAt']>(),
   };
+  const fund = { rebudget: vi.fn<FundService['rebudget']>() };
   let state: EngineStateService;
   let service: CommandService;
 
@@ -69,6 +71,7 @@ describe('CommandService', () => {
         { provide: CommandRepository, useValue: commands },
         { provide: BotService, useValue: bots },
         { provide: RiskService, useValue: risk },
+        { provide: FundService, useValue: fund },
       ],
     }).compile();
     service = moduleRef.get(CommandService);
@@ -195,13 +198,31 @@ describe('CommandService', () => {
     expect(handled()[0]?.result).toBe('failed');
   });
 
-  it('rebudget은 기존 투자금을 그대로 두고 failed로 남겨요', async () => {
-    commands.findPending.mockResolvedValueOnce([command('rebudget')]);
+  it('rebudget은 새 투자금 설정을 FundService에 넘기고 결과를 남겨요', async () => {
+    const budget = { budgetType: 'fixed', budgetAmount: 300_000 };
+    commands.findPending.mockResolvedValueOnce([
+      command('rebudget', { budget }),
+    ]);
+    fund.rebudget.mockResolvedValue({ ok: true });
 
     await service.start();
 
-    expect(bots.setStatus).not.toHaveBeenCalled();
-    expect(handled()[0]?.result).toBe('failed');
+    expect(fund.rebudget).toHaveBeenCalledWith(7, budget);
+    expect(handled()).toEqual([{ id: 1, result: 'ok', error: null }]);
+  });
+
+  it('rebudget을 할 수 없으면 이유를 남기고 기존 투자금을 그대로 둬요', async () => {
+    commands.findPending.mockResolvedValueOnce([command('rebudget')]);
+    fund.rebudget.mockResolvedValue({
+      ok: false,
+      error: 'BOT_NOT_RESTING:holding',
+    });
+
+    await service.start();
+
+    expect(handled()).toEqual([
+      { id: 1, result: 'failed', error: 'BOT_NOT_RESTING:holding' },
+    ]);
   });
 
   it('NOTIFY를 받으면 바로 미처리 명령을 다시 읽어요', async () => {

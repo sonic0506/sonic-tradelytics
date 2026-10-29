@@ -10,6 +10,7 @@ describe('PositionService', () => {
     findById: vi.fn<PositionRepository['findById']>(),
     findOpenManual: vi.fn<PositionRepository['findOpenManual']>(),
     createManual: vi.fn<PositionRepository['createManual']>(),
+    findForFunds: vi.fn<PositionRepository['findForFunds']>(),
     update: vi.fn<PositionRepository['update']>(),
   };
   let service: PositionService;
@@ -167,6 +168,57 @@ describe('PositionService', () => {
         at,
       }),
     ).rejects.toThrow(PositionNotFoundException);
+  });
+
+  it('봇마다 보유 매수 금액과 배분 이후 실현 손익을 모아요', async () => {
+    const since = new Date('2026-10-29T00:00:00Z');
+    positions.findForFunds.mockResolvedValue([
+      position({
+        id: 1,
+        botId: 7,
+        quantity: 5,
+        costBasis: 350_000,
+        openedAt: since,
+      }),
+      position({
+        id: 2,
+        botId: 7,
+        status: 'closed',
+        realizedPnl: 12_000,
+        openedAt: new Date('2026-10-29T01:00:00Z'),
+      }),
+      // 배분 전에 닫힌 포지션의 손익은 넣지 않아요
+      position({
+        id: 3,
+        botId: 7,
+        status: 'closed',
+        realizedPnl: 99_000,
+        openedAt: new Date('2026-10-28T01:00:00Z'),
+      }),
+      position({ id: 4, botId: 8, quantity: 0, costBasis: 0, openedAt: since }),
+    ]);
+
+    const result = await service.botHoldings([
+      { botId: 7, since },
+      { botId: 8, since },
+    ]);
+
+    expect(positions.findForFunds).toHaveBeenCalledWith([7, 8], since);
+    expect(result.get(7)).toEqual({
+      holdingsCost: 350_000,
+      realizedPnl: 12_000,
+      hasHoldings: true,
+    });
+    expect(result.get(8)).toEqual({
+      holdingsCost: 0,
+      realizedPnl: 0,
+      hasHoldings: false,
+    });
+  });
+
+  it('봇이 없으면 조회하지 않아요', async () => {
+    await expect(service.botHoldings([])).resolves.toEqual(new Map());
+    expect(positions.findForFunds).not.toHaveBeenCalled();
   });
 
   it('열린 직접 거래 포지션이 있으면 새로 만들지 않고 그걸 써요', async () => {

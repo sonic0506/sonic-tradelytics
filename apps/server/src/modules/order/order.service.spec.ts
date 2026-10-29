@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { PositionService } from '@/modules/position/index.js';
+import { type Position, PositionService } from '@/modules/position/index.js';
 
 import {
   noOpTransactionalModule,
@@ -21,6 +21,7 @@ describe('OrderService', () => {
     create: vi.fn<OrderRepository['create']>(),
     update: vi.fn<OrderRepository['update']>(),
     addEvent: vi.fn<OrderRepository['addEvent']>(),
+    findOpenForBots: vi.fn<OrderRepository['findOpenForBots']>(),
   };
   const positions = {
     openManual: vi.fn<PositionService['openManual']>(),
@@ -87,6 +88,39 @@ describe('OrderService', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('봇마다 미체결 매수 금액(남은 수량 × 지정가)과 미체결 여부를 모아요', async () => {
+    orders.findOpenForBots.mockResolvedValue([
+      known({
+        side: 'BUY',
+        price: 70_000,
+        quantity: 10,
+        filledQuantity: 4,
+        position: Object.assign({ botId: 7 }) as Position,
+      }),
+      known({
+        side: 'SELL',
+        price: 71_000,
+        quantity: 3,
+        filledQuantity: 0,
+        position: Object.assign({ botId: 8 }) as Position,
+      }),
+    ]);
+
+    const result = await service.openOrdersByBot([7, 8, 9]);
+
+    expect(result.get(7)).toEqual({
+      openBuyAmount: 420_000,
+      hasOpenOrders: true,
+    });
+    expect(result.get(8)).toEqual({ openBuyAmount: 0, hasOpenOrders: true });
+    expect(result.get(9)).toEqual({ openBuyAmount: 0, hasOpenOrders: false });
+  });
+
+  it('봇이 없으면 미체결을 조회하지 않아요', async () => {
+    await expect(service.openOrdersByBot([])).resolves.toEqual(new Map());
+    expect(orders.findOpenForBots).not.toHaveBeenCalled();
   });
 
   it('아는 주문의 체결이 늘면 상태를 갱신하고 늘어난 만큼만 포지션에 반영해요', async () => {

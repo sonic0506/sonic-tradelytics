@@ -4,6 +4,7 @@ import { Transactional } from '@nestjs-cls/transactional';
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { BotService } from '@/modules/bot/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
+import { FundService } from '@/modules/fund/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import type { CommandResult } from './command.constants.js';
@@ -39,6 +40,7 @@ export class CommandService {
     private readonly engineState: EngineStateService,
     private readonly bots: BotService,
     private readonly risk: RiskService,
+    private readonly fund: FundService,
   ) {}
 
   // engine 시작 순서 4번: bots.status와 risk_events로 정지 상태를 다시 채워요
@@ -109,7 +111,11 @@ export class CommandService {
       this.engineState.blockBot(command.botId, command.kind);
 
     try {
-      const outcome = await this.apply(command);
+      // rebudget은 토스 스냅샷을 찍어서 명령 트랜잭션 밖에서 해요. 배분은 FundService가 한 트랜잭션으로 바꿔요
+      const outcome =
+        command.kind === 'rebudget'
+          ? await this.rebudget(command)
+          : await this.apply(command);
       if (
         command.kind === 'resume' &&
         command.botId !== null &&
@@ -134,6 +140,17 @@ export class CommandService {
     return outcome;
   }
 
+  // POL-FUND-12: 쉬는 중이 아니거나 돈이 모자라면 failed로 남기고 기존 투자금을 그대로 둬요
+  private async rebudget(command: Command): Promise<Outcome> {
+    const result =
+      command.botId === null
+        ? { ok: false as const, error: 'BOT_NOT_FOUND' }
+        : await this.fund.rebudget(command.botId, command.budget);
+    const outcome = result.ok ? OK : failed(result.error);
+    await this.commands.markHandled(command.id, outcome.result, outcome.error);
+    return outcome;
+  }
+
   private async run(command: Command): Promise<Outcome> {
     if (command.kind === 'kill') {
       await this.bots.stopAll('kill_switch');
@@ -146,9 +163,6 @@ export class CommandService {
         ? failed('모든 봇을 멈췄지만 전량 청산은 아직 하지 못해요')
         : OK;
     }
-    if (command.kind === 'rebudget')
-      return failed('투자금 다시 정하기는 아직 처리하지 못해요');
-
     const bot =
       command.botId === null ? null : await this.bots.findById(command.botId);
     if (!bot) return failed('봇을 찾을 수 없어요');
@@ -165,6 +179,9 @@ export class CommandService {
           return failed('손실 한도로 멈춘 봇은 다시 시작할 수 없어요');
         await this.bots.setStatus(bot.id, 'running', null);
         return OK;
+      // handle()이 먼저 rebudget()으로 보내서 여기에는 오지 않아요
+      case 'rebudget':
+        return this.rebudget(command);
     }
   }
 }

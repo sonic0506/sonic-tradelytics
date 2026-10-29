@@ -5,5 +5,5 @@ export { OrderEvent } from './entities/order-event.entity.js';
 export { ProtectiveOrder } from './entities/protective-order.entity.js';
 export * from './order.constants.js';
 export { OrderModule } from './order.module.js';
-export { OrderService } from './order.service.js';
+export { type BotOpenOrders, OrderService } from './order.service.js';
 export type { ApplyResult, OrderReport } from './order.types.js';
