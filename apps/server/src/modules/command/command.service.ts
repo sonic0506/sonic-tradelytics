@@ -5,6 +5,7 @@ import { EngineLock } from '@/infra/database/engine-lock.js';
 import { BotService } from '@/modules/bot/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { FundService } from '@/modules/fund/index.js';
+import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import type { CommandResult } from './command.constants.js';
@@ -41,6 +42,7 @@ export class CommandService {
     private readonly bots: BotService,
     private readonly risk: RiskService,
     private readonly fund: FundService,
+    private readonly orders: OrderService,
   ) {}
 
   // engine 시작 순서 4번: bots.status와 risk_events로 정지 상태를 다시 채워요
@@ -116,6 +118,7 @@ export class CommandService {
         command.kind === 'rebudget'
           ? await this.rebudget(command)
           : await this.apply(command);
+      if (outcome.result === 'ok') await this.followUp(command);
       if (
         command.kind === 'resume' &&
         command.botId !== null &&
@@ -140,6 +143,32 @@ export class CommandService {
     return outcome;
   }
 
+  // 상태를 바꾼 뒤(트랜잭션 밖, 토스 호출): 미체결 취소와 청산 (docs/architecture/engine.md 명령 처리).
+  // 시간이 걸리는 일이라 1초 기준에 넣지 않아요. 남은 일이 있으면 알려요
+  private async followUp(command: Command): Promise<void> {
+    const botId = command.botId ?? undefined;
+    let uncanceled = 0;
+    let unsold = 0;
+    if (command.kind === 'pause')
+      uncanceled = await this.orders.cancelOpen({ botId, side: 'BUY' });
+    if (command.kind === 'liquidate') {
+      uncanceled = await this.orders.cancelOpen({ botId });
+      unsold = await this.orders.liquidate('manual', botId);
+    }
+    if (command.kind === 'kill') {
+      uncanceled = await this.orders.cancelOpen({});
+      if (command.liquidateAll)
+        unsold = await this.orders.liquidate('kill_switch');
+    }
+    if (uncanceled > 0 || unsold > 0)
+      await this.risk.record('order_rejected', command.botId, {
+        commandId: command.id,
+        kind: command.kind,
+        uncanceled,
+        unsold,
+      });
+  }
+
   // POL-FUND-12: 쉬는 중이 아니거나 돈이 모자라면 failed로 남기고 기존 투자금을 그대로 둬요
   private async rebudget(command: Command): Promise<Outcome> {
     const result =
@@ -158,10 +187,7 @@ export class CommandService {
         commandId: command.id,
         liquidateAll: command.liquidateAll,
       });
-      // ponytail: 미체결 취소·전량 청산은 주문 흐름(OrderService 주문·취소)을 만들 때 붙여요
-      return command.liquidateAll
-        ? failed('모든 봇을 멈췄지만 전량 청산은 아직 하지 못해요')
-        : OK;
+      return OK;
     }
     const bot =
       command.botId === null ? null : await this.bots.findById(command.botId);
@@ -173,7 +199,7 @@ export class CommandService {
         return OK;
       case 'liquidate':
         await this.bots.setStatus(bot.id, 'stopped', 'liquidate');
-        return failed('봇을 멈췄지만 청산은 아직 하지 못해요');
+        return OK;
       case 'resume':
         if (bot.statusReason && LOSS_LIMIT_REASONS.has(bot.statusReason))
           return failed('손실 한도로 멈춘 봇은 다시 시작할 수 없어요');

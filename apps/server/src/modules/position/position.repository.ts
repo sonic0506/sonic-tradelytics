@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import { In, IsNull, MoreThanOrEqual, type Repository } from 'typeorm';
+import {
+  In,
+  IsNull,
+  MoreThan,
+  MoreThanOrEqual,
+  Not,
+  type Repository,
+} from 'typeorm';
 
 import { Position } from './entities/position.entity.js';
 
@@ -43,6 +50,18 @@ export class PositionRepository {
     exitReason: NonNullable<Position['exitReason']>,
   ): Promise<void> {
     await this.positions.update({ id, status: 'open' }, { exitReason });
+  }
+
+  // 봇의 보유 중인 포지션. botId가 없으면 모든 봇
+  findHeldByBot(botId?: number): Promise<Position[]> {
+    return this.positions.find({
+      where: {
+        botId: botId ?? Not(IsNull()),
+        status: 'open',
+        quantity: MoreThan(0),
+      },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
   }
 
   findById(id: number): Promise<Position | null> {

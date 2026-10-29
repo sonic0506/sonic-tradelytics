@@ -64,6 +64,10 @@ export class PositionService {
     return result;
   }
 
+  findHeldByBot(botId?: number): Promise<Position[]> {
+    return this.positions.findHeldByBot(botId);
+  }
+
   find(positionId: number): Promise<Position | null> {
     return this.positions.findById(positionId);
   }

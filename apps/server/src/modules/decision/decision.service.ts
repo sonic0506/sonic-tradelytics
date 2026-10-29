@@ -12,6 +12,11 @@ import {
 export class DecisionService {
   constructor(private readonly decisions: DecisionRepository) {}
 
+  // 그 포지션 첫 진입 판단의 봇 버전 (청산 판단도 진입 때 버전으로 남겨요)
+  async entryVersionId(positionId: number): Promise<number | null> {
+    return (await this.decisions.findEntry(positionId))?.botVersionId ?? null;
+  }
+
   // 그 포지션 첫 진입 판단의 손절가 (손절 조건주문 발동가, POL-RISK-11)
   async entryStopPrice(positionId: number): Promise<number | null> {
     return (await this.decisions.findEntry(positionId))?.stopPrice ?? null;

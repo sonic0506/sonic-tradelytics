@@ -33,16 +33,19 @@ describe('OrderService', () => {
     addProtective: vi.fn<OrderRepository['addProtective']>(),
     updateProtective: vi.fn<OrderRepository['updateProtective']>(),
     hasOpenOrders: vi.fn<OrderRepository['hasOpenOrders']>(),
+    findOpenBotOrders: vi.fn<OrderRepository['findOpenBotOrders']>(),
   };
   const decisions = {
     record: vi.fn<DecisionService['record']>(),
     entryStopPrice: vi.fn<DecisionService['entryStopPrice']>(),
+    entryVersionId: vi.fn<DecisionService['entryVersionId']>(),
   };
   const broker = {
     place: vi.fn<TossBrokerService['place']>(),
     listOrders: vi.fn<TossBrokerService['listOrders']>(),
     placeStop: vi.fn<TossBrokerService['placeStop']>(),
     cancelStop: vi.fn<TossBrokerService['cancelStop']>(),
+    cancel: vi.fn<TossBrokerService['cancel']>(),
     stopState: vi.fn<TossBrokerService['stopState']>(),
   };
   const risk = {
@@ -59,6 +62,7 @@ describe('OrderService', () => {
     find: vi.fn<PositionService['find']>(),
     setExitReason: vi.fn<PositionService['setExitReason']>(),
     closeFlat: vi.fn<PositionService['closeFlat']>(),
+    findHeldByBot: vi.fn<PositionService['findHeldByBot']>(),
   };
   let moduleRef: TestingModule;
   let service: OrderService;
@@ -934,6 +938,75 @@ describe('OrderService', () => {
       });
       expect(orders.create).toHaveBeenCalledWith(
         expect.objectContaining({ origin: 'protective', positionId: 8 }),
+      );
+    });
+  });
+
+  describe('미체결 취소와 청산 (명령)', () => {
+    it('봇의 미체결 중 고른 방향만 취소하고 취소하지 못한 수를 돌려줘요', async () => {
+      orders.findOpenBotOrders.mockResolvedValue([
+        known({ id: 1, side: 'BUY', brokerOrderId: 'o-1' }),
+        known({ id: 2, side: 'SELL', brokerOrderId: 'o-2' }),
+        known({ id: 3, side: 'BUY', brokerOrderId: 'o-3' }),
+      ]);
+      broker.cancel.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+      await expect(service.cancelOpen({ botId: 7, side: 'BUY' })).resolves.toBe(
+        1,
+      );
+
+      expect(orders.findOpenBotOrders).toHaveBeenCalledWith(7);
+      expect(broker.cancel.mock.calls).toEqual([['o-1'], ['o-3']]);
+    });
+
+    it('보유 포지션마다 시장가로 청산하고 팔지 못한 수를 돌려줘요', async () => {
+      const held = Object.assign({
+        id: 2,
+        botId: 7,
+        symbol: '005930',
+        status: 'open',
+        quantity: 3,
+        costBasis: 210_000,
+      }) as Position;
+      positions.findHeldByBot.mockResolvedValue([held]);
+      positions.find.mockResolvedValue(held);
+      decisions.entryVersionId.mockResolvedValue(70);
+      orders.findLiveProtective.mockResolvedValue(null);
+      decisions.record.mockResolvedValue('d-exit');
+      orders.create.mockResolvedValue(
+        known({
+          id: 60,
+          decisionId: 'd-exit',
+          side: 'SELL',
+          orderType: 'MARKET',
+          price: null,
+          quantity: 3,
+          symbol: '005930',
+        }),
+      );
+      broker.place.mockResolvedValue({
+        outcome: 'accepted',
+        brokerOrderId: 'o-sell',
+      });
+
+      await expect(
+        runInCls(moduleRef, () => service.liquidate('kill_switch', 7)),
+      ).resolves.toBe(0);
+
+      expect(positions.setExitReason).toHaveBeenCalledWith(2, 'kill_switch');
+      expect(decisions.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'exit',
+          botVersionId: 70,
+          price: 70_000,
+        }),
+      );
+      expect(broker.place).toHaveBeenCalledWith(
+        expect.objectContaining({
+          side: 'SELL',
+          orderType: 'MARKET',
+          quantity: 3,
+        }),
       );
     });
   });

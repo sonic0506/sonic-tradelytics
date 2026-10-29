@@ -419,6 +419,54 @@ export class OrderService {
     );
   }
 
+  // 일시정지·청산·킬 스위치: 봇 미체결 주문을 취소해요. 결과(CANCELED)는 재동기화로 반영돼요. 취소하지 못한 수를 돌려줘요
+  async cancelOpen(filter: { botId?: number; side?: 'BUY' }): Promise<number> {
+    const open = (await this.orders.findOpenBotOrders(filter.botId)).filter(
+      ({ side }) => filter.side === undefined || side === filter.side,
+    );
+    const results = await open.reduce<Promise<boolean[]>>(
+      (previous, order) =>
+        previous.then(async (done) => [
+          ...done,
+          order.brokerOrderId === null
+            ? false
+            : await this.broker.cancel(order.brokerOrderId),
+        ]),
+      Promise.resolve([]),
+    );
+    return results.filter((isCanceled) => !isCanceled).length;
+  }
+
+  // 봇의 보유 포지션을 시장가로 청산해요(청산 순서는 exit과 같아요). 팔지 못한 포지션 수를 돌려줘요
+  // ponytail: 명령에는 지금가가 없어서 판단 기준 가격으로 평균 매수가를 남겨요. BotRunner가 생기면 시세 스냅샷으로 바꿔요
+  async liquidate(reason: ExitReason, botId?: number): Promise<number> {
+    const held = await this.positions.findHeldByBot(botId);
+    const results = await held.reduce<Promise<ExitResult[]>>(
+      (previous, position) =>
+        previous.then(async (done) => {
+          const botVersionId = await this.decisions.entryVersionId(position.id);
+          if (botVersionId === null) return [...done, { status: 'nothing' }];
+          return [
+            ...done,
+            await this.exit({
+              positionId: position.id,
+              botVersionId,
+              reason,
+              orderType: 'MARKET',
+              price: null,
+              markPrice: Math.round(position.costBasis / position.quantity),
+              rationale: { passed: [], failed: [], score: null },
+            }),
+          ];
+        }),
+      Promise.resolve([]),
+    );
+    return results.filter(
+      ({ status }) =>
+        !['accepted', 'pending', 'stop_triggered'].includes(status),
+    ).length;
+  }
+
   // POL-RISK-14: 손절 취소 확인 → 청산 판단·매도. 이미 발동됐으면 팔지 않아요
   async exit(request: ExitRequest): Promise<ExitResult> {
     if (!this.engineState.canOrder()) return { status: 'blocked' };

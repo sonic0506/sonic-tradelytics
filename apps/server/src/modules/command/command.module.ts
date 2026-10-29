@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Bot, BotModule } from '@/modules/bot/index.js';
 import { EngineStateModule } from '@/modules/engine-state/index.js';
 import { FundModule } from '@/modules/fund/index.js';
+import { OrderModule } from '@/modules/order/index.js';
 import { RiskModule } from '@/modules/risk/index.js';
 
 import { CommandRepository } from './command.repository.js';
@@ -18,6 +19,7 @@ import { Command } from './entities/command.entity.js';
     BotModule,
     EngineStateModule,
     FundModule,
+    OrderModule,
     RiskModule,
   ],
   providers: [CommandService, CommandRepository],

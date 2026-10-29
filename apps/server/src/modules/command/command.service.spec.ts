@@ -4,6 +4,7 @@ import { EngineLock } from '@/infra/database/engine-lock.js';
 import { type Bot, BotService } from '@/modules/bot/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { FundService } from '@/modules/fund/index.js';
+import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { noOpTransactionalModule } from '../../../test/setup/transactional.js';
@@ -30,6 +31,10 @@ describe('CommandService', () => {
     latestAt: vi.fn<RiskService['latestAt']>(),
   };
   const fund = { rebudget: vi.fn<FundService['rebudget']>() };
+  const orders = {
+    cancelOpen: vi.fn<OrderService['cancelOpen']>(),
+    liquidate: vi.fn<OrderService['liquidate']>(),
+  };
   let state: EngineStateService;
   let service: CommandService;
 
@@ -72,6 +77,7 @@ describe('CommandService', () => {
         { provide: BotService, useValue: bots },
         { provide: RiskService, useValue: risk },
         { provide: FundService, useValue: fund },
+        { provide: OrderService, useValue: orders },
       ],
     }).compile();
     service = moduleRef.get(CommandService);
@@ -110,7 +116,7 @@ describe('CommandService', () => {
     ]);
   });
 
-  it('전량 청산을 고른 킬 스위치는 정지만 하고 청산은 아직 못 한다고 남겨요', async () => {
+  it('전량 청산을 고른 킬 스위치는 모든 미체결을 취소하고 보유분을 청산해요', async () => {
     commands.findPending.mockResolvedValueOnce([
       command('kill', { liquidateAll: true }),
     ]);
@@ -118,13 +124,9 @@ describe('CommandService', () => {
     await service.start();
 
     expect(state.haltReasons()).toEqual(['kill']);
-    expect(handled()).toEqual([
-      {
-        id: 1,
-        result: 'failed',
-        error: '모든 봇을 멈췄지만 전량 청산은 아직 하지 못해요',
-      },
-    ]);
+    expect(handled()).toEqual([{ id: 1, result: 'ok', error: null }]);
+    expect(orders.cancelOpen).toHaveBeenCalledWith({});
+    expect(orders.liquidate).toHaveBeenCalledWith('kill_switch');
   });
 
   it('pause는 그 봇만 멈춰요', async () => {
@@ -137,6 +139,7 @@ describe('CommandService', () => {
     expect(state.canEnter(8)).toBe(true);
     expect(bots.setStatus).toHaveBeenCalledWith(7, 'paused', 'pause');
     expect(handled()).toEqual([{ id: 1, result: 'ok', error: null }]);
+    expect(orders.cancelOpen).toHaveBeenCalledWith({ botId: 7, side: 'BUY' });
   });
 
   it('없는 봇의 명령은 failed로 남겨요', async () => {
@@ -187,7 +190,7 @@ describe('CommandService', () => {
     ]);
   });
 
-  it('liquidate는 봇을 멈추고 청산은 아직 못 한다고 남겨요', async () => {
+  it('liquidate는 봇을 멈추고 미체결을 취소한 뒤 청산해요', async () => {
     commands.findPending.mockResolvedValueOnce([command('liquidate')]);
     bots.findById.mockResolvedValue(bot());
 
@@ -195,7 +198,9 @@ describe('CommandService', () => {
 
     expect(state.canEnter(7)).toBe(false);
     expect(bots.setStatus).toHaveBeenCalledWith(7, 'stopped', 'liquidate');
-    expect(handled()[0]?.result).toBe('failed');
+    expect(handled()[0]?.result).toBe('ok');
+    expect(orders.cancelOpen).toHaveBeenCalledWith({ botId: 7 });
+    expect(orders.liquidate).toHaveBeenCalledWith('manual', 7);
   });
 
   it('rebudget은 새 투자금 설정을 FundService에 넘기고 결과를 남겨요', async () => {
@@ -311,6 +316,23 @@ describe('CommandService', () => {
       await service.restore();
 
       expect(state.haltReasons()).toEqual([]);
+    });
+  });
+
+  it('미체결을 취소하지 못했거나 팔지 못한 포지션이 남으면 알려요', async () => {
+    commands.findPending.mockResolvedValueOnce([
+      command('kill', { liquidateAll: true }),
+    ]);
+    orders.cancelOpen.mockResolvedValue(1);
+    orders.liquidate.mockResolvedValue(2);
+
+    await service.start();
+
+    expect(risk.record).toHaveBeenLastCalledWith('order_rejected', null, {
+      commandId: 1,
+      kind: 'kill',
+      uncanceled: 1,
+      unsold: 2,
     });
   });
 });

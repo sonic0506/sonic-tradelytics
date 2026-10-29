@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import { In, IsNull, LessThanOrEqual, type Repository } from 'typeorm';
+import { In, IsNull, LessThanOrEqual, Not, type Repository } from 'typeorm';
 
 import { BrokerOrder } from './entities/broker-order.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
@@ -61,6 +61,19 @@ export class OrderRepository {
       where: {
         status: In([...OPEN_ORDER_STATUSES]),
         position: { botId: In(botIds) },
+      },
+      take: OrderRepository.MAX_OPEN_ORDERS,
+    });
+  }
+
+  // 봇 주문 중 미체결이고 토스에 접수된 것 (취소 대상). botId가 없으면 모든 봇
+  findOpenBotOrders(botId?: number): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      relations: { position: true },
+      where: {
+        status: In([...OPEN_ORDER_STATUSES]),
+        brokerOrderId: Not(IsNull()),
+        position: { botId: botId ?? Not(IsNull()) },
       },
       take: OrderRepository.MAX_OPEN_ORDERS,
     });
