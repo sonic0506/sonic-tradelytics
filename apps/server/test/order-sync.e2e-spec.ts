@@ -10,6 +10,7 @@ import {
 } from '@/modules/order/index.js';
 import { Position } from '@/modules/position/index.js';
 
+import { FakeTossModule } from './setup/fake-toss.js';
 import { createTestApp, resetDatabase } from './setup/test-app.js';
 
 // AccountSync가 넘긴 토스 주문을 실제 Postgres에 반영해요 (docs/architecture/order-lifecycle.md 재동기화).
@@ -42,7 +43,7 @@ describe('주문 재동기화 반영 (e2e)', () => {
   });
 
   beforeAll(async () => {
-    app = await createTestApp([OrderModule]);
+    app = await createTestApp([FakeTossModule, OrderModule]);
     service = app.get(OrderService);
     dataSource = app.get(DataSource);
     await resetDatabase(app);

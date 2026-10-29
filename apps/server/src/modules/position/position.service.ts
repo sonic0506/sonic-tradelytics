@@ -64,6 +64,16 @@ export class PositionService {
     return result;
   }
 
+  // 진입 판단의 포지션 (수량 0에서 시작)
+  openForBot(botId: number, symbol: string, openedAt: Date): Promise<Position> {
+    return this.positions.createForBot(botId, symbol, openedAt);
+  }
+
+  // 한 주도 체결되지 않고 끝난 포지션을 닫아요 (F2 "취소"). 체결이 있으면 그대로 두고 false예요
+  closeNotFilled(positionId: number, closedAt: Date): Promise<boolean> {
+    return this.positions.closeIfEmpty(positionId, 'not_filled', closedAt);
+  }
+
   // 직접 거래 주문을 붙일 포지션 (FR-MAN-01). 같은 종목에 열린 것이 있으면 그걸 써요
   async openManual(symbol: string, openedAt: Date): Promise<Position> {
     return (

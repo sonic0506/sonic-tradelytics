@@ -57,6 +57,27 @@ export class OrderRepository {
     });
   }
 
+  // 응답을 못 받은 주문 (status requested, broker_order_id 없음)
+  findRequested(): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      relations: { position: true },
+      where: { status: 'requested', brokerOrderId: IsNull() },
+      order: { createdAt: 'ASC' },
+      take: OrderRepository.MAX_OPEN_ORDERS,
+    });
+  }
+
+  // 이미 어떤 broker_orders에 연결된 토스 주문 id
+  async linkedBrokerOrderIds(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const linked = await this.orders.find({
+      select: { id: true, brokerOrderId: true },
+      where: { brokerOrderId: In(ids) },
+      take: ids.length,
+    });
+    return new Set(linked.flatMap(({ brokerOrderId }) => brokerOrderId ?? []));
+  }
+
   findByBrokerOrderId(brokerOrderId: string): Promise<BrokerOrder | null> {
     return this.orders.findOneBy({ brokerOrderId });
   }

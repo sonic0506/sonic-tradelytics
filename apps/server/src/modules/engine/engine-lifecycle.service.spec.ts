@@ -10,6 +10,7 @@ import {
   MarketCollectorService,
 } from '@/modules/market-data/index.js';
 import { NotificationService } from '@/modules/notification/index.js';
+import { OrderService } from '@/modules/order/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
@@ -55,6 +56,9 @@ describe('EngineLifecycleService', () => {
     start: vi.fn<EngineScheduleService['start']>(),
     stop: vi.fn<EngineScheduleService['stop']>(),
   };
+  const orders = {
+    recoverRequested: vi.fn<OrderService['recoverRequested']>(),
+  };
   let engineState: EngineStateService;
   let service: EngineLifecycleService;
 
@@ -72,6 +76,7 @@ describe('EngineLifecycleService', () => {
         { provide: NotificationService, useValue: notifications },
         { provide: StatusReporterService, useValue: statusReporter },
         { provide: EngineScheduleService, useValue: schedule },
+        { provide: OrderService, useValue: orders },
         EngineStateService,
       ],
     }).compile();
@@ -108,6 +113,9 @@ describe('EngineLifecycleService', () => {
     expect(calendar.ensureToday).toHaveBeenCalledAfter(toss.ensureToken);
     expect(commands.restore).toHaveBeenCalledAfter(calendar.ensureToday);
     expect(commands.restore).toHaveBeenCalledBefore(marketCollector.start);
+    // 시작 순서 5번: 응답을 못 받은 주문 정리는 정지 상태 복원 뒤, 재동기화 전이에요
+    expect(orders.recoverRequested).toHaveBeenCalledAfter(commands.restore);
+    expect(orders.recoverRequested).toHaveBeenCalledBefore(accountSync.syncAll);
     expect(commands.start).toHaveBeenCalledAfter(accountSync.syncAll);
   });
 

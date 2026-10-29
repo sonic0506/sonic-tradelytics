@@ -50,6 +50,35 @@ export class PositionRepository {
     });
   }
 
+  // 진입 판단과 함께 수량 0으로 만들어요 (주문 흐름: 포지션은 주문 전에 만들어요)
+  createForBot(
+    botId: number,
+    symbol: string,
+    openedAt: Date,
+  ): Promise<Position> {
+    return this.positions.save(
+      this.positions.create({
+        botId,
+        symbol,
+        status: 'open',
+        quantity: 0,
+        openedAt,
+      }),
+    );
+  }
+
+  async closeIfEmpty(
+    id: number,
+    exitReason: NonNullable<Position['exitReason']>,
+    closedAt: Date,
+  ): Promise<boolean> {
+    const { affected } = await this.positions.update(
+      { id, status: 'open', quantity: 0 },
+      { status: 'closed', exitReason, closedAt },
+    );
+    return (affected ?? 0) > 0;
+  }
+
   createManual(symbol: string, openedAt: Date): Promise<Position> {
     return this.positions.save(
       this.positions.create({

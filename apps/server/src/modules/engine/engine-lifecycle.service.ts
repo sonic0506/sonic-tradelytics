@@ -15,13 +15,14 @@ import {
   MarketCollectorService,
 } from '@/modules/market-data/index.js';
 import { NotificationService } from '@/modules/notification/index.js';
+import { OrderService } from '@/modules/order/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineScheduleService } from './engine-schedule.service.js';
 import { StatusReporterService } from './status-reporter.service.js';
 
 // engine의 시작·종료 순서 (docs/architecture/engine.md 시작 순서·종료 순서).
-// 지금은 1~4번, 6~9번이 있어요. 5번(응답 유실 주문 정리)·10번(BotRunner)은 그 기능을 만들 때 더해요.
+// 지금은 1~9번이 있어요. 10번(BotRunner)은 그 기능을 만들 때 더해요.
 @Injectable()
 export class EngineLifecycleService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -39,6 +40,7 @@ export class EngineLifecycleService
     private readonly notifications: NotificationService,
     private readonly statusReporter: StatusReporterService,
     private readonly schedule: EngineScheduleService,
+    private readonly orders: OrderService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -51,6 +53,7 @@ export class EngineLifecycleService
     await this.toss.ensureToken();
     await this.calendar.ensureToday();
     await this.commands.restore();
+    await this.orders.recoverRequested();
     // 웹소켓을 먼저 열어 재동기화하는 동안 들어온 주문 이벤트도 받아요. 둘은 AccountSync 안에서 차례로 반영돼요
     this.marketCollector.start({
       onOrder: (data) => {

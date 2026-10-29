@@ -6,6 +6,7 @@ import { CommandModule } from '@/modules/command/index.js';
 import { EngineStateModule } from '@/modules/engine-state/index.js';
 import { MarketDataModule } from '@/modules/market-data/index.js';
 import { NotificationModule } from '@/modules/notification/index.js';
+import { OrderModule } from '@/modules/order/index.js';
 import { RiskModule } from '@/modules/risk/index.js';
 
 import { BatchRunRepository } from './batch-run.repository.js';
@@ -23,6 +24,7 @@ import { StatusReporterService } from './status-reporter.service.js';
     EngineStateModule,
     MarketDataModule,
     NotificationModule,
+    OrderModule,
     RiskModule,
   ],
   providers: [
