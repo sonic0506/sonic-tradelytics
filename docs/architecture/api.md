@@ -132,6 +132,7 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 | 카드 | 엔드포인트 | 갱신 |
 | --- | --- | --- |
 | 일별 손익 막대 | `GET /v1/daily-results?from&to` (최근 20거래일) + 오늘 막대는 `GET /v1/home`의 봇 카드 `todayPnl` 합계 | 처음 한 번. 오늘 막대만 5초 |
+| 보유 종목 | `GET /v1/positions?status=holding` (평가 손익과 가격 기준 시각 포함, 봇·직접 거래 모두) | 5초 |
 | 오늘 체결 | `GET /v1/orders?from=오늘&to=오늘&size=5` | 5초 |
 | 리스크 이벤트 | `GET /v1/risk-events?from=오늘&to=오늘&size=3` | 5초 |
 
