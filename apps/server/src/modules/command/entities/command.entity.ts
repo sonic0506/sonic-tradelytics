@@ -48,6 +48,10 @@ export class Command {
   @Column('boolean', { default: false })
   liquidateAll: boolean;
 
+  // rebudget의 새 투자금 설정(방식·금액·1회 주문 금액). 다른 명령은 null
+  @Column('jsonb', { nullable: true })
+  budget: Record<string, unknown> | null;
+
   @Column('timestamptz')
   requestedAt: Date;
 
