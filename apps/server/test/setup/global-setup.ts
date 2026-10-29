@@ -21,7 +21,7 @@ export async function setup(): Promise<void> {
   execFileSync(
     'node',
     [
-      // 모노레포에서는 typeorm이 루트 node_modules에 있어서 경로를 찾아요
+      // 모노레포에서는 typeorm이 루트 node_modules에 있어요.
       createRequire(import.meta.url).resolve('typeorm/cli.js'),
       '-d',
       'dist/infra/database/data-source.js',
