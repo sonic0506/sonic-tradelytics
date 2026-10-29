@@ -5,3 +5,19 @@ const kstFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 export function kstDate(at: Date = new Date()): string {
   return kstFormat.format(at);
 }
+
+const kstTimeFormat = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul',
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+// YYYY-MM-DD HH:mm (KST). 알림처럼 사람이 읽는 곳에 써요
+export function kstDateTime(at: Date): string {
+  return kstTimeFormat.format(at);
+}
+
+// 그 날(KST)의 HH:mm 시각. 한국은 서머타임이 없어서 +09:00으로 고정해요
+export function kstAt(date: string, time: string): Date {
+  return new Date(`${date}T${time}:00+09:00`);
+}

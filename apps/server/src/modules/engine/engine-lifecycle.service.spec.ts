@@ -9,9 +9,12 @@ import {
   MarketCalendarService,
   MarketCollectorService,
 } from '@/modules/market-data/index.js';
+import { NotificationService } from '@/modules/notification/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
+import { EngineScheduleService } from './engine-schedule.service.js';
+import { StatusReporterService } from './status-reporter.service.js';
 
 describe('EngineLifecycleService', () => {
   const lock = {
@@ -39,6 +42,19 @@ describe('EngineLifecycleService', () => {
     ensureToday: vi.fn<MarketCalendarService['ensureToday']>(),
     isRegularSession: vi.fn<MarketCalendarService['isRegularSession']>(),
   };
+  const notifications = {
+    start: vi.fn<NotificationService['start']>(),
+    stop: vi.fn<NotificationService['stop']>(),
+  };
+  const statusReporter = {
+    start: vi.fn<StatusReporterService['start']>(),
+    stop: vi.fn<StatusReporterService['stop']>(),
+    report: vi.fn<StatusReporterService['report']>(),
+  };
+  const schedule = {
+    start: vi.fn<EngineScheduleService['start']>(),
+    stop: vi.fn<EngineScheduleService['stop']>(),
+  };
   let engineState: EngineStateService;
   let service: EngineLifecycleService;
 
@@ -53,6 +69,9 @@ describe('EngineLifecycleService', () => {
         { provide: AccountSyncService, useValue: accountSync },
         { provide: CommandService, useValue: commands },
         { provide: MarketCalendarService, useValue: calendar },
+        { provide: NotificationService, useValue: notifications },
+        { provide: StatusReporterService, useValue: statusReporter },
+        { provide: EngineScheduleService, useValue: schedule },
         EngineStateService,
       ],
     }).compile();
@@ -90,6 +109,16 @@ describe('EngineLifecycleService', () => {
     expect(commands.restore).toHaveBeenCalledAfter(calendar.ensureToday);
     expect(commands.restore).toHaveBeenCalledBefore(marketCollector.start);
     expect(commands.start).toHaveBeenCalledAfter(accountSync.syncAll);
+  });
+
+  it('알림을 가장 먼저 켜고, 명령 처리 뒤에 상태 쓰기와 배치 일정을 시작해요', async () => {
+    lock.acquire.mockResolvedValue(true);
+
+    await service.onApplicationBootstrap();
+
+    expect(notifications.start).toHaveBeenCalledBefore(toss.ensureToken);
+    expect(statusReporter.start).toHaveBeenCalledAfter(commands.start);
+    expect(schedule.start).toHaveBeenCalledAfter(commands.start);
   });
 
   it('주기 재동기화는 장 캘린더의 정규장 시간에만 돌아요', async () => {
@@ -149,6 +178,9 @@ describe('EngineLifecycleService', () => {
       await service.onApplicationShutdown(signal);
 
       expect(engineState.state()).toBe('stopping');
+      expect(schedule.stop).toHaveBeenCalledOnce();
+      expect(statusReporter.report).toHaveBeenCalledOnce();
+      expect(notifications.stop).toHaveBeenCalledOnce();
       expect(commands.stop).toHaveBeenCalledOnce();
       expect(accountSync.stop).toHaveBeenCalledOnce();
       expect(marketCollector.stop).toHaveBeenCalledOnce();

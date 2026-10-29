@@ -20,6 +20,8 @@ export default defineConfig({
       TOSS_ACCOUNT_SEQ: '1',
       TOSS_API_BASE_URL: 'https://toss.test',
       TOSS_WS_URL: 'wss://toss-ws.test/ws/v1',
+      TELEGRAM_BOT_TOKEN: 'test-bot-token',
+      TELEGRAM_CHAT_ID: '42',
       TOSS_TOKEN_FILE: join(tmpdir(), 'tradelytics-unit-toss-token.json'),
     },
     coverage: {

@@ -14,11 +14,14 @@ import {
   MarketCalendarService,
   MarketCollectorService,
 } from '@/modules/market-data/index.js';
+import { NotificationService } from '@/modules/notification/index.js';
 
 import { EngineAlreadyRunningException } from './engine.exception.js';
+import { EngineScheduleService } from './engine-schedule.service.js';
+import { StatusReporterService } from './status-reporter.service.js';
 
 // engine의 시작·종료 순서 (docs/architecture/engine.md 시작 순서·종료 순서).
-// 지금은 1~4번, 6~8번이 있어요. 5번(응답 유실 주문 정리)·9번(놓친 배치)·10번(BotRunner)은 그 기능을 만들 때 더해요.
+// 지금은 1~4번, 6~9번이 있어요. 5번(응답 유실 주문 정리)·10번(BotRunner)은 그 기능을 만들 때 더해요.
 @Injectable()
 export class EngineLifecycleService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -33,6 +36,9 @@ export class EngineLifecycleService
     private readonly engineState: EngineStateService,
     private readonly commands: CommandService,
     private readonly calendar: MarketCalendarService,
+    private readonly notifications: NotificationService,
+    private readonly statusReporter: StatusReporterService,
+    private readonly schedule: EngineScheduleService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -40,6 +46,8 @@ export class EngineLifecycleService
       this.onLockLost();
     });
     if (!hasLock) throw new EngineAlreadyRunningException();
+    // 시작 중 실패(batch_fail 등)도 알리도록 알림을 먼저 켜요
+    this.notifications.start();
     await this.toss.ensureToken();
     await this.calendar.ensureToday();
     await this.commands.restore();
@@ -55,6 +63,8 @@ export class EngineLifecycleService
     await this.accountSync.syncAll();
     this.accountSync.start(() => this.calendar.isRegularSession());
     await this.commands.start();
+    this.statusReporter.start();
+    await this.schedule.start();
     this.logger.log('engine 시작');
   }
 
@@ -63,9 +73,14 @@ export class EngineLifecycleService
     this.logger.log(`engine 종료 (${signal ?? '신호 없음'})`);
     // 신규 판단과 주문을 먼저 막아요 (종료 순서 1번)
     this.engineState.halt('stopping');
+    this.schedule.stop();
     this.commands.stop();
     this.accountSync.stop();
     this.marketCollector.stop();
+    // 화면에 종료 중으로 남기고 멈춰요
+    this.statusReporter.stop();
+    await this.statusReporter.report();
+    this.notifications.stop();
     await this.lock.release();
   }
 

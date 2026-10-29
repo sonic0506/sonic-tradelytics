@@ -8,6 +8,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { env } from './config/env.js';
 import { dataSourceOptions } from './infra/database/data-source.js';
 import { EngineLockModule } from './infra/database/engine-lock.module.js';
+import { TelegramModule } from './infra/telegram/telegram.module.js';
 import { TossModule } from './infra/toss/toss.module.js';
 import { EngineModule } from './modules/engine/index.js';
 
@@ -42,6 +43,7 @@ import { EngineModule } from './modules/engine/index.js';
     }),
     EngineLockModule,
     TossModule,
+    TelegramModule,
     EngineModule,
   ],
 })

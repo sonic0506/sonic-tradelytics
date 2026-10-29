@@ -8,6 +8,8 @@ describe('RiskService', () => {
   const events = {
     add: vi.fn<RiskRepository['add']>(),
     findLatest: vi.fn<RiskRepository['findLatest']>(),
+    findUnnotified: vi.fn<RiskRepository['findUnnotified']>(),
+    markNotified: vi.fn<RiskRepository['markNotified']>(),
   };
   let service: RiskService;
   const now = new Date('2026-10-29T01:00:00Z');
@@ -34,6 +36,16 @@ describe('RiskService', () => {
       occurredAt: now,
       detail: { commandId: 1 },
     });
+  });
+
+  it('알릴 이벤트를 찾고 지금 시각으로 알림을 남겨요', async () => {
+    events.findUnnotified.mockResolvedValue([]);
+
+    await service.findUnnotified(20);
+    await service.markNotified(3);
+
+    expect(events.findUnnotified).toHaveBeenCalledWith(20);
+    expect(events.markNotified).toHaveBeenCalledWith(3, now);
   });
 
   it('마지막 이벤트 시각을 돌려주고, 없으면 undefined예요', async () => {

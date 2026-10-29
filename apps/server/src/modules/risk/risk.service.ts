@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { RiskEvent } from './entities/risk-event.entity.js';
 import type { RiskEventKind } from './risk.constants.js';
 import { RiskRepository } from './risk.repository.js';
 
@@ -14,6 +15,15 @@ export class RiskService {
     detail: Record<string, unknown>,
   ): Promise<void> {
     await this.events.add({ kind, botId, occurredAt: new Date(), detail });
+  }
+
+  // 알림(NotificationService)이 보낼 차례인 이벤트
+  findUnnotified(take: number): Promise<RiskEvent[]> {
+    return this.events.findUnnotified(take);
+  }
+
+  markNotified(id: number): Promise<void> {
+    return this.events.markNotified(id, new Date());
   }
 
   // 이 종류의 마지막 이벤트 시각 (재시작 때 정지 상태 복원)

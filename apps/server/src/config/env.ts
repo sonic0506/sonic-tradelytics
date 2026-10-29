@@ -39,6 +39,9 @@ const envSchema = z
     TOSS_WS_URL: z.url().default('wss://openapi-ws.tossinvest.com/ws/v1'),
     // 발급한 토큰을 저장하는 파일. 재시작해도 다시 발급하지 않게 engine 볼륨에 둬요
     TOSS_TOKEN_FILE: z.string().min(1).default('.toss-token.json'),
+    // 텔레그램 알림(POL-RISK-12). 둘 중 하나라도 없으면 알림을 보내지 않고 로그만 남겨요
+    TELEGRAM_BOT_TOKEN: optionalString,
+    TELEGRAM_CHAT_ID: optionalString,
   })
   .refine(
     (value) =>

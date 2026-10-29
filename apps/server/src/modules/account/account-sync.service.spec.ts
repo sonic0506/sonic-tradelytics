@@ -113,6 +113,15 @@ describe('AccountSyncService', () => {
     ]);
   });
 
+  it('재동기화에 성공하면 그 시각을 남겨요', async () => {
+    toss.request.mockResolvedValue(page([]));
+    expect(sync.lastSyncedAt()).toBeUndefined();
+
+    await sync.syncAll();
+
+    expect(sync.lastSyncedAt()).toEqual(new Date('2026-10-29T00:40:00Z'));
+  });
+
   it('토스 주문의 문자열 숫자와 시각을 바꿔 넘겨요', async () => {
     toss.request.mockResolvedValueOnce(page([tossOrder()]));
     toss.request.mockResolvedValueOnce(page([]));

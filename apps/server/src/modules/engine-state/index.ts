@@ -2,4 +2,8 @@
 export * from './engine-state.constants.js';
 export { EngineStateModule } from './engine-state.module.js';
 export { EngineStateService } from './engine-state.service.js';
+export {
+  type EngineStatusReport,
+  EngineStatusService,
+} from './engine-status.service.js';
 export { EngineStatus } from './entities/engine-status.entity.js';

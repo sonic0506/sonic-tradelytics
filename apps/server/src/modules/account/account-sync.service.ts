@@ -57,6 +57,8 @@ export class AccountSyncService {
   private queue: Promise<unknown> = Promise.resolve();
   private timer: NodeJS.Timeout | undefined;
   private isSyncing = false;
+  // 마지막으로 REST 재동기화에 성공한 시각 (engine_statuses.account_synced_at)
+  private syncedAt: Date | undefined;
 
   constructor(
     private readonly toss: TossClient,
@@ -80,6 +82,10 @@ export class AccountSyncService {
 
   stop(): void {
     clearInterval(this.timer);
+  }
+
+  lastSyncedAt(): Date | undefined {
+    return this.syncedAt;
   }
 
   // engine 시작, 웹소켓 재연결 직후: OPEN 전량 + 오늘 CLOSED. 실패하면 던져요(시작 순서 6번은 실패 시 종료)
@@ -122,6 +128,7 @@ export class AccountSyncService {
   private async syncOpen(): Promise<void> {
     const page = await this.fetch({ status: 'OPEN' });
     await this.applyAll(page.orders);
+    this.syncedAt = new Date();
   }
 
   // 오늘 CLOSED를 cursor로 끝까지 읽어요
