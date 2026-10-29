@@ -18,7 +18,10 @@ describe('EngineScheduleService', () => {
   const calendar = {
     ensureToday: vi.fn<MarketCalendarService['ensureToday']>(),
   };
-  const risk = { record: vi.fn<RiskService['record']>() };
+  const risk = {
+    record: vi.fn<RiskService['record']>(),
+    resumeDailyStops: vi.fn<RiskService['resumeDailyStops']>(),
+  };
   const toss = { ensureToken: vi.fn<TossClient['ensureToken']>() };
   const accountSync = { syncAll: vi.fn<AccountSyncService['syncAll']>() };
   let schedule: EngineScheduleService;
@@ -64,6 +67,7 @@ describe('EngineScheduleService', () => {
     await schedule.start();
 
     expect(toss.ensureToken).toHaveBeenCalledOnce();
+    expect(risk.resumeDailyStops).toHaveBeenCalledOnce();
     expect(accountSync.syncAll).not.toHaveBeenCalled();
     expect(runs.start).toHaveBeenCalledWith(
       { job: 'pre_open', tradeDate: '2026-10-29', slot: '' },

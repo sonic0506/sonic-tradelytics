@@ -36,13 +36,14 @@ export class EngineScheduleService {
   ) {
     // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·스냅샷·집계)는 그 기능을 만들 때 더해요
     this.jobs = [
-      // 토큰·오늘 캘린더 확인
+      // 토큰·오늘 캘린더 확인, 하루 손실 한도로 멈춘 봇 재개 (POL-RISK-02)
       {
         job: 'pre_open',
         time: '08:30',
         run: async () => {
           await toss.ensureToken();
           await this.calendar.ensureToday();
+          await this.risk.resumeDailyStops();
         },
       },
       // 오늘 CLOSED 전량으로 체결 최종 확정
