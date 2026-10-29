@@ -12,6 +12,11 @@ import {
 export class DecisionService {
   constructor(private readonly decisions: DecisionRepository) {}
 
+  // 그 포지션 첫 진입 판단의 손절가 (손절 조건주문 발동가, POL-RISK-11)
+  async entryStopPrice(positionId: number): Promise<number | null> {
+    return (await this.decisions.findEntry(positionId))?.stopPrice ?? null;
+  }
+
   // 저장한 판단 id를 돌려줘요. 호출하는 쪽 트랜잭션 안에서 함께 저장돼요
   async record(
     fields: Omit<DecisionFields, 'id' | 'decidedAt'>,

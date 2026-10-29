@@ -47,6 +47,29 @@ const listSchema = z.object({
   ),
 });
 const voidSchema = z.unknown();
+const stopCreatedSchema = z.object({ conditionalOrderId: z.string() });
+const stopDetailSchema = z.object({
+  status: z.string(),
+  first: z.object({ triggeredOrderId: z.string().nullable().optional() }),
+});
+
+// 손절 조건주문 요청 (POL-RISK-11): SINGLE + 시장가 매도
+export interface PlaceStop {
+  clientOrderId: string;
+  symbol: string;
+  quantity: number;
+  triggerPrice: number;
+  // YYYY-MM-DD. 당일 청산 봇은 당일
+  expireDate: string;
+}
+
+export type StopResult =
+  | { outcome: 'accepted'; conditionalOrderId: string }
+  | { outcome: 'rejected'; code: string }
+  | { outcome: 'unknown'; reason: string };
+
+// 발동돼 주문이 나간 상태 (ConditionalOrderDetailResponse.status)
+const TRIGGERED_STATUSES = new Set(['ORDERING', 'ORDERED', 'COMPLETED']);
 
 // 같은 clientOrderId로 다시 보내면 되는 거절 (docs/architecture/order-lifecycle.md 에러별 처리)
 const RETRYABLE_CODES = new Set(['request-in-progress']);
@@ -104,6 +127,70 @@ export class TossBrokerService {
         return false;
       throw error;
     }
+  }
+
+  async placeStop(stop: PlaceStop): Promise<StopResult> {
+    try {
+      const { conditionalOrderId } = await this.toss.request({
+        group: 'CONDITIONAL_ORDER',
+        method: 'POST',
+        path: '/api/v1/conditional-orders',
+        account: true,
+        waitMs: TossBrokerService.ORDER_WAIT_MS,
+        body: {
+          clientOrderId: stop.clientOrderId,
+          symbol: stop.symbol,
+          type: 'SINGLE',
+          orderType: 'MARKET',
+          quantity: String(stop.quantity),
+          expireDate: stop.expireDate,
+          first: { orderSide: 'SELL', triggerPrice: String(stop.triggerPrice) },
+        },
+        result: stopCreatedSchema,
+      });
+      return { outcome: 'accepted', conditionalOrderId };
+    } catch (error) {
+      const { outcome } = classify(error);
+      return outcome === 'rejected' && error instanceof TossApiError
+        ? { outcome, code: error.code }
+        : { outcome: 'unknown', reason: String(error) };
+    }
+  }
+
+  // 취소가 받아들여지면 true. 이미 발동·만료돼 취소할 수 없으면 false (상태는 stopState로 확인해요)
+  async cancelStop(conditionalOrderId: string): Promise<boolean> {
+    try {
+      await this.toss.request({
+        group: 'CONDITIONAL_ORDER',
+        method: 'DELETE',
+        path: `/api/v1/conditional-orders/${encodeURIComponent(conditionalOrderId)}`,
+        account: true,
+        waitMs: TossBrokerService.ORDER_WAIT_MS,
+        result: voidSchema,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof TossApiError && isClientError(error.status))
+        return false;
+      throw error;
+    }
+  }
+
+  // 손절 조건주문이 발동됐는지와 발동 주문 id
+  async stopState(
+    conditionalOrderId: string,
+  ): Promise<{ isTriggered: boolean; triggeredOrderId: string | null }> {
+    const detail = await this.toss.request({
+      group: 'CONDITIONAL_ORDER_HISTORY',
+      path: `/api/v1/conditional-orders/${encodeURIComponent(conditionalOrderId)}`,
+      account: true,
+      waitMs: TossBrokerService.LOOKUP_WAIT_MS,
+      result: stopDetailSchema,
+    });
+    return {
+      isTriggered: TRIGGERED_STATUSES.has(detail.status),
+      triggeredOrderId: detail.first.triggeredOrderId ?? null,
+    };
   }
 
   // 그 날(KST) 이후 접수된 그 종목 주문 (응답 유실 복구 후보 찾기)

@@ -38,6 +38,13 @@ export class PositionRepository {
     });
   }
 
+  async setExitReason(
+    id: number,
+    exitReason: NonNullable<Position['exitReason']>,
+  ): Promise<void> {
+    await this.positions.update({ id, status: 'open' }, { exitReason });
+  }
+
   findById(id: number): Promise<Position | null> {
     return this.positions.findOneBy({ id });
   }

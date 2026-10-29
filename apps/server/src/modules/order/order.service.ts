@@ -1,13 +1,16 @@
+import { randomUUID } from 'node:crypto';
+
 import { Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 
 import { kstDate } from '@/common/time/kst-date.js';
 import { DecisionService } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
-import { PositionService } from '@/modules/position/index.js';
+import { type ExitReason, PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import type { BrokerOrder } from './entities/broker-order.entity.js';
+import type { ProtectiveOrder } from './entities/protective-order.entity.js';
 import {
   OPEN_ORDER_STATUSES,
   type OrderEventSource,
@@ -41,6 +44,28 @@ export interface EntryRequest {
     | 'horizonMinutes'
   >;
 }
+
+// 청산 판단 1건과 매도 (docs/architecture/order-lifecycle.md 청산)
+export interface ExitRequest {
+  positionId: number;
+  botVersionId: number;
+  reason: ExitReason;
+  // 시장가면 price null
+  orderType: 'LIMIT' | 'MARKET';
+  price: number | null;
+  // 판단 기록의 기준 가격(지금가)
+  markPrice: number;
+  rationale: Pick<DecisionRecord, 'passed' | 'failed' | 'score'>;
+}
+
+export type ExitResult =
+  | EntryResult
+  // 판단할 포지션이나 보유 수량이 없어요
+  | { status: 'nothing' }
+  // 손절이 이미 발동돼 팔지 않았어요. 발동 주문이 포지션을 닫아요 (POL-RISK-14)
+  | { status: 'stop_triggered' }
+  // 손절 취소를 확인하지 못해 아직 팔지 않았어요. 다음 주기에 다시 해요
+  | { status: 'not_ready' };
 
 export type EntryResult =
   | { status: 'blocked' }
@@ -303,8 +328,216 @@ export class OrderService {
   }
 
   // 토스가 알려 준 주문 1건을 반영해요. 같은 값을 여러 번 받아도 결과가 같아요
-  @Transactional()
   async applyReport(
+    report: OrderReport,
+    source: OrderEventSource,
+  ): Promise<ApplyResult> {
+    const result = await this.saveReport(report, source);
+    if (result === 'updated' || result === 'created')
+      await this.afterReport(report.brokerOrderId);
+    return result;
+  }
+
+  // 체결이 반영된 뒤(트랜잭션 밖, 토스 호출 포함): 봇 포지션이 0주면 닫고 잠금을 풀고, 남아 있으면 손절을 맞춰요
+  private async afterReport(brokerOrderId: string): Promise<void> {
+    const order = await this.orders.findByBrokerOrderId(brokerOrderId);
+    if (!order) return;
+    const position = await this.positions.find(order.positionId);
+    if (position?.botId === null || position?.status !== 'open') return;
+    if (position.quantity > 0) {
+      await this.protect(position.id);
+      return;
+    }
+    // 매수 체결이 하나도 없는 진입 주문이 아직 살아 있으면 기다려요
+    if (await this.orders.hasOpenOrders(position.id)) return;
+    if (await this.orders.findLiveProtective(position.id)) return;
+    const reason =
+      order.origin === 'protective'
+        ? 'stop_loss'
+        : (position.exitReason ?? 'not_filled');
+    if (await this.positions.closeFlat(position.id, reason, new Date()))
+      await this.risk.releaseLock(position.symbol, position.botId);
+  }
+
+  // POL-RISK-11: 보유 수량만큼 SINGLE + 시장가 매도 손절을 걸어요. 수량이 바뀌면 취소를 확인한 뒤 다시 걸어요
+  async protect(positionId: number): Promise<void> {
+    const position = await this.positions.find(positionId);
+    if (position?.botId === null || position?.status !== 'open') return;
+    const live = await this.orders.findLiveProtective(positionId);
+    if (live?.status === 'open' && live.quantity === position.quantity) return;
+    if (live && (await this.cancelProtective(live)) !== 'canceled') return;
+    if (position.quantity === 0) return;
+    const triggerPrice = await this.decisions.entryStopPrice(positionId);
+    if (triggerPrice === null) {
+      this.logger.error(
+        `position ${positionId}: 손절가가 없어 손절을 걸지 못했어요`,
+      );
+      return;
+    }
+    // ponytail: 만료일은 당일이에요(당일 청산 봇). 이월 봇(M6)을 만들 때 최대 보유일로 바꿔요
+    const stop = await this.orders.addProtective({
+      positionId,
+      brokerConditionalOrderId: null,
+      clientOrderId: randomUUID(),
+      triggerPrice,
+      quantity: position.quantity,
+      expireDate: kstDate(),
+      status: 'requested',
+      triggeredOrderId: null,
+      closedAt: null,
+    });
+    const result = await this.broker.placeStop({
+      clientOrderId: stop.clientOrderId,
+      symbol: position.symbol,
+      quantity: stop.quantity,
+      triggerPrice,
+      expireDate: stop.expireDate,
+    });
+    if (result.outcome === 'accepted') {
+      await this.orders.updateProtective(stop.id, {
+        status: 'open',
+        brokerConditionalOrderId: result.conditionalOrderId,
+      });
+      return;
+    }
+    if (result.outcome === 'rejected') {
+      await this.orders.updateProtective(stop.id, {
+        status: 'canceled',
+        closedAt: new Date(),
+      });
+      // 손절 공백이에요. 바로 알려요
+      await this.risk.record('order_rejected', position.botId, {
+        kind: 'protective',
+        code: result.code,
+        positionId,
+      });
+      return;
+    }
+    // ponytail: 응답을 못 받은 손절은 requested로 남겨요. 다음 체결 반영이나 청산 때 다시 맞춰요
+    this.logger.warn(
+      `position ${positionId}: 손절 응답을 못 받았어요(${result.reason})`,
+    );
+  }
+
+  // POL-RISK-14: 손절 취소 확인 → 청산 판단·매도. 이미 발동됐으면 팔지 않아요
+  async exit(request: ExitRequest): Promise<ExitResult> {
+    if (!this.engineState.canOrder()) return { status: 'blocked' };
+    const position = await this.positions.find(request.positionId);
+    if (
+      position?.botId === null ||
+      position?.status !== 'open' ||
+      position.quantity === 0
+    )
+      return { status: 'nothing' };
+    const botId = position.botId;
+    await this.positions.setExitReason(position.id, request.reason);
+    const live = await this.orders.findLiveProtective(position.id);
+    if (live) {
+      const canceled = await this.cancelProtective(live);
+      if (canceled === 'triggered') {
+        await this.positions.setExitReason(position.id, 'stop_loss');
+        return { status: 'stop_triggered' };
+      }
+      if (canceled === 'unknown') return { status: 'not_ready' };
+    }
+    const order = await this.saveExit(
+      request,
+      position.symbol,
+      position.quantity,
+    );
+    const result = await this.send(order, botId);
+    if (result.status === 'rejected') {
+      // 예: 직접 거래 반대 방향 미체결(409). 재시도하지 않고 알리고, 손절이 비지 않게 다시 걸어요
+      await this.risk.record('order_rejected', botId, {
+        kind: 'exit',
+        code: result.code,
+        positionId: position.id,
+      });
+      await this.protect(position.id);
+    }
+    return result;
+  }
+
+  // 취소를 확인하면 canceled, 이미 발동됐으면 triggered, 확인하지 못하면 unknown
+  private async cancelProtective(
+    stop: ProtectiveOrder,
+  ): Promise<'canceled' | 'triggered' | 'unknown'> {
+    const id = stop.brokerConditionalOrderId;
+    if (id === null) {
+      // ponytail: 응답을 못 받은 손절은 토스에 있는지 몰라요. 같은 clientOrderId로 조회할 방법이 생기면 확인해요
+      await this.orders.updateProtective(stop.id, {
+        status: 'canceled',
+        closedAt: new Date(),
+      });
+      return 'canceled';
+    }
+    await this.orders.updateProtective(stop.id, { status: 'canceling' });
+    if (await this.broker.cancelStop(id)) {
+      await this.orders.updateProtective(stop.id, {
+        status: 'canceled',
+        closedAt: new Date(),
+      });
+      return 'canceled';
+    }
+    const state = await this.broker.stopState(id);
+    if (state.isTriggered) {
+      await this.orders.updateProtective(stop.id, {
+        status: 'triggered',
+        triggeredOrderId: state.triggeredOrderId,
+        closedAt: new Date(),
+      });
+      return 'triggered';
+    }
+    return 'unknown';
+  }
+
+  @Transactional()
+  private async saveExit(
+    request: ExitRequest,
+    symbol: string,
+    quantity: number,
+  ): Promise<BrokerOrder> {
+    const decisionId = await this.decisions.record({
+      ...request.rationale,
+      botVersionId: request.botVersionId,
+      positionId: request.positionId,
+      symbol,
+      kind: 'exit',
+      price: request.markPrice,
+      direction: null,
+      targetPrice: null,
+      stopPrice: null,
+      horizonMinutes: null,
+      skipReason: null,
+    });
+    return this.orders.create({
+      origin: 'bot',
+      decisionId,
+      positionId: request.positionId,
+      brokerOrderId: null,
+      symbol,
+      side: 'SELL',
+      orderType: request.orderType,
+      timeInForce: 'DAY',
+      price: request.price,
+      quantity,
+      status: 'requested',
+      rejectCode: null,
+      filledQuantity: 0,
+      avgFilledPrice: null,
+      filledAmount: null,
+      commission: null,
+      tax: null,
+      orderedAt: null,
+      filledAt: null,
+      canceledAt: null,
+      settlementDate: null,
+      syncedAt: null,
+    });
+  }
+
+  @Transactional()
+  private async saveReport(
     report: OrderReport,
     source: OrderEventSource,
   ): Promise<ApplyResult> {
@@ -359,9 +592,23 @@ export class OrderService {
     report: OrderReport,
     source: OrderEventSource,
   ): Promise<ApplyResult> {
-    const protective = await this.orders.findProtectiveByTriggeredOrderId(
-      report.brokerOrderId,
-    );
+    // 발동 주문 id를 아직 모르면 같은 종목·수량의 살아 있는 손절 매도로 봐요
+    const protective =
+      (await this.orders.findProtectiveByTriggeredOrderId(
+        report.brokerOrderId,
+      )) ??
+      (report.side === 'SELL'
+        ? await this.orders.findLiveProtectiveFor(
+            report.symbol,
+            report.quantity,
+          )
+        : null);
+    if (protective && protective.triggeredOrderId === null)
+      await this.orders.updateProtective(protective.id, {
+        status: 'triggered',
+        triggeredOrderId: report.brokerOrderId,
+        closedAt: new Date(),
+      });
     if (!protective && (await this.orders.hasLostCandidate(report))) {
       this.logger.warn(
         `응답을 못 받은 봇 주문일 수 있어 분류하지 않았어요: ${report.symbol} ${report.side} ${report.quantity}주`,

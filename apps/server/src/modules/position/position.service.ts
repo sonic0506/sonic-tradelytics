@@ -64,6 +64,27 @@ export class PositionService {
     return result;
   }
 
+  find(positionId: number): Promise<Position | null> {
+    return this.positions.findById(positionId);
+  }
+
+  // 청산을 시작할 때 사유를 먼저 적어 둬요. 수량이 0이 되어 닫힐 때 그대로 남아요
+  setExitReason(
+    positionId: number,
+    exitReason: NonNullable<Position['exitReason']>,
+  ): Promise<void> {
+    return this.positions.setExitReason(positionId, exitReason);
+  }
+
+  // 수량이 0인 봇 포지션을 사유와 함께 닫아요. 닫았으면 true
+  closeFlat(
+    positionId: number,
+    exitReason: NonNullable<Position['exitReason']>,
+    closedAt: Date,
+  ): Promise<boolean> {
+    return this.positions.closeIfEmpty(positionId, exitReason, closedAt);
+  }
+
   // 진입 판단의 포지션 (수량 0에서 시작)
   openForBot(botId: number, symbol: string, openedAt: Date): Promise<Position> {
     return this.positions.createForBot(botId, symbol, openedAt);

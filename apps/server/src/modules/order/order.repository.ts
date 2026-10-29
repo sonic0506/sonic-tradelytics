@@ -6,7 +6,16 @@ import { In, IsNull, LessThanOrEqual, type Repository } from 'typeorm';
 import { BrokerOrder } from './entities/broker-order.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
 import { ProtectiveOrder } from './entities/protective-order.entity.js';
-import { OPEN_ORDER_STATUSES, type OrderSide } from './order.constants.js';
+import {
+  LIVE_PROTECTIVE_ORDER_STATUSES,
+  OPEN_ORDER_STATUSES,
+  type OrderSide,
+} from './order.constants.js';
+
+export type ProtectiveFields = Omit<
+  ProtectiveOrder,
+  'id' | 'position' | 'createdAt' | 'updatedAt'
+>;
 
 export type BrokerOrderFields = Omit<
   BrokerOrder,
@@ -80,6 +89,47 @@ export class OrderRepository {
 
   findByBrokerOrderId(brokerOrderId: string): Promise<BrokerOrder | null> {
     return this.orders.findOneBy({ brokerOrderId });
+  }
+
+  findLiveProtective(positionId: number): Promise<ProtectiveOrder | null> {
+    return this.protectives.findOneBy({
+      positionId,
+      status: In([...LIVE_PROTECTIVE_ORDER_STATUSES]),
+    });
+  }
+
+  // 발동 주문 id를 아직 모를 때: 같은 종목·수량으로 걸려 있는 살아 있는 손절
+  findLiveProtectiveFor(
+    symbol: string,
+    quantity: number,
+  ): Promise<ProtectiveOrder | null> {
+    return this.protectives.findOne({
+      relations: { position: true },
+      where: {
+        quantity,
+        status: In([...LIVE_PROTECTIVE_ORDER_STATUSES]),
+        position: { symbol, status: 'open' },
+      },
+    });
+  }
+
+  addProtective(fields: ProtectiveFields): Promise<ProtectiveOrder> {
+    return this.protectives.save(this.protectives.create(fields));
+  }
+
+  async updateProtective(
+    id: number,
+    fields: Partial<ProtectiveFields>,
+  ): Promise<void> {
+    await this.protectives.update({ id }, fields);
+  }
+
+  async hasOpenOrders(positionId: number): Promise<boolean> {
+    const open = await this.orders.findOne({
+      select: { id: true },
+      where: { positionId, status: In([...OPEN_ORDER_STATUSES]) },
+    });
+    return open !== null;
   }
 
   // 이 토스 주문을 낸 손절 조건주문

@@ -146,4 +146,71 @@ describe('TossBrokerService', () => {
       { status: 'CLOSED', symbol: '005930', from: '2026-10-29' },
     ]);
   });
+
+  it('손절은 SINGLE 시장가 매도로 발동가와 만료일을 보내요', async () => {
+    respond({ conditionalOrderId: 'c-1' });
+    const stop = {
+      clientOrderId: 'p-1',
+      symbol: '005930',
+      quantity: 3,
+      triggerPrice: 68_000,
+      expireDate: '2026-10-29',
+    };
+
+    await expect(broker.placeStop(stop)).resolves.toEqual({
+      outcome: 'accepted',
+      conditionalOrderId: 'c-1',
+    });
+    expect(toss.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        group: 'CONDITIONAL_ORDER',
+        path: '/api/v1/conditional-orders',
+        body: {
+          clientOrderId: 'p-1',
+          symbol: '005930',
+          type: 'SINGLE',
+          orderType: 'MARKET',
+          quantity: '3',
+          expireDate: '2026-10-29',
+          first: { orderSide: 'SELL', triggerPrice: '68000' },
+        },
+      }),
+    );
+
+    toss.request.mockRejectedValue(
+      new TossApiError(422, 'stock-restricted', ''),
+    );
+    await expect(broker.placeStop(stop)).resolves.toEqual({
+      outcome: 'rejected',
+      code: 'stock-restricted',
+    });
+    toss.request.mockRejectedValue(new TossNoResponseError('/c', 'timeout'));
+    await expect(broker.placeStop(stop)).resolves.toMatchObject({
+      outcome: 'unknown',
+    });
+  });
+
+  it('손절 취소가 받아들여지면 true, 이미 발동돼 4xx면 false예요', async () => {
+    respond(undefined);
+    await expect(broker.cancelStop('c-1')).resolves.toBe(true);
+
+    toss.request.mockRejectedValue(
+      new TossApiError(400, 'already-triggered', ''),
+    );
+    await expect(broker.cancelStop('c-1')).resolves.toBe(false);
+  });
+
+  it('발동돼 주문이 나간 손절은 발동 주문 id와 함께 알려 줘요', async () => {
+    respond({ status: 'ORDERED', first: { triggeredOrderId: 'o-stop' } });
+    await expect(broker.stopState('c-1')).resolves.toEqual({
+      isTriggered: true,
+      triggeredOrderId: 'o-stop',
+    });
+
+    respond({ status: 'WATCHING', first: { triggeredOrderId: null } });
+    await expect(broker.stopState('c-1')).resolves.toEqual({
+      isTriggered: false,
+      triggeredOrderId: null,
+    });
+  });
 });

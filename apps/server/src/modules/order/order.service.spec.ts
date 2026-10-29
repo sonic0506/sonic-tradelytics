@@ -28,11 +28,22 @@ describe('OrderService', () => {
     findOpenForBots: vi.fn<OrderRepository['findOpenForBots']>(),
     findRequested: vi.fn<OrderRepository['findRequested']>(),
     linkedBrokerOrderIds: vi.fn<OrderRepository['linkedBrokerOrderIds']>(),
+    findLiveProtective: vi.fn<OrderRepository['findLiveProtective']>(),
+    findLiveProtectiveFor: vi.fn<OrderRepository['findLiveProtectiveFor']>(),
+    addProtective: vi.fn<OrderRepository['addProtective']>(),
+    updateProtective: vi.fn<OrderRepository['updateProtective']>(),
+    hasOpenOrders: vi.fn<OrderRepository['hasOpenOrders']>(),
   };
-  const decisions = { record: vi.fn<DecisionService['record']>() };
+  const decisions = {
+    record: vi.fn<DecisionService['record']>(),
+    entryStopPrice: vi.fn<DecisionService['entryStopPrice']>(),
+  };
   const broker = {
     place: vi.fn<TossBrokerService['place']>(),
     listOrders: vi.fn<TossBrokerService['listOrders']>(),
+    placeStop: vi.fn<TossBrokerService['placeStop']>(),
+    cancelStop: vi.fn<TossBrokerService['cancelStop']>(),
+    stopState: vi.fn<TossBrokerService['stopState']>(),
   };
   const risk = {
     acquireLock: vi.fn<RiskService['acquireLock']>(),
@@ -45,6 +56,9 @@ describe('OrderService', () => {
     applyFill: vi.fn<PositionService['applyFill']>(),
     openForBot: vi.fn<PositionService['openForBot']>(),
     closeNotFilled: vi.fn<PositionService['closeNotFilled']>(),
+    find: vi.fn<PositionService['find']>(),
+    setExitReason: vi.fn<PositionService['setExitReason']>(),
+    closeFlat: vi.fn<PositionService['closeFlat']>(),
   };
   let moduleRef: TestingModule;
   let service: OrderService;
@@ -605,6 +619,321 @@ describe('OrderService', () => {
           reason: 'ambiguous_recovery',
           candidates: ['o-1', 'o-2'],
         }),
+      );
+    });
+  });
+
+  describe('손절 조건주문과 청산', () => {
+    const position = (fields: Partial<Position> = {}): Position =>
+      Object.assign(
+        {
+          id: 2,
+          botId: 7,
+          symbol: '005930',
+          status: 'open',
+          quantity: 3,
+          exitReason: null,
+        },
+        fields,
+      ) as Position;
+    const stop = (fields: Partial<ProtectiveOrder> = {}): ProtectiveOrder =>
+      Object.assign(
+        {
+          id: 50,
+          positionId: 2,
+          brokerConditionalOrderId: 'c-1',
+          clientOrderId: 'p-1',
+          quantity: 3,
+          status: 'open',
+          triggeredOrderId: null,
+        },
+        fields,
+      ) as ProtectiveOrder;
+
+    beforeEach(() => {
+      decisions.entryStopPrice.mockResolvedValue(68_000);
+      orders.addProtective.mockImplementation((fields) =>
+        Promise.resolve(Object.assign({ id: 51 }, fields) as ProtectiveOrder),
+      );
+    });
+
+    it('보유 수량만큼 진입 판단의 손절가로 시장가 매도 손절을 걸어요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(null);
+      broker.placeStop.mockResolvedValue({
+        outcome: 'accepted',
+        conditionalOrderId: 'c-9',
+      });
+
+      await service.protect(2);
+
+      expect(broker.placeStop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbol: '005930',
+          quantity: 3,
+          triggerPrice: 68_000,
+          expireDate: '2026-10-29',
+        }),
+      );
+      expect(orders.updateProtective).toHaveBeenCalledWith(51, {
+        status: 'open',
+        brokerConditionalOrderId: 'c-9',
+      });
+    });
+
+    it('수량이 같은 손절이 걸려 있으면 다시 걸지 않아요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(stop());
+
+      await service.protect(2);
+
+      expect(broker.cancelStop).not.toHaveBeenCalled();
+      expect(broker.placeStop).not.toHaveBeenCalled();
+    });
+
+    it('수량이 늘면 기존 손절 취소를 확인한 뒤 새 수량으로 다시 걸어요', async () => {
+      positions.find.mockResolvedValue(position({ quantity: 5 }));
+      orders.findLiveProtective.mockResolvedValue(stop());
+      broker.cancelStop.mockResolvedValue(true);
+      broker.placeStop.mockResolvedValue({
+        outcome: 'accepted',
+        conditionalOrderId: 'c-10',
+      });
+
+      await service.protect(2);
+
+      expect(broker.cancelStop).toHaveBeenCalledWith('c-1');
+      expect(broker.placeStop).toHaveBeenCalledWith(
+        expect.objectContaining({ quantity: 5 }),
+      );
+    });
+
+    it('손절이 거부되면 손절 공백을 바로 알려요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(null);
+      broker.placeStop.mockResolvedValue({
+        outcome: 'rejected',
+        code: 'stock-restricted',
+      });
+
+      await service.protect(2);
+
+      expect(risk.record).toHaveBeenCalledWith(
+        'order_rejected',
+        7,
+        expect.objectContaining({
+          kind: 'protective',
+          code: 'stock-restricted',
+        }),
+      );
+    });
+
+    const exitRequest = {
+      positionId: 2,
+      botVersionId: 70,
+      reason: 'take_profit' as const,
+      orderType: 'MARKET' as const,
+      price: null,
+      markPrice: 72_000,
+      rationale: { passed: [], failed: [], score: null },
+    };
+    const exit = () => runInCls(moduleRef, () => service.exit(exitRequest));
+
+    it('청산은 손절 취소를 확인한 뒤에만 판단을 남기고 보유 수량을 매도해요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(stop());
+      broker.cancelStop.mockResolvedValue(true);
+      decisions.record.mockResolvedValue('d-exit');
+      orders.create.mockResolvedValue(
+        known({
+          id: 60,
+          decisionId: 'd-exit',
+          side: 'SELL',
+          orderType: 'MARKET',
+          price: null,
+          quantity: 3,
+          symbol: '005930',
+        }),
+      );
+      broker.place.mockResolvedValue({
+        outcome: 'accepted',
+        brokerOrderId: 'o-sell',
+      });
+
+      await expect(exit()).resolves.toEqual({
+        status: 'accepted',
+        brokerOrderId: 'o-sell',
+      });
+
+      expect(positions.setExitReason).toHaveBeenCalledWith(2, 'take_profit');
+      expect(broker.cancelStop).toHaveBeenCalledBefore(broker.place);
+      expect(decisions.record).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'exit', positionId: 2 }),
+      );
+      expect(broker.place).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientOrderId: 'd-exit',
+          side: 'SELL',
+          quantity: 3,
+          price: null,
+        }),
+      );
+    });
+
+    it('손절이 이미 발동됐으면 팔지 않고 손절 청산으로 기록해요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(stop());
+      broker.cancelStop.mockResolvedValue(false);
+      broker.stopState.mockResolvedValue({
+        isTriggered: true,
+        triggeredOrderId: 'o-stop',
+      });
+
+      await expect(exit()).resolves.toEqual({ status: 'stop_triggered' });
+
+      expect(broker.place).not.toHaveBeenCalled();
+      expect(orders.updateProtective).toHaveBeenLastCalledWith(50, {
+        status: 'triggered',
+        triggeredOrderId: 'o-stop',
+        closedAt: now,
+      });
+      expect(positions.setExitReason).toHaveBeenLastCalledWith(2, 'stop_loss');
+    });
+
+    it('손절 취소를 확인하지 못하면 아직 팔지 않아요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(stop());
+      broker.cancelStop.mockResolvedValue(false);
+      broker.stopState.mockResolvedValue({
+        isTriggered: false,
+        triggeredOrderId: null,
+      });
+
+      await expect(exit()).resolves.toEqual({ status: 'not_ready' });
+      expect(broker.place).not.toHaveBeenCalled();
+    });
+
+    it('매도가 거부되면 알리고 남은 수량으로 손절을 다시 걸어요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(null);
+      decisions.record.mockResolvedValue('d-exit');
+      orders.create.mockResolvedValue(
+        known({
+          id: 60,
+          decisionId: 'd-exit',
+          side: 'SELL',
+          quantity: 3,
+          symbol: '005930',
+        }),
+      );
+      broker.place.mockResolvedValue({
+        outcome: 'rejected',
+        code: 'opposite-pending-order-exists',
+      });
+      positions.closeNotFilled.mockResolvedValue(false);
+      broker.placeStop.mockResolvedValue({
+        outcome: 'accepted',
+        conditionalOrderId: 'c-11',
+      });
+
+      await expect(exit()).resolves.toEqual({
+        status: 'rejected',
+        code: 'opposite-pending-order-exists',
+      });
+
+      expect(risk.record).toHaveBeenCalledWith(
+        'order_rejected',
+        7,
+        expect.objectContaining({
+          kind: 'exit',
+          code: 'opposite-pending-order-exists',
+        }),
+      );
+      expect(broker.placeStop).toHaveBeenCalledWith(
+        expect.objectContaining({ quantity: 3 }),
+      );
+      expect(risk.releaseLock).not.toHaveBeenCalled();
+    });
+
+    it('종료 중이면 청산 주문도 내지 않고, 보유가 없으면 할 일이 없어요', async () => {
+      state.halt('stopping');
+      await expect(exit()).resolves.toEqual({ status: 'blocked' });
+
+      state.release('stopping');
+      positions.find.mockResolvedValue(position({ quantity: 0 }));
+      await expect(exit()).resolves.toEqual({ status: 'nothing' });
+    });
+
+    it('체결로 봇 포지션이 0주가 되면 사유와 함께 닫고 종목 잠금을 풀어요', async () => {
+      orders.findByBrokerOrderId
+        .mockResolvedValueOnce(
+          known({
+            id: 5,
+            positionId: 2,
+            status: 'PENDING',
+            side: 'SELL',
+            origin: 'bot',
+          }),
+        )
+        .mockResolvedValueOnce(
+          known({ id: 5, positionId: 2, side: 'SELL', origin: 'bot' }),
+        );
+      positions.find.mockResolvedValue(
+        position({ quantity: 0, exitReason: 'take_profit' }),
+      );
+      orders.hasOpenOrders.mockResolvedValue(false);
+      orders.findLiveProtective.mockResolvedValue(null);
+      positions.closeFlat.mockResolvedValue(true);
+
+      await apply(report({ side: 'SELL' }));
+
+      expect(positions.closeFlat).toHaveBeenCalledWith(2, 'take_profit', now);
+      expect(risk.releaseLock).toHaveBeenCalledWith('005930', 7);
+    });
+
+    it('일부만 팔렸으면 남은 수량으로 손절을 다시 맞춰요', async () => {
+      orders.findByBrokerOrderId
+        .mockResolvedValueOnce(
+          known({ id: 5, positionId: 2, status: 'PENDING', side: 'SELL' }),
+        )
+        .mockResolvedValueOnce(known({ id: 5, positionId: 2, side: 'SELL' }));
+      positions.find.mockResolvedValue(position({ quantity: 1 }));
+      orders.findLiveProtective.mockResolvedValue(stop());
+      broker.cancelStop.mockResolvedValue(true);
+      broker.placeStop.mockResolvedValue({
+        outcome: 'accepted',
+        conditionalOrderId: 'c-12',
+      });
+
+      await apply(
+        report({ side: 'SELL', status: 'PARTIAL_FILLED', filledQuantity: 2 }),
+      );
+
+      expect(broker.placeStop).toHaveBeenCalledWith(
+        expect.objectContaining({ quantity: 1 }),
+      );
+      expect(positions.closeFlat).not.toHaveBeenCalled();
+    });
+
+    it('발동 주문 id를 모르는 손절 매도는 같은 종목·수량의 살아 있는 손절로 묶어요', async () => {
+      orders.findByBrokerOrderId.mockResolvedValue(null);
+      orders.findProtectiveByTriggeredOrderId.mockResolvedValue(null);
+      orders.findLiveProtectiveFor.mockResolvedValue(stop({ positionId: 8 }));
+      orders.create.mockResolvedValue(known({ id: 13, positionId: 8 }));
+
+      await expect(apply(report({ side: 'SELL', quantity: 3 }))).resolves.toBe(
+        'created',
+      );
+
+      expect(orders.updateProtective).toHaveBeenCalledWith(50, {
+        status: 'triggered',
+        triggeredOrderId: 'o-1',
+        closedAt: now,
+      });
+      expect(orders.create).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: 'protective', positionId: 8 }),
       );
     });
   });

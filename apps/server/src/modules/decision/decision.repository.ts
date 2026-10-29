@@ -21,6 +21,13 @@ export class DecisionRepository {
     return this.txHost.tx.getRepository(Decision);
   }
 
+  findEntry(positionId: number): Promise<Decision | null> {
+    return this.decisions.findOne({
+      where: { positionId, kind: 'enter' },
+      order: { decidedAt: 'ASC' },
+    });
+  }
+
   async add(fields: DecisionFields): Promise<void> {
     await this.decisions.insert(fields);
   }
