@@ -64,6 +64,11 @@ export class PositionService {
     return result;
   }
 
+  // 체결 뒤에 확정된 수수료·세금(늘어난 만큼)을 실현 손익에서 빼요 (NFR-05)
+  addFees(positionId: number, fees: number): Promise<void> {
+    return this.positions.addFees(positionId, fees);
+  }
+
   findHeldByBot(botId?: number): Promise<Position[]> {
     return this.positions.findHeldByBot(botId);
   }

@@ -343,7 +343,16 @@ export class OrderService {
     const order = await this.orders.findByBrokerOrderId(brokerOrderId);
     if (!order) return;
     const position = await this.positions.find(order.positionId);
-    if (position?.botId === null || position?.status !== 'open') return;
+    if (position?.status !== 'open') return;
+    // 직접 거래: 체결 없이 끝난 주문만 남은 0주 포지션을 닫아요(매도로 0주가 되면 체결 반영 때 이미 닫혀요)
+    if (position.botId === null) {
+      if (
+        position.quantity === 0 &&
+        !(await this.orders.hasOpenOrders(position.id))
+      )
+        await this.positions.closeFlat(position.id, 'not_filled', new Date());
+      return;
+    }
     if (position.quantity > 0) {
       await this.protect(position.id);
       return;
@@ -609,10 +618,16 @@ export class OrderService {
       (!OPEN_STATUSES.includes(order.status) &&
         OPEN_STATUSES.includes(report.status));
     if (isStale) return 'unchanged';
-    if (
+    // 체결 수량이 같아도 수수료·세금·체결 금액·체결 시각은 REST가 나중에 채워요 (실제 토스 확인 2026-10-30)
+    const isSame =
       report.filledQuantity === order.filledQuantity &&
-      report.status === order.status
-    ) {
+      report.status === order.status &&
+      report.filledAmount === order.filledAmount &&
+      report.commission === order.commission &&
+      report.tax === order.tax &&
+      (report.filledAt === null ||
+        report.filledAt.getTime() === order.filledAt?.getTime());
+    if (isSame) {
       if (source === 'rest') await this.orders.update(order.id, { syncedAt });
       return 'unchanged';
     }
@@ -722,6 +737,9 @@ export class OrderService {
       occurredAt,
       raw: report.raw,
     });
+    // 체결 없이 수수료·세금만 확정되면 그 차이만 손익에서 빼요
+    if (quantity === 0 && fees !== 0)
+      await this.positions.addFees(positionId, fees);
     if (quantity > 0)
       await this.positions.applyFill(positionId, {
         side: report.side,

@@ -60,6 +60,7 @@ describe('OrderService', () => {
     openForBot: vi.fn<PositionService['openForBot']>(),
     closeNotFilled: vi.fn<PositionService['closeNotFilled']>(),
     find: vi.fn<PositionService['find']>(),
+    addFees: vi.fn<PositionService['addFees']>(),
     setExitReason: vi.fn<PositionService['setExitReason']>(),
     closeFlat: vi.fn<PositionService['closeFlat']>(),
     findHeldByBot: vi.fn<PositionService['findHeldByBot']>(),
@@ -239,13 +240,59 @@ describe('OrderService', () => {
 
   it('REST 값이 같으면 맞춘 시각만 갱신하고 이력은 남기지 않아요', async () => {
     orders.findByBrokerOrderId.mockResolvedValue(
-      known({ status: 'FILLED', filledQuantity: 10 }),
+      known({
+        status: 'FILLED',
+        filledQuantity: 10,
+        filledAmount: 700_000,
+        commission: 100,
+        tax: 0,
+        filledAt,
+      }),
     );
 
     await expect(apply(report(), 'rest')).resolves.toBe('unchanged');
 
     expect(orders.update).toHaveBeenCalledWith(5, { syncedAt: now });
     expect(orders.addEvent).not.toHaveBeenCalled();
+  });
+
+  it('체결 수량이 같아도 REST가 채운 체결 시각은 갱신하고 포지션은 그대로예요', async () => {
+    orders.findByBrokerOrderId.mockResolvedValue(
+      known({
+        status: 'FILLED',
+        filledQuantity: 10,
+        filledAmount: 700_000,
+        commission: 100,
+        tax: 0,
+      }),
+    );
+
+    await expect(apply(report(), 'rest')).resolves.toBe('updated');
+
+    expect(orders.update).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ filledAt }),
+    );
+    expect(positions.applyFill).not.toHaveBeenCalled();
+    expect(positions.addFees).not.toHaveBeenCalled();
+  });
+
+  it('체결 뒤에 확정된 세금은 늘어난 만큼만 포지션 손익에서 빼요', async () => {
+    orders.findByBrokerOrderId.mockResolvedValue(
+      known({
+        status: 'FILLED',
+        filledQuantity: 10,
+        filledAmount: 700_000,
+        commission: 100,
+        tax: 0,
+        filledAt,
+      }),
+    );
+
+    await apply(report({ tax: 1050 }), 'rest');
+
+    expect(positions.addFees).toHaveBeenCalledWith(2, 1050);
+    expect(positions.applyFill).not.toHaveBeenCalled();
   });
 
   it('늦게 온 옛 값은 반영하지 않아요', async () => {
@@ -1009,5 +1056,34 @@ describe('OrderService', () => {
         }),
       );
     });
+  });
+
+  it('체결 없이 끝난 직접 거래 주문만 남은 0주 포지션을 닫아요', async () => {
+    orders.findByBrokerOrderId.mockResolvedValue(
+      known({ id: 1, positionId: 4, status: 'PENDING', filledQuantity: 0 }),
+    );
+    positions.find.mockResolvedValue(
+      Object.assign({
+        id: 4,
+        botId: null,
+        status: 'open',
+        quantity: 0,
+      }) as Position,
+    );
+    orders.hasOpenOrders.mockResolvedValue(false);
+
+    await apply(
+      report({
+        status: 'CANCELED',
+        filledQuantity: 0,
+        filledAmount: 0,
+        commission: 0,
+        tax: 0,
+        filledAt: null,
+      }),
+    );
+
+    expect(positions.closeFlat).toHaveBeenCalledWith(4, 'not_filled', now);
+    expect(risk.releaseLock).not.toHaveBeenCalled();
   });
 });

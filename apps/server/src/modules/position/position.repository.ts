@@ -45,6 +45,19 @@ export class PositionRepository {
     });
   }
 
+  async addFees(id: number, fees: number): Promise<void> {
+    await this.positions
+      .createQueryBuilder()
+      .update(Position)
+      .set({
+        realizedPnl: () => `"realized_pnl" - :fees`,
+        totalFees: () => `"total_fees" + :fees`,
+      })
+      .where('id = :id', { id })
+      .setParameter('fees', fees)
+      .execute();
+  }
+
   async setExitReason(
     id: number,
     exitReason: NonNullable<Position['exitReason']>,
