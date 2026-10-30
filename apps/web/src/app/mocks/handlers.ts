@@ -11,7 +11,7 @@ import { dailyResultHandlers } from '@/entities/daily-result';
 import { engineStatusHandlers } from '@/entities/engine-status';
 import { homeHandlers } from '@/entities/home';
 import { orderHandlers } from '@/entities/order';
-import { positionHandlers } from '@/entities/position';
+import { positionHandlers, positionHistoryHandlers } from '@/entities/position';
 import { riskEventHandlers } from '@/entities/risk-event';
 import { createBotHandlers } from '@/features/bot/create-bot';
 import { killSwitchHandlers } from '@/features/engine/kill-switch';
@@ -28,6 +28,7 @@ export const handlers: RequestHandler[] = [
   ...allocationHandlers,
   ...createBotHandlers,
   ...dailyResultHandlers,
+  ...positionHistoryHandlers,
   ...positionHandlers,
   ...orderHandlers,
   ...riskEventHandlers,

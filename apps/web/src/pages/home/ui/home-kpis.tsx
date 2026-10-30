@@ -6,9 +6,7 @@ import type { ReactNode } from 'react';
 
 import { useHomeSummaryQuery } from '@/entities/home';
 import { formatSignedPercent, formatSignedWon, formatWon } from '@/shared/lib';
-import { PnlText } from '@/shared/ui';
-
-import { KpiCard } from './kpi-card';
+import { KpiCard, PnlText } from '@/shared/ui';
 
 function KpiGrid({ children }: { children: ReactNode }) {
   return (

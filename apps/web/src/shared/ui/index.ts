@@ -1,4 +1,5 @@
 export { FilterActions, FilterField, FilterPanel } from './filter-panel';
+export { KpiCard } from './kpi-card';
 export { PnlBarChart } from './pnl-bar-chart';
 export type { PnlPoint } from './pnl-chart-parts';
 export { PnlLineChart } from './pnl-line-chart';

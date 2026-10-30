@@ -20,14 +20,15 @@ export const holdingSchema = z.object({
 
 export const holdingsSchema = listResponseSchema(holdingSchema);
 
-export const exitReasonSchema = z.enum([
+export const EXIT_REASONS = [
   'take_profit',
   'stop_loss',
   'time_exit',
   'close_exit',
   'reeval_exit',
   'manual',
-]);
+] as const;
+export const exitReasonSchema = z.enum(EXIT_REASONS);
 
 // GET /v1/positions?status=closed 한 줄 (청산한 포지션)
 export const closedPositionSchema = z.object({
