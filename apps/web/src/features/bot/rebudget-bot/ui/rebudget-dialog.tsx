@@ -28,7 +28,6 @@ type RebudgetDialogProps = {
   // 돌려받을 지금 투자금과 손익
   cashShare: number;
   budget: { type: 'ratio' | 'fixed'; value: number };
-  orderAmount: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -54,7 +53,6 @@ export function RebudgetDialog({
   capAmount,
   cashShare,
   budget,
-  orderAmount,
   open,
   onOpenChange,
 }: RebudgetDialogProps) {
@@ -82,7 +80,7 @@ export function RebudgetDialog({
     rebudget.mutate(
       {
         botId,
-        budget: { type, value: isRatio ? amount / 100 : amount, orderAmount },
+        budget: { type, value: isRatio ? amount / 100 : amount },
       },
       {
         onSuccess: () => {

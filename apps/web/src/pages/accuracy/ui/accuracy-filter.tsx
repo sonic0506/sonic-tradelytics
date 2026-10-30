@@ -4,7 +4,7 @@ import { Input, Select } from '@xonic0506/sonic-ui';
 import { type SubmitEvent, useState } from 'react';
 
 import type { GetAccuracyStatsParams } from '@/entities/accuracy';
-import { useBotsQuery } from '@/entities/bot';
+import { useBotOptionsQuery } from '@/entities/bot';
 import {
   FilterActions,
   FilterField,
@@ -25,12 +25,12 @@ function BotSelect({
   value: string[];
   onChange: (botIds: string[]) => void;
 }) {
-  const { data: bots } = useBotsQuery();
+  const { data: botOptions } = useBotOptionsQuery();
   return (
     <Select
       multiple
       aria-label="봇"
-      options={bots.items.map((bot) => ({ value: bot.id, label: bot.name }))}
+      options={botOptions}
       value={value}
       onValueChange={onChange}
       placeholder="전체"

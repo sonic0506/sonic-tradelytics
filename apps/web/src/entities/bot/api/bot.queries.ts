@@ -10,6 +10,7 @@ import {
   getBotDailyResults,
   getBotDefaults,
   type GetBotDefaultsParams,
+  getBotOptions,
   getBots,
 } from './bot.api';
 import { getBotStats } from './bot-stat.api';
@@ -23,6 +24,13 @@ export const botQueries = {
       queryKey: [...botQueries.all(), 'list'],
       queryFn: getBots,
       refetchInterval: 5_000,
+    }),
+  // 필터 선택지. 봇 이름은 잘 바뀌지 않아서 1분 동안 다시 받지 않아요
+  options: () =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'options'],
+      queryFn: getBotOptions,
+      staleTime: 60_000,
     }),
   detail: (id: string) =>
     queryOptions({

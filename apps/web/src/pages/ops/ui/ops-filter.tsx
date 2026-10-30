@@ -3,7 +3,7 @@
 import { Input, Select } from '@xonic0506/sonic-ui';
 import { type SubmitEvent, useState } from 'react';
 
-import { useBotsQuery } from '@/entities/bot';
+import { useBotOptionsQuery } from '@/entities/bot';
 import {
   RISK_EVENT_KIND_LABEL,
   RISK_EVENT_KINDS,
@@ -46,12 +46,12 @@ function BotSelect({
   value: string[];
   onChange: (botIds: string[]) => void;
 }) {
-  const { data: bots } = useBotsQuery();
+  const { data: botOptions } = useBotOptionsQuery();
   return (
     <Select
       multiple
       aria-label="봇"
-      options={bots.items.map((bot) => ({ value: bot.id, label: bot.name }))}
+      options={botOptions}
       value={value}
       onValueChange={onChange}
       placeholder="전체"

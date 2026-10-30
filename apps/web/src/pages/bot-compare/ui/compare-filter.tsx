@@ -3,7 +3,7 @@
 import { Input, Select } from '@xonic0506/sonic-ui';
 import { type SubmitEvent, useState } from 'react';
 
-import { BOT_STAGE_LABEL, useBotsQuery } from '@/entities/bot';
+import { BOT_STAGE_LABEL, useBotOptionsQuery } from '@/entities/bot';
 import { type BotStage, botStageSchema } from '@/shared/api';
 import {
   FilterActions,
@@ -42,11 +42,8 @@ function BotSelect({
   value: string[];
   onChange: (botIds: string[]) => void;
 }) {
-  const { data: bots } = useBotsQuery();
-  const options = [
-    ...bots.items.map((bot) => ({ value: bot.id, label: bot.name })),
-    { value: 'manual', label: '직접 거래' },
-  ];
+  const { data: botOptions } = useBotOptionsQuery();
+  const options = [...botOptions, { value: 'manual', label: '직접 거래' }];
   return (
     <Select
       multiple

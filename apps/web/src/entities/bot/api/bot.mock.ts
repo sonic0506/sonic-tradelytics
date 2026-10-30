@@ -127,6 +127,12 @@ export const BOTS_FIXTURE: BotListItem[] = [
 ];
 
 export const botHandlers = [
+  // /v1/bots/:id보다 먼저 둬서 options가 id로 잡히지 않게 해요
+  http.get(mockApiUrl('/v1/bots/options'), () =>
+    HttpResponse.json(
+      BOTS_FIXTURE.map((bot) => ({ value: bot.id, label: bot.name })),
+    ),
+  ),
   http.get(mockApiUrl('/v1/bots'), () =>
     HttpResponse.json({
       items: BOTS_FIXTURE,

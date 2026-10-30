@@ -5,6 +5,7 @@ export { BOT_DETAILS_FIXTURE, botDetailHandlers } from './api/bot-detail.mock';
 export { botStatHandlers } from './api/bot-stat.mock';
 export { botVersionHandlers } from './api/bot-version.mock';
 export { useBotDailyResultsQuery } from './hooks/use-bot-daily-results-query';
+export { useBotOptionsQuery } from './hooks/use-bot-options-query';
 export { type BotDetailView, useBotQuery } from './hooks/use-bot-query';
 export { useBotStatsQuery } from './hooks/use-bot-stats-query';
 export { useBotVersionsQuery } from './hooks/use-bot-versions-query';

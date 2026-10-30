@@ -1,6 +1,10 @@
 import { type BotType, http } from '@/shared/api';
 
-import { botsSchema, type RiskProfile } from '../model/bot.schema';
+import {
+  botOptionsSchema,
+  botsSchema,
+  type RiskProfile,
+} from '../model/bot.schema';
 import { botDefaultsSchema } from '../model/bot-defaults.schema';
 import {
   botDailyResultsSchema,
@@ -9,6 +13,10 @@ import {
 
 export async function getBots() {
   return botsSchema.parse(await http<unknown>('/v1/bots?size=100'));
+}
+
+export async function getBotOptions() {
+  return botOptionsSchema.parse(await http<unknown>('/v1/bots/options'));
 }
 
 export async function getBotById(id: string) {

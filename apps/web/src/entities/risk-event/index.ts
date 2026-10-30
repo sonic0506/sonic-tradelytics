@@ -4,6 +4,7 @@ export type { GetRiskEventHistoryParams } from './api/risk-event-history.api';
 export { riskEventHistoryHandlers } from './api/risk-event-history.mock';
 export { useRiskEventHistoryQuery } from './hooks/use-risk-event-history-query';
 export { useTodayRiskEventsQuery } from './hooks/use-today-risk-events-query';
+export { formatRiskEventMessage } from './lib/format-risk-event';
 export {
   RISK_EVENT_KIND_LABEL,
   RISK_EVENT_KIND_TONE,

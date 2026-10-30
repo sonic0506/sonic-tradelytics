@@ -18,6 +18,7 @@ import {
 import { Search } from 'lucide-react';
 
 import {
+  formatRiskEventMessage,
   type GetRiskEventHistoryParams,
   RISK_EVENT_KIND_LABEL,
   type RiskEvent,
@@ -111,7 +112,7 @@ export function RiskEventList({
                   <KindBadge event={event} />
                 </TableCell>
                 <TableCell>{event.botName ?? '전체'}</TableCell>
-                <TableCell>{event.message}</TableCell>
+                <TableCell>{formatRiskEventMessage(event)}</TableCell>
                 <TableCell>
                   <NotifiedText event={event} />
                 </TableCell>
@@ -136,7 +137,7 @@ export function RiskEventList({
                   {formatMonthDayTime(event.occurredAt)}
                 </Text>
               </div>
-              <Text as="p">{event.message}</Text>
+              <Text as="p">{formatRiskEventMessage(event)}</Text>
               <span className="text-caption">
                 <NotifiedText event={event} />
               </span>

@@ -213,7 +213,6 @@ function LockedBudget({ bot }: { bot: BotDetailView }) {
           capAmount={bot.capAmount}
           cashShare={bot.funds?.cashShare ?? bot.budget ?? 0}
           budget={bot.budgetSetting}
-          orderAmount={bot.settings.orderAmount}
           open={isOpen}
           onOpenChange={setIsOpen}
         />

@@ -6,10 +6,15 @@ export const OPS_KIND_TONE: Record<
   RiskEventKind,
   'danger' | 'warning' | 'neutral'
 > = {
-  daily_loss_limit: 'warning',
-  cumulative_loss_limit: 'danger',
-  consecutive_losses: 'warning',
+  daily_stop: 'warning',
+  total_stop: 'danger',
+  streak_pause: 'warning',
+  rate_cap: 'warning',
+  kill_switch: 'danger',
+  batch_fail: 'warning',
   feed_stale: 'neutral',
-  insufficient_funds: 'warning',
+  record_fail: 'danger',
   order_rejected: 'danger',
+  funds_waiting: 'warning',
+  bot_error: 'danger',
 };

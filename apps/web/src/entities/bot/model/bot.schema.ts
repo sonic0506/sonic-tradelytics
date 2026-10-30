@@ -76,6 +76,11 @@ export const botListItemSchema = z.object({
 
 export const botsSchema = listResponseSchema(botListItemSchema);
 
+// 필터용 봇 목록 OptionDto[] (GET /v1/bots/options). 끝난 봇도 모두 와요
+export const botOptionsSchema = z.array(
+  z.object({ value: z.string(), label: z.string() }),
+);
+
 export type BotListItem = z.infer<typeof botListItemSchema>;
 export type RiskProfile = z.infer<typeof riskProfileSchema>;
 export type StatusReason = z.infer<typeof statusReasonSchema>;

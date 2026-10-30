@@ -4,6 +4,7 @@ import { EmptyState, Skeleton, Text } from '@xonic0506/sonic-ui';
 import { CircleAlert, Inbox } from 'lucide-react';
 
 import {
+  formatRiskEventMessage,
   RISK_EVENT_KIND_LABEL,
   RISK_EVENT_KIND_TONE,
   useTodayRiskEventsQuery,
@@ -26,9 +27,9 @@ export function TodayRiskEventList() {
             className={`size-4 shrink-0 ${ICON_CLASS[RISK_EVENT_KIND_TONE[event.kind]]}`}
           />
           <div className="flex flex-col gap-1">
-            <Text as="p">{event.message}</Text>
+            <Text as="p">{formatRiskEventMessage(event)}</Text>
             <Text variant="mono-caption" tone="muted">
-              {formatHourMinute(event.occurredAt)} ·{' '}
+              {formatHourMinute(event.occurredAt)} · {event.botName ?? '전체'} ·{' '}
               {RISK_EVENT_KIND_LABEL[event.kind]}
             </Text>
           </div>

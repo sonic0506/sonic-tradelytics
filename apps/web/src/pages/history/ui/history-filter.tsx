@@ -3,7 +3,7 @@
 import { Input, Select } from '@xonic0506/sonic-ui';
 import { type SubmitEvent, useState } from 'react';
 
-import { useBotsQuery } from '@/entities/bot';
+import { useBotOptionsQuery } from '@/entities/bot';
 import {
   EXIT_REASON_LABEL,
   EXIT_REASONS,
@@ -50,11 +50,8 @@ type BotSelectProps = {
 
 // 봇 여러 개와 직접 거래를 함께 골라요 (FR-PERF-05, 07)
 function BotSelect({ value, onChange }: BotSelectProps) {
-  const { data: bots } = useBotsQuery();
-  const options = [
-    ...bots.items.map((bot) => ({ value: bot.id, label: bot.name })),
-    { value: 'manual', label: '직접 거래' },
-  ];
+  const { data: botOptions } = useBotOptionsQuery();
+  const options = [...botOptions, { value: 'manual', label: '직접 거래' }];
   return (
     <Select
       multiple

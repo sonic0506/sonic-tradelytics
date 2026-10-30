@@ -24,7 +24,9 @@ describe('HomeDashboard', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText('한화오션')).toBeInTheDocument();
     expect(
-      await screen.findByText('스윙 추세 C가 3연속 손실로 일시정지했어요.'),
+      await screen.findByText(
+        '3번 연속 손절해서 일시정지했어요. 재개는 직접 눌러야 해요.',
+      ),
     ).toBeInTheDocument();
   });
 

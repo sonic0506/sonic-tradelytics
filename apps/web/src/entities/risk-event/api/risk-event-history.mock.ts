@@ -5,23 +5,23 @@ import { mockApiUrl } from '@/shared/api';
 import type { RiskEvent } from '../model/risk-event.schema';
 
 // Figma Ops / 정상과 같은 기록이에요. botName이 null이면 봇 전체에 해당해요
-const OPS_EVENTS: (RiskEvent & { botId: string | null })[] = [
+const OPS_EVENTS: RiskEvent[] = [
   {
     id: 'ops-6',
     occurredAt: '2026-10-29T13:05:00+09:00',
-    kind: 'daily_loss_limit',
+    kind: 'daily_stop',
     botId: 'bot-a',
     botName: '모멘텀 단타 A',
-    message: '하루 손실 −3.1%로 한도 −3%에 닿아 오늘 신규 진입을 멈췄어요.',
+    detail: { amount: 3_000_000, dailyPnl: -93_000, totalPnl: 41_000 },
     notifiedAt: '2026-10-29T13:05:02+09:00',
   },
   {
     id: 'ops-5',
     occurredAt: '2026-10-29T11:40:00+09:00',
-    kind: 'consecutive_losses',
+    kind: 'streak_pause',
     botId: 'bot-c',
     botName: '스윙 추세 C',
-    message: '3번 연속 손절해서 일시정지했어요. 재개는 직접 눌러야 해요.',
+    detail: { stopStreak: 3 },
     notifiedAt: '2026-10-29T11:40:01+09:00',
   },
   {
@@ -30,16 +30,16 @@ const OPS_EVENTS: (RiskEvent & { botId: string | null })[] = [
     kind: 'feed_stale',
     botId: null,
     botName: null,
-    message: '셀트리온 시세가 32초 끊겼다가 다시 들어왔어요.',
+    detail: { symbol: '068270', staleSeconds: 32 },
     notifiedAt: null,
   },
   {
     id: 'ops-3',
     occurredAt: '2026-10-29T09:00:00+09:00',
-    kind: 'insufficient_funds',
+    kind: 'funds_waiting',
     botId: 'bot-d',
     botName: '스캘핑 D',
-    message: '32,000원이 모자라 자금 대기로 바꿨어요.',
+    detail: { reason: 'insufficient', shortfall: 32_000 },
     notifiedAt: '2026-10-29T09:00:03+09:00',
   },
   {
@@ -48,16 +48,16 @@ const OPS_EVENTS: (RiskEvent & { botId: string | null })[] = [
     kind: 'order_rejected',
     botId: 'bot-a',
     botName: '모멘텀 단타 A',
-    message: '기아 매수 주문이 거부됐어요. 반대 방향 미체결 주문이 있었어요.',
+    detail: { code: 'OPPOSITE_ORDER_PENDING' },
     notifiedAt: '2026-10-28T14:52:01+09:00',
   },
   {
     id: 'ops-1',
     occurredAt: '2026-10-21T11:18:00+09:00',
-    kind: 'cumulative_loss_limit',
+    kind: 'total_stop',
     botId: 'bot-e',
     botName: '단타 실험 E',
-    message: '누적 손실 −15.0%로 한도에 닿아 봇을 끝냈어요.',
+    detail: { amount: 100_000, dailyPnl: -3_000, totalPnl: -15_000 },
     notifiedAt: '2026-10-21T11:18:02+09:00',
   },
 ];
