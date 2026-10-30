@@ -26,6 +26,53 @@ export class BotRepository {
     return this.txHost.tx.getRepository(BotVersion);
   }
 
+  // 선택 목록(필터)용 모든 봇. 끝난 봇도 내역 필터에 필요해요
+  findAllNames(): Promise<Pick<Bot, 'id' | 'name'>[]> {
+    return this.bots.find({
+      select: { id: true, name: true },
+      order: { id: 'ASC' },
+      take: BotRepository.MAX_BOTS,
+    });
+  }
+
+  // 같은 시각에 시작하는, 끝나지 않은 봇들의 투자금 설정과 시작 우선순위 (POL-FUND-03, 14)
+  findStartingAt(
+    tradingStart: string,
+  ): Promise<
+    Pick<Bot, 'id' | 'budgetType' | 'budgetRatio' | 'startPriority'>[]
+  > {
+    return this.bots.find({
+      select: {
+        id: true,
+        budgetType: true,
+        budgetRatio: true,
+        startPriority: true,
+      },
+      where: { tradingStart, status: Not('stopped') },
+      take: BotRepository.MAX_BOTS,
+    });
+  }
+
+  // 봇과 첫 버전(initial)을 함께 저장해요. 호출하는 쪽 트랜잭션 안이에요
+  async createWithVersion(
+    bot: Omit<Bot, 'id' | 'createdAt' | 'updatedAt'>,
+    version: Omit<
+      BotVersion,
+      'id' | 'botId' | 'bot' | 'version' | 'changeKind' | 'createdAt'
+    >,
+  ): Promise<Bot> {
+    const saved = await this.bots.save(this.bots.create(bot));
+    await this.versions.save(
+      this.versions.create({
+        ...version,
+        botId: saved.id,
+        version: 1,
+        changeKind: 'initial',
+      }),
+    );
+    return saved;
+  }
+
   findByIds(ids: number[]): Promise<Bot[]> {
     return this.bots.find({
       where: { id: In(ids) },
@@ -55,7 +102,7 @@ export class BotRepository {
 
   findByStatuses(statuses: BotStatus[]): Promise<Bot[]> {
     return this.bots.find({
-      select: { id: true, status: true, statusReason: true },
+      select: { id: true, status: true, statusReason: true, periodStart: true },
       where: { status: In(statuses) },
       take: BotRepository.MAX_BOTS,
     });

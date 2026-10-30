@@ -31,7 +31,7 @@ describe('DB 스키마 규칙', () => {
   const insertBot = async (): Promise<number> => {
     const { id } = await queryOne<{ id: number }>(
       `INSERT INTO bots (name, type, risk_profile, budget_type, budget_ratio, start_priority, trading_start, trading_end, period_start, on_period_end)
-       VALUES ($1, 'day_trading', 'neutral', 'ratio', 0.3, 1, '09:05', '15:15', '2026-10-28', 'liquidate') RETURNING id`,
+       VALUES ($1, 'day', 'neutral', 'ratio', 0.3, 1, '09:05', '15:15', '2026-10-28', 'liquidate') RETURNING id`,
       [`봇-${randomUUID()}`],
     );
     return id;

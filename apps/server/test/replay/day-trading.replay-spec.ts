@@ -80,7 +80,7 @@ describe.skipIf(!file)('데이 트레이딩 리플레이', () => {
     });
     const bot = await dataSource.getRepository(Bot).save({
       name: 'replay-day-trading',
-      type: 'day_trading',
+      type: 'day',
       riskProfile: 'neutral',
       stage: 'verifying',
       status: 'running',

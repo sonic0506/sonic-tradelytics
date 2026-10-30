@@ -23,7 +23,7 @@ INSERT INTO bots (
   start_priority, trading_start, trading_end, period_start, on_period_end
 )
 VALUES (
-  'paper-day-trading', 'day_trading', 'neutral', 'verifying', 'running', 'fixed', 100000,
+  'paper-day-trading', 'day', 'neutral', 'verifying', 'running', 'fixed', 100000,
   1, '09:05', '15:20', CURRENT_DATE, 'liquidate'
 )
 ON CONFLICT (name) DO NOTHING;

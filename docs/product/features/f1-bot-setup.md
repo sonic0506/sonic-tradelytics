@@ -50,7 +50,7 @@
 | --- | --- | --- |
 | 종목 필터 | 거래대금 실시간 순위 30위 안(투자 유의 종목 제외), 주가 1,000~200,000원, 시가 대비 +2%~+10% | `maxRank` `minPrice` `maxPrice` `minRisePct` `maxRisePct` |
 | 진입 | 현재가가 오늘 정규장 VWAP 위 0~1% 안 (VWAP 지지) | `vwapBandPct` |
-| 청산 | +2%에 절반, +4%에 나머지 익절. VWAP 아래 0.5% 이탈 시 전량. 15:15 전량 청산 | `takeProfitPcts` `vwapExitPct` `exitAt` |
+| 청산 | +2%에 절반, +4%에 나머지 익절. VWAP 아래 0.5% 이탈 시 전량. 15:15 전량 청산 | `takeProfit1Pct` `takeProfit2Pct` `vwapExitPct` `exitAt` |
 | 손절 | 진입가 -2% 손절 조건주문 (POL-RISK-11) | `stopLossPct` |
 | 재진입 대기 | 청산한 종목은 30분 동안 다시 사지 않아요 (2026-10-30 리플레이에서 같은 종목 반복 진입 손실을 보고 더함) | `reentryCooldownMinutes` |
 | 판단 주기 | 10초 | — |

@@ -68,7 +68,7 @@ erDiagram
 | --- | --- | --- | --- |
 | id | bigint | PK | |
 | name | text | not null, unique | |
-| type | text | not null, CHECK `scalping` `day_trading` `swing` `closing_bet` | 봇 유형 |
+| type | text | not null, CHECK `scalping` `day` `swing` `closing` | 봇 유형 |
 | risk_profile | text | not null, CHECK `aggressive` `neutral` `conservative` | POL-RISK-01, 05 |
 | stage | text | not null, default `verifying`, CHECK `verifying` `released` | 검증 구간 (POL-RISK-13) |
 | status | text | not null, default `ready`, CHECK `ready` `running` `paused` `waiting_funds` `stopped` | `waiting_funds`는 POL-FUND-15 |

@@ -19,7 +19,9 @@ import { BotRunnerService } from './bot-runner.service.js';
 describe('BotRunnerService', () => {
   const bots = {
     findTrading: vi.fn<BotService['findTrading']>(),
+    findFundable: vi.fn<BotService['findFundable']>(),
     setStatus: vi.fn<BotService['setStatus']>(),
+    parseParams: vi.fn<BotService['parseParams']>(),
   };
   const calendar = {
     isRegularSession: vi.fn<MarketCalendarService['isRegularSession']>(),
@@ -43,6 +45,7 @@ describe('BotRunnerService', () => {
   const fund = {
     entryBudget: vi.fn<FundService['entryBudget']>(),
     activeAllocation: vi.fn<FundService['activeAllocation']>(),
+    allocate: vi.fn<FundService['allocate']>(),
   };
   const decisions = { record: vi.fn<DecisionService['record']>() };
   const orders = {
@@ -62,7 +65,7 @@ describe('BotRunnerService', () => {
   const now = new Date('2026-10-30T01:00:00Z');
   const bot = Object.assign({
     id: 7,
-    type: 'day_trading',
+    type: 'day',
     status: 'running',
     tradingStart: '09:00:00',
     tradingEnd: '15:30:00',
@@ -100,6 +103,11 @@ describe('BotRunnerService', () => {
     vi.resetAllMocks();
     calendar.isRegularSession.mockReturnValue(true);
     bots.findTrading.mockResolvedValue([{ bot, version: version() }]);
+    bots.findFundable.mockResolvedValue([]);
+    // 규칙 값 해석은 BotService의 실제 동작을 써요 (this를 쓰지 않는 함수예요)
+    bots.parseParams.mockImplementation((raw) =>
+      BotService.prototype.parseParams.call(undefined, raw),
+    );
     // 1위는 시가 대비 +0.5%라 탈락, 2위가 모든 조건 충족
     scanner.rankByTradingAmount.mockResolvedValue([
       { symbol: '000001', rank: 1 },
@@ -478,5 +486,22 @@ describe('BotRunnerService', () => {
       expect(risk.stopBot).not.toHaveBeenCalled();
       expect(orders.enter).toHaveBeenCalledOnce();
     });
+  });
+
+  it('운용 시작일이 된 새 봇(ready)은 장중 주기에서 투자금을 확정해요', async () => {
+    bots.findFundable.mockResolvedValue([
+      Object.assign({ id: 9, status: 'ready' }) as Bot,
+      Object.assign({ id: 7, status: 'running' }) as Bot,
+    ]);
+
+    await runner.cycle(now);
+
+    expect(fund.allocate).toHaveBeenCalledWith([9]);
+  });
+
+  it('새 봇이 없으면 투자금 확정을 부르지 않아요', async () => {
+    await runner.cycle(now);
+
+    expect(fund.allocate).not.toHaveBeenCalled();
   });
 });

@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { z } from 'zod';
 
 import { kstAt, kstDate, kstTime } from '@/common/time/kst-date.js';
 import {
   type Bot,
   BotService,
   type BotVersion,
-  DAY_TRADING_DEFAULTS,
   type DayTradingParams,
   type EntryEvaluation,
   entryPlan,
@@ -36,23 +34,6 @@ import {
   isTradingWindow,
   RiskService,
 } from '@/modules/risk/index.js';
-
-// bot_versions.params. 빠진 값은 기본값으로 채워요. 모양이 틀리면 그 봇을 bot_error로 멈춰요
-const paramsSchema = z
-  .object({
-    maxRank: z.number().int().positive(),
-    minPrice: z.number().positive(),
-    maxPrice: z.number().positive(),
-    minRisePct: z.number(),
-    maxRisePct: z.number(),
-    vwapBandPct: z.number().nonnegative(),
-    takeProfitPcts: z.array(z.number().positive()).min(1),
-    vwapExitPct: z.number().positive(),
-    stopLossPct: z.number().positive(),
-    exitAt: z.string().regex(/^\d{2}:\d{2}:\d{2}$/),
-    reentryCooldownMinutes: z.number().int().nonnegative(),
-  })
-  .partial();
 
 interface Candidate {
   symbol: string;
@@ -124,8 +105,9 @@ export class BotRunnerService {
     if (this.isCycling || !this.calendar.isRegularSession(now)) return;
     this.isCycling = true;
     try {
+      await this.startReadyBots();
       const running = (await this.bots.findTrading()).filter(
-        ({ bot }) => bot.type === 'day_trading',
+        ({ bot }) => bot.type === 'day',
       );
       if (running.length === 0) return;
       await this.scan(now);
@@ -141,6 +123,15 @@ export class BotRunnerService {
     } finally {
       this.isCycling = false;
     }
+  }
+
+  // 운용 시작일이 된 새 봇은 장중에 만들어졌어도 바로 투자금을 확정하고 돌기 시작해요 (POL-FUND-09).
+  // 08:59 open_snapshot이 먼저 확정한 봇은 FundService가 건너뛰어요
+  private async startReadyBots(): Promise<void> {
+    const ready = (await this.bots.findFundable()).filter(
+      ({ status }) => status === 'ready',
+    );
+    if (ready.length > 0) await this.fund.allocate(ready.map(({ id }) => id));
   }
 
   // 후보를 다시 받고 보유 종목과 함께 시세를 구독해요. 실패하면 이전 후보를 그대로 써요
@@ -167,10 +158,7 @@ export class BotRunnerService {
     now: Date,
   ): Promise<void> {
     try {
-      const params: DayTradingParams = {
-        ...DAY_TRADING_DEFAULTS,
-        ...paramsSchema.parse(version.params),
-      };
+      const params = this.bots.parseParams(version.params);
       const held = await this.positions.findHeldByBot(bot.id);
       const isRunning = bot.status === 'running';
       if (isRunning && (await this.isLimitHit(bot, version, held, now))) return;

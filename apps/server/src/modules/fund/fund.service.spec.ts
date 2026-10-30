@@ -210,6 +210,15 @@ describe('FundService', () => {
       expect(bots.setStatus).toHaveBeenCalledWith(1, 'running', null);
     });
 
+    it('시작 전(ready) 새 봇도 확정되면 running이 돼요', async () => {
+      bots.findWithVersions.mockResolvedValue([target(bot(1))]);
+      snapshots.take.mockResolvedValue(snapshot(1_000_000));
+
+      await service.allocate([1]);
+
+      expect(bots.setStatus).toHaveBeenCalledWith(1, 'running', null);
+    });
+
     it('검증 구간 봇은 상한까지만, 1회 주문 금액이 정액이면 그보다 작을 때 보류해요', async () => {
       bots.findWithVersions.mockResolvedValue([
         target(bot(1, { stage: 'verifying', budgetRatio: 0.5 })),

@@ -13,9 +13,11 @@ import { LoggerModule } from 'nestjs-pino';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard.js';
 import { RolesGuard } from './common/auth/roles.guard.js';
 import { AppExceptionFilter } from './common/filters/app-exception.filter.js';
+import { BotSetupModule } from './compositions/bot-setup/bot-setup.module.js';
 import { env } from './config/env.js';
 import { dataSourceOptions } from './infra/database/data-source.js';
 import { HealthModule } from './infra/health/health.module.js';
+import { BotModule } from './modules/bot/index.js';
 import { CommandApiModule } from './modules/command/index.js';
 import { EngineStateModule } from './modules/engine-state/index.js';
 import { RiskModule } from './modules/risk/index.js';
@@ -82,6 +84,8 @@ const REQUEST_ID = /^[\w-]{1,128}$/;
     ]),
     HealthModule,
     // feature 모듈은 여기에 더해요: import { UserModule } from './modules/user/index.js';
+    BotModule,
+    BotSetupModule,
     CommandApiModule,
     EngineStateModule,
     RiskModule,

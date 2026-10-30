@@ -22,7 +22,7 @@ describe('GET /v1/risk-events', () => {
     await resetDatabase(app);
     const bot = await dataSource.getRepository(Bot).save({
       name: 'day',
-      type: 'day_trading',
+      type: 'day',
       riskProfile: 'neutral',
       status: 'paused',
       budgetType: 'fixed',

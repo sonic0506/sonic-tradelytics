@@ -168,7 +168,7 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 
 ### `GET /v1/bot-defaults?type&riskProfile`
 
-유형·성향별 기본값(F1 1단계 자동 입력). 기본값은 코드 상수예요(`strategy` 기본 파라미터 + [POL-RISK-01](../policy/risk-management.md#1-투자-성향별-손실-중지-pol-risk-01) 손실 %). 이월 유형이면 갭 하락 안내가 필요하다는 표시를 같이 줘요 (FR-BOT-07).
+유형·성향별 기본값(F1 1단계 자동 입력). 규칙 값은 칸 목록(`rules`: `key`·`group`·`label`·`kind`·`unit`·`value`)으로 주고, web은 이 칸을 그대로 그려요. `key`가 `bot_versions.params`의 키예요. 아직 전략이 없는 유형(지금은 `day`만 있어요)은 422 `BOT_TYPE_NOT_SUPPORTED`예요. 기본값은 코드 상수예요(`strategy` 기본 파라미터 + [POL-RISK-01](../policy/risk-management.md#1-투자-성향별-손실-중지-pol-risk-01) 손실 %). 이월 유형이면 갭 하락 안내가 필요하다는 표시를 같이 줘요 (FR-BOT-07).
 
 ### `POST /v1/allocation-previews`
 
@@ -189,7 +189,9 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 | 규칙 파라미터 모양 (유형별 스키마) | FR-RAT-07 | `VALIDATION_FAILED` |
 
 - `stage = verifying`, `status = ready`로 시작해요 (FR-BOT-02). 클라이언트는 둘을 보낼 수 없어요
-- **시작은 engine이 해요.** engine은 `period_start`의 운영 시작 시각에 투자금을 확정하고 `running`으로 바꿔요. 이미 지난 시각이면 늦게 시작하는 봇으로 바로 확정해요 (POL-FUND-09)
+- 몸체: `name`, `type`, `riskProfile`, `budget`(`type`·`value`), `startPriority`(`first`면 같은 시각 봇들 맨 앞, 그 밖에는 맨 뒤), `orderAmount`(원), `splitCount`, `maxPositions`, `period`(`start`·`end`·`onEnd`), `tradingHours`(`HH:mm`), `params`(`rules`의 키, 시각은 `HH:mm`), `lossStop`(`first`·`total`, 양수 %), `stopStreak`, `onDailyLimit`. 응답은 `{ id }`예요
+- 규칙 값에 모르는 키가 있거나 모양이 틀리면 400 `VALIDATION_FAILED`이고 `errors[].field`가 `params.<키>`예요
+- **시작은 engine이 해요.** engine은 `period_start`가 된 `ready` 봇의 투자금을 08:59 `open_snapshot`에서 확정하고 `running`으로 바꿔요. 장중에 만든 봇은 BotRunner 주기(10초)에서 바로 확정해요 (POL-FUND-09). M4 현재 봇 시작 시각별 스냅샷은 아직 없어요
 
 ### `GET /v1/bots`, `GET /v1/bots/:id`
 
@@ -324,6 +326,7 @@ Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중�
 | 코드 | 상태 | 언제 |
 | --- | --- | --- |
 | `BOT_NOT_FOUND` | 404 | 없는 봇 |
+| `BOT_TYPE_NOT_SUPPORTED` | 422 | 아직 전략이 없는 봇 유형 |
 | `POSITION_NOT_FOUND` | 404 | 없는 포지션 |
 | `DECISION_NOT_FOUND` | 404 | 없는 판단 |
 | `COMMAND_NOT_FOUND` | 404 | 없는 명령 |

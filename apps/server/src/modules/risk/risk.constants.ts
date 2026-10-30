@@ -25,7 +25,7 @@ export const DEFAULT_LOSS_LIMITS = {
     neutral: { scope: 'day', lossPct: 3, totalLossPct: 10 },
     conservative: { scope: 'day', lossPct: 2, totalLossPct: 6 },
   },
-  day_trading: {
+  day: {
     aggressive: { scope: 'day', lossPct: 6, totalLossPct: 15 },
     neutral: { scope: 'day', lossPct: 4, totalLossPct: 10 },
     conservative: { scope: 'day', lossPct: 2, totalLossPct: 6 },
@@ -35,7 +35,7 @@ export const DEFAULT_LOSS_LIMITS = {
     neutral: { scope: 'position', lossPct: 5, totalLossPct: 10 },
     conservative: { scope: 'position', lossPct: 3, totalLossPct: 5 },
   },
-  closing_bet: {
+  closing: {
     aggressive: { scope: 'position', lossPct: 5, totalLossPct: 15 },
     neutral: { scope: 'position', lossPct: 3, totalLossPct: 10 },
     conservative: { scope: 'position', lossPct: 2, totalLossPct: 6 },

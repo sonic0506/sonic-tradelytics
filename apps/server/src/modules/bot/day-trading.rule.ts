@@ -18,8 +18,9 @@ export interface DayTradingParams {
   maxRisePct: number;
   // 현재가가 VWAP 위 0~이 값(%) 안이면 VWAP 지지로 봐요
   vwapBandPct: number;
-  // 분할 익절 단계(%). 단계마다 남은 수량을 남은 단계 수로 나눠 팔아요
-  takeProfitPcts: number[];
+  // 분할 익절 1·2단계(%). 1단계에서 절반, 2단계에서 나머지를 팔아요
+  takeProfit1Pct: number;
+  takeProfit2Pct: number;
   // 현재가가 VWAP 아래로 이 값(%) 이상 내려가면 전량 청산
   vwapExitPct: number;
   // 손절 조건주문 발동가 = 진입가에서 이 값(%) 아래 (POL-RISK-11)
@@ -137,7 +138,7 @@ export function entryPlan(
   price: number,
   nowKst: string,
 ): { targetPrice: number; stopPrice: number; horizonMinutes: number } {
-  const lastTakeProfit = params.takeProfitPcts.at(-1) ?? 0;
+  const lastTakeProfit = params.takeProfit2Pct;
   return {
     targetPrice: floorToTick(price * (1 + lastTakeProfit / PERCENT)),
     stopPrice: floorToTick(price * (1 - params.stopLossPct / PERCENT)),
@@ -196,13 +197,14 @@ export function evaluateExit(
         threshold: params.vwapExitPct,
       },
     };
-  const step = params.takeProfitPcts[state.takenSteps];
+  const steps = [params.takeProfit1Pct, params.takeProfit2Pct];
+  const step = steps[state.takenSteps];
   const profit = round(pctChange(state.avgPrice, state.price));
   if (step !== undefined && profit >= step)
     return {
       action: 'sell',
       reason: 'take_profit',
-      ratio: 1 / (params.takeProfitPcts.length - state.takenSteps),
+      ratio: 1 / (steps.length - state.takenSteps),
       check: {
         rule: `take_profit_${state.takenSteps + 1}`,
         value: profit,

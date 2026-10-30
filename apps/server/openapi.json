@@ -238,6 +238,315 @@
         "security": []
       }
     },
+    "/v1/bots/options": {
+      "get": {
+        "operationId": "BotController_findOptions_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bots/options",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "필터용 봇 선택 목록. 끝난 봇도 모두 줘요",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
+    "/v1/bot-defaults": {
+      "get": {
+        "operationId": "BotSetupController_findDefaults_v1",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "봇 유형",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "scalping",
+                "day",
+                "swing",
+                "closing"
+              ]
+            }
+          },
+          {
+            "name": "riskProfile",
+            "required": true,
+            "in": "query",
+            "description": "투자 성향",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "aggressive",
+                "neutral",
+                "conservative"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BotDefaultsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/bot-defaults",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bot-defaults",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_TYPE_NOT_SUPPORTED": {
+                    "summary": "swing 봇은 아직 만들 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "swing 봇은 아직 만들 수 없어요.",
+                      "code": "BOT_TYPE_NOT_SUPPORTED",
+                      "instance": "/v1/bot-defaults",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "유형·성향별 기본값 (봇 만들기 1단계 자동 입력)",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
+    "/v1/bots": {
+      "post": {
+        "operationId": "BotSetupController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedBotDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "규칙 값을 확인해 주세요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "규칙 값을 확인해 주세요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/bots",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bots",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_TYPE_NOT_SUPPORTED": {
+                    "summary": "swing 봇은 아직 만들 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "swing 봇은 아직 만들 수 없어요.",
+                      "code": "BOT_TYPE_NOT_SUPPORTED",
+                      "instance": "/v1/bots",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  },
+                  "TRADING_HOURS_OUT_OF_RANGE": {
+                    "summary": "운영 시간은 09:00~15:30 안이어야 해요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "운영 시간은 09:00~15:30 안이어야 해요.",
+                      "code": "TRADING_HOURS_OUT_OF_RANGE",
+                      "instance": "/v1/bots",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  },
+                  "BUDGET_RATIO_EXCEEDED": {
+                    "summary": "09:05에 시작하는 정률 봇들의 합이 100%를 넘어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "09:05에 시작하는 정률 봇들의 합이 100%를 넘어요.",
+                      "code": "BUDGET_RATIO_EXCEEDED",
+                      "instance": "/v1/bots",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "봇과 첫 규칙 버전을 저장해요. 시작(투자금 확정)은 engine이 운용 시작일 운영 시각에 해요",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
     "/v1/commands": {
       "post": {
         "operationId": "CommandController_create_v1",
@@ -723,6 +1032,376 @@
       }
     },
     "schemas": {
+      "OptionDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ]
+      },
+      "AmountSettingDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "정률이면 비율(0~1], 정액이면 원"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "TradingHoursDto": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "시작 \"HH:mm\""
+          },
+          "end": {
+            "type": "string",
+            "description": "종료 \"HH:mm\""
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ]
+      },
+      "RuleFieldDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "description": "묶음: 종목 필터·진입·청산",
+            "enum": [
+              "filter",
+              "entry",
+              "exit"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "description": "number면 숫자, time이면 \"HH:mm\"",
+            "enum": [
+              "number",
+              "time"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "bot_versions.params의 키"
+          },
+          "label": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "description": "숫자 뒤에 붙는 단위. 시각이면 null"
+          }
+        },
+        "required": [
+          "group",
+          "kind",
+          "value",
+          "key",
+          "label",
+          "unit"
+        ]
+      },
+      "LossStopDto": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "number",
+            "description": "하루 손실 중지 %(양수, 4면 -4%)"
+          },
+          "total": {
+            "type": "number",
+            "description": "누적 손실 중지 %(양수)"
+          }
+        },
+        "required": [
+          "first",
+          "total"
+        ]
+      },
+      "BotDefaultsResponseDto": {
+        "type": "object",
+        "properties": {
+          "onDailyLimit": {
+            "enum": [
+              "liquidate",
+              "hold"
+            ],
+            "type": "string"
+          },
+          "capAmount": {
+            "type": "number",
+            "description": "검증 구간에서 확정하는 투자금 상한 (POL-FUND-11)"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AmountSettingDto"
+          },
+          "orderAmount": {
+            "type": "number",
+            "description": "1회 주문 금액(원)"
+          },
+          "splitCount": {
+            "type": "number"
+          },
+          "maxPositions": {
+            "type": "number"
+          },
+          "tradingHours": {
+            "$ref": "#/components/schemas/TradingHoursDto"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleFieldDto"
+            }
+          },
+          "lossStop": {
+            "$ref": "#/components/schemas/LossStopDto"
+          },
+          "stopStreak": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "onDailyLimit",
+          "capAmount",
+          "budget",
+          "orderAmount",
+          "splitCount",
+          "maxPositions",
+          "tradingHours",
+          "rules",
+          "lossStop",
+          "stopStreak"
+        ]
+      },
+      "CreateBotBudgetDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "정률이면 비율(0~1], 정액이면 원",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "CreateBotPeriodDto": {
+        "type": "object",
+        "properties": {
+          "onEnd": {
+            "description": "종료일 도달 시 보유분 처리",
+            "enum": [
+              "liquidate",
+              "hold"
+            ],
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "description": "운용 시작일 YYYY-MM-DD"
+          },
+          "end": {
+            "type": "string",
+            "nullable": true,
+            "description": "운용 종료일. 무기한이면 null"
+          }
+        },
+        "required": [
+          "onEnd",
+          "start",
+          "end"
+        ]
+      },
+      "CreateBotTradingHoursDto": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "시작 \"HH:mm\""
+          },
+          "end": {
+            "type": "string",
+            "description": "종료 \"HH:mm\""
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ]
+      },
+      "CreateBotLossStopDto": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "number",
+            "description": "하루 손실 중지 %(양수)",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "total": {
+            "type": "number",
+            "description": "누적 손실 중지 %(양수)",
+            "maximum": 100,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "first",
+          "total"
+        ]
+      },
+      "CreateBotDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "scalping",
+              "day",
+              "swing",
+              "closing"
+            ],
+            "type": "string"
+          },
+          "riskProfile": {
+            "enum": [
+              "aggressive",
+              "neutral",
+              "conservative"
+            ],
+            "type": "string"
+          },
+          "startPriority": {
+            "nullable": true,
+            "description": "정액 봇이 같은 시각 봇들 중 돈을 받는 순서. first면 맨 앞, 그 밖에는 맨 뒤 (POL-FUND-14)",
+            "enum": [
+              "first",
+              "last"
+            ],
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "유형별 규칙 값 (GET /v1/bot-defaults의 rules 키). 시각은 \"HH:mm\""
+          },
+          "onDailyLimit": {
+            "enum": [
+              "liquidate",
+              "hold"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "budget": {
+            "$ref": "#/components/schemas/CreateBotBudgetDto"
+          },
+          "orderAmount": {
+            "type": "number",
+            "description": "1회 주문 금액(원)",
+            "minimum": 1
+          },
+          "splitCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "maxPositions": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "period": {
+            "$ref": "#/components/schemas/CreateBotPeriodDto"
+          },
+          "tradingHours": {
+            "$ref": "#/components/schemas/CreateBotTradingHoursDto"
+          },
+          "lossStop": {
+            "$ref": "#/components/schemas/CreateBotLossStopDto"
+          },
+          "stopStreak": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "type",
+          "riskProfile",
+          "params",
+          "onDailyLimit",
+          "name",
+          "budget",
+          "orderAmount",
+          "splitCount",
+          "maxPositions",
+          "period",
+          "tradingHours",
+          "lossStop",
+          "stopStreak"
+        ]
+      },
+      "CreatedBotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "만든 봇 id"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "CommandBudgetDto": {
         "type": "object",
         "properties": {

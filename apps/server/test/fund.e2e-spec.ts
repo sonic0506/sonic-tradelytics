@@ -29,7 +29,7 @@ describe('자금 배분 (e2e)', () => {
     const bots = await dataSource.getRepository(Bot).save(
       [0.1, 0.2, 0.3].map((ratio, index) => ({
         name: `bot-${index}`,
-        type: 'day_trading' as const,
+        type: 'day' as const,
         riskProfile: 'neutral' as const,
         stage: 'released' as const,
         status: 'running' as const,

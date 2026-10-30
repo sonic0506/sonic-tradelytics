@@ -210,8 +210,8 @@ export class FundService {
           const bot = bots.get(outcome.botId);
           if (!bot) return;
           if (outcome.status === 'allocated') {
-            // 자금 대기에서 확정되면 다시 돌아요 (POL-FUND-15)
-            if (bot.status === 'waiting_funds')
+            // 새 봇·자금 대기 봇은 확정되면 돌기 시작해요 (POL-FUND-09, 15)
+            if (bot.status === 'ready' || bot.status === 'waiting_funds')
               await this.bots.setStatus(bot.id, 'running', null);
             return;
           }

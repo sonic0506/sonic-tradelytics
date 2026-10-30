@@ -1,5 +1,9 @@
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 
+import {
+  noOpTransactionalModule,
+  runInCls,
+} from '../../../test/setup/transactional.js';
 import { BotRepository } from './bot.repository.js';
 import { BotService } from './bot.service.js';
 import type { Bot } from './entities/bot.entity.js';
@@ -14,12 +18,17 @@ describe('BotService', () => {
     findByIds: vi.fn<BotRepository['findByIds']>(),
     findAppliedVersions: vi.fn<BotRepository['findAppliedVersions']>(),
     updateBudget: vi.fn<BotRepository['updateBudget']>(),
+    findAllNames: vi.fn<BotRepository['findAllNames']>(),
+    findStartingAt: vi.fn<BotRepository['findStartingAt']>(),
+    createWithVersion: vi.fn<BotRepository['createWithVersion']>(),
   };
   let service: BotService;
+  let moduleRef: TestingModule;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const moduleRef = await Test.createTestingModule({
+    moduleRef = await Test.createTestingModule({
+      imports: [noOpTransactionalModule],
       providers: [BotService, { provide: BotRepository, useValue: bots }],
     }).compile();
     service = moduleRef.get(BotService);
@@ -74,15 +83,24 @@ describe('BotService', () => {
     expect(bots.findById).toHaveBeenCalledWith(7);
   });
 
-  it('투자금을 확정할 봇은 실행 중·자금 대기 봇이에요', async () => {
-    bots.findByStatuses.mockResolvedValue([]);
+  it('투자금을 확정할 봇은 운용 시작일이 된 새 봇과 실행 중·자금 대기 봇이에요', async () => {
+    const bot = (id: number, status: Bot['status'], periodStart: string) =>
+      Object.assign({ id, status, periodStart }) as Bot;
+    bots.findByStatuses.mockResolvedValue([
+      bot(1, 'ready', '2026-10-30'),
+      bot(2, 'ready', '2026-11-02'),
+      bot(3, 'running', '2026-10-01'),
+      bot(4, 'waiting_funds', '2026-11-02'),
+    ]);
 
-    await service.findFundable();
+    const fundable = await service.findFundable('2026-10-30');
 
     expect(bots.findByStatuses).toHaveBeenCalledWith([
+      'ready',
       'running',
       'waiting_funds',
     ]);
+    expect(fundable.map(({ id }) => id)).toEqual([1, 3, 4]);
   });
 
   it('실행 중·일시정지 봇을 지금 버전과 함께 읽어요', async () => {
@@ -96,5 +114,74 @@ describe('BotService', () => {
     ]);
     expect(bots.findByStatuses).toHaveBeenCalledWith(['running', 'paused']);
     expect(bots.findByIds).toHaveBeenCalledWith([7]);
+  });
+
+  describe('규칙 값과 봇 만들기', () => {
+    it('저장된 규칙 값에 기본값을 채우고, 모르는 키나 틀린 모양은 필드와 함께 VALIDATION_FAILED예요', () => {
+      expect(service.parseParams({ maxRank: 20 })).toMatchObject({
+        maxRank: 20,
+        minPrice: 1_000,
+        exitAt: '15:15:00',
+      });
+      expect(() => service.parseParams({ maxRank: 'many' })).toThrow(
+        expect.objectContaining({
+          code: 'VALIDATION_FAILED',
+          errors: [expect.objectContaining({ field: 'params.maxRank' })],
+        }),
+      );
+      expect(() => service.parseParams({ turnoverSurge: 2 })).toThrow(
+        expect.objectContaining({ code: 'VALIDATION_FAILED' }),
+      );
+    });
+
+    it('화면 규칙 칸에 값을 붙이고 시각은 HH:mm으로 보여 줘요', () => {
+      const fields = service.ruleFields(service.parseParams({}));
+
+      expect(fields).toContainEqual({
+        key: 'exitAt',
+        group: 'exit',
+        label: '장 마감 전 청산',
+        kind: 'time',
+        unit: null,
+        value: '15:15',
+      });
+      expect(fields).toContainEqual(
+        expect.objectContaining({ key: 'maxRank', unit: '위', value: 30 }),
+      );
+    });
+
+    it('새 봇은 검증 중·시작 전(ready)으로 첫 버전과 함께 저장해요', async () => {
+      const saved = Object.assign({ id: 5 }) as Bot;
+      bots.createWithVersion.mockResolvedValue(saved);
+      const fields = Object.assign({ name: 'day' }) as Parameters<
+        BotService['create']
+      >[0];
+      const version = Object.assign({ maxPositions: 2 }) as Parameters<
+        BotService['create']
+      >[1];
+
+      await expect(
+        runInCls(moduleRef, () => service.create(fields, version)),
+      ).resolves.toBe(saved);
+      expect(bots.createWithVersion).toHaveBeenCalledWith(
+        {
+          name: 'day',
+          stage: 'verifying',
+          status: 'ready',
+          statusReason: null,
+        },
+        version,
+      );
+    });
+
+    it('선택 목록과 같은 시각 봇은 repository에서 읽어요', async () => {
+      bots.findAllNames.mockResolvedValue([]);
+      bots.findStartingAt.mockResolvedValue([]);
+
+      await service.findOptions();
+      await service.findStartingAt('09:05:00');
+
+      expect(bots.findStartingAt).toHaveBeenCalledWith('09:05:00');
+    });
   });
 });

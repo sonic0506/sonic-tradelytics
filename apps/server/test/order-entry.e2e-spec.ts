@@ -53,7 +53,7 @@ describe('진입 주문 (e2e)', () => {
     const saved = await dataSource.getRepository(Bot).save(
       ['first', 'second'].map((name, index) => ({
         name,
-        type: 'day_trading' as const,
+        type: 'day' as const,
         riskProfile: 'neutral' as const,
         status: 'running' as const,
         budgetType: 'fixed' as const,
