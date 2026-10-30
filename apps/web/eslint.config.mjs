@@ -12,4 +12,10 @@ export default [
   nextPlugin.configs['core-web-vitals'],
   sonicDesign,
   // 이 프로젝트에만 필요한 규칙은 여기에 둬요.
+  // 타입 정보는 이 폴더의 tsconfig로 읽어요. 에디터처럼 저장소 루트에서 실행해도 CLI와 같은 결과가 나와요
+  {
+    languageOptions: {
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
+    },
+  },
 ];
