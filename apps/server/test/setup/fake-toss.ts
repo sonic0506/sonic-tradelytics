@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import type { z } from 'zod';
 
 import { TossClient } from '@/infra/toss/toss.client.js';
+import { TossSocket } from '@/infra/toss/toss-socket.js';
 
 // e2e에서 engine 모듈(TossClient가 필요한 모듈)을 띄울 때 넣어요. 실제 토스를 부르지 않아요.
 // 주문 생성은 받아 주고(orderId = fake-<clientOrderId>), 나머지는 주문 가능 금액(buying-power)을 돌려줘요.
@@ -38,7 +39,16 @@ function respond({ method, path, body, result }: FakeRequest): unknown {
         request: (options: FakeRequest) => Promise.resolve(respond(options)),
       },
     },
+    // 시세 웹소켓은 열지 않아요 (MarketDataModule이 주입받아요)
+    {
+      provide: TossSocket,
+      useValue: {
+        connect: () => undefined,
+        declare: () => undefined,
+        close: () => undefined,
+      },
+    },
   ],
-  exports: [TossClient],
+  exports: [TossClient, TossSocket],
 })
 export class FakeTossModule {}

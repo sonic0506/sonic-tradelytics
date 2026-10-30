@@ -1,5 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { env } from '@/config/env.js';
 import { type Decision, DecisionService } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { type Position, PositionService } from '@/modules/position/index.js';
@@ -14,6 +15,7 @@ import type { ProtectiveOrder } from './entities/protective-order.entity.js';
 import { OrderRepository } from './order.repository.js';
 import { OrderService } from './order.service.js';
 import type { OrderReport } from './order.types.js';
+import { PaperBrokerService } from './paper-broker.service.js';
 import { TossBrokerService } from './toss-broker.service.js';
 
 describe('OrderService', () => {
@@ -50,6 +52,11 @@ describe('OrderService', () => {
     cancelStop: vi.fn<TossBrokerService['cancelStop']>(),
     cancel: vi.fn<TossBrokerService['cancel']>(),
     stopState: vi.fn<TossBrokerService['stopState']>(),
+  };
+  const paper = {
+    start: vi.fn<PaperBrokerService['start']>(),
+    stop: vi.fn<PaperBrokerService['stop']>(),
+    place: vi.fn<PaperBrokerService['place']>(),
   };
   const risk = {
     acquireLock: vi.fn<RiskService['acquireLock']>(),
@@ -124,6 +131,7 @@ describe('OrderService', () => {
         { provide: PositionService, useValue: positions },
         { provide: DecisionService, useValue: decisions },
         { provide: TossBrokerService, useValue: broker },
+        { provide: PaperBrokerService, useValue: paper },
         { provide: RiskService, useValue: risk },
         EngineStateService,
       ],
@@ -1134,6 +1142,31 @@ describe('OrderService', () => {
       await expect(service.scoreClosedPositions()).resolves.toBe(0);
 
       expect(decisions.saveScore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('개발 점검 모의 체결 (PaperBroker)', () => {
+    afterEach(() => {
+      env.BROKER_MODE = 'toss';
+    });
+
+    it('실전 모드에서는 모의 체결을 켜지 않고 토스로 주문해요', async () => {
+      await service.startBroker();
+
+      expect(paper.start).not.toHaveBeenCalled();
+    });
+
+    it('개발 점검 모드에서는 모의 체결을 켜고 그 결과를 웹소켓 이벤트처럼 반영해요', async () => {
+      env.BROKER_MODE = 'paper';
+      orders.findByBrokerOrderId.mockResolvedValue(known());
+
+      await service.startBroker();
+      const [onReport] = paper.start.mock.lastCall ?? [];
+      await onReport?.(report({ status: 'CANCELED' }));
+
+      expect(orders.addEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'ws', status: 'CANCELED' }),
+      );
     });
   });
 });

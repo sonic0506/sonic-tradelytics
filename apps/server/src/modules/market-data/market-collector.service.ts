@@ -106,7 +106,11 @@ export class MarketCollectorService {
       0,
       MarketCollectorService.MAX_SUBSCRIBED_SYMBOLS,
     );
-    const account = env.TOSS_ACCOUNT_SEQ ? [env.TOSS_ACCOUNT_SEQ] : [];
+    // 개발 점검(PaperBroker)은 실제 계좌 주문 이벤트를 받지 않아요
+    const account =
+      env.TOSS_ACCOUNT_SEQ && env.BROKER_MODE !== 'paper'
+        ? [env.TOSS_ACCOUNT_SEQ]
+        : [];
     this.socket.declare([
       { type: 'trade:kr', codes },
       { type: 'orderbook:kr', codes },

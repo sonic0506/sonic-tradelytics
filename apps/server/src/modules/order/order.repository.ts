@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 
 import { BrokerOrder } from './entities/broker-order.entity.js';
+import { FeeSchedule } from './entities/fee-schedule.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
 import { ProtectiveOrder } from './entities/protective-order.entity.js';
 import {
@@ -57,6 +58,10 @@ export class OrderRepository {
     return this.txHost.tx.getRepository(OrderEvent);
   }
 
+  private get fees(): Repository<FeeSchedule> {
+    return this.txHost.tx.getRepository(FeeSchedule);
+  }
+
   private get protectives(): Repository<ProtectiveOrder> {
     return this.txHost.tx.getRepository(ProtectiveOrder);
   }
@@ -81,6 +86,26 @@ export class OrderRepository {
         status: In([...OPEN_ORDER_STATUSES]),
         brokerOrderId: Not(IsNull()),
         position: { botId: botId ?? Not(IsNull()) },
+      },
+      take: OrderRepository.MAX_OPEN_ORDERS,
+    });
+  }
+
+  // 그 날(YYYY-MM-DD)에 적용되는 수수료·세금률 (PaperBroker)
+  findFeeSchedule(date: string): Promise<FeeSchedule | null> {
+    return this.fees.findOne({
+      where: { effectiveFrom: LessThanOrEqual(date) },
+      order: { effectiveFrom: 'DESC' },
+    });
+  }
+
+  // 토스(또는 PaperBroker)에 걸려 있는 손절 조건주문 (PaperBroker 재시작 때 다시 맡아요)
+  findWatchingProtectives(): Promise<ProtectiveOrder[]> {
+    return this.protectives.find({
+      relations: { position: true },
+      where: {
+        status: In(['open', 'canceling']),
+        brokerConditionalOrderId: Not(IsNull()),
       },
       take: OrderRepository.MAX_OPEN_ORDERS,
     });

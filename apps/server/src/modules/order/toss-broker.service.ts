@@ -75,7 +75,7 @@ const TRIGGERED_STATUSES = new Set(['ORDERING', 'ORDERED', 'COMPLETED']);
 const RETRYABLE_CODES = new Set(['request-in-progress']);
 
 // 토스 주문 API (docs/architecture/order-lifecycle.md). 주문·취소 HTTP는 OrderService만 이걸로 보내요.
-// ponytail: PaperBroker(M2 5단계)를 붙일 때 같은 모양의 인터페이스로 나눠요
+// 개발 점검은 같은 메서드를 가진 PaperBrokerService로 바꿔 끼워요 (OrderService.broker)
 @Injectable()
 export class TossBrokerService {
   // 판단용 주문이라 한도를 오래 기다리지 않아요 (NFR-03)

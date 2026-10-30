@@ -53,6 +53,8 @@ export class EngineLifecycleService
     await this.toss.ensureToken();
     await this.calendar.ensureToday();
     await this.commands.restore();
+    // 개발 점검이면 모의 체결을 먼저 켜요. 응답 유실 복구가 모의 주문 목록을 봐요
+    await this.orders.startBroker();
     await this.orders.recoverRequested();
     // 웹소켓을 먼저 열어 재동기화하는 동안 들어온 주문 이벤트도 받아요. 둘은 AccountSync 안에서 차례로 반영돼요
     this.marketCollector.start({
@@ -79,6 +81,7 @@ export class EngineLifecycleService
     this.schedule.stop();
     this.commands.stop();
     this.accountSync.stop();
+    this.orders.stopBroker();
     this.marketCollector.stop();
     // 화면에 종료 중으로 남기고 멈춰요
     this.statusReporter.stop();

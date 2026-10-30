@@ -3,14 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Decision, DecisionModule } from '@/modules/decision/index.js';
 import { EngineStateModule } from '@/modules/engine-state/index.js';
+import { MarketDataModule } from '@/modules/market-data/index.js';
 import { PositionModule } from '@/modules/position/index.js';
 import { RiskModule } from '@/modules/risk/index.js';
 
 import { BrokerOrder } from './entities/broker-order.entity.js';
+import { FeeSchedule } from './entities/fee-schedule.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
 import { ProtectiveOrder } from './entities/protective-order.entity.js';
 import { OrderRepository } from './order.repository.js';
 import { OrderService } from './order.service.js';
+import { PaperBrokerService } from './paper-broker.service.js';
 import { TossBrokerService } from './toss-broker.service.js';
 
 @Module({
@@ -18,6 +21,7 @@ import { TossBrokerService } from './toss-broker.service.js';
   imports: [
     TypeOrmModule.forFeature([
       BrokerOrder,
+      FeeSchedule,
       OrderEvent,
       ProtectiveOrder,
       Decision,
@@ -25,9 +29,15 @@ import { TossBrokerService } from './toss-broker.service.js';
     PositionModule,
     DecisionModule,
     EngineStateModule,
+    MarketDataModule,
     RiskModule,
   ],
-  providers: [OrderService, OrderRepository, TossBrokerService],
+  providers: [
+    OrderService,
+    OrderRepository,
+    TossBrokerService,
+    PaperBrokerService,
+  ],
   exports: [OrderService],
 })
 export class OrderModule {}

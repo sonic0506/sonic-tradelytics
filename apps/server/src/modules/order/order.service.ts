@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 
 import { kstDate } from '@/common/time/kst-date.js';
+import { env } from '@/config/env.js';
 import { DecisionService, scorePrediction } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { type ExitReason, PositionService } from '@/modules/position/index.js';
@@ -17,6 +18,7 @@ import {
 } from './order.constants.js';
 import { OrderRepository } from './order.repository.js';
 import type { ApplyResult, OrderReport } from './order.types.js';
+import { PaperBrokerService } from './paper-broker.service.js';
 import { TossBrokerService } from './toss-broker.service.js';
 
 // 토스의 clientOrderId 중복 방지는 10분만 유효해요 (POL-RISK-07). 재전송은 여유를 두고 8분 안에서만 해요
@@ -108,10 +110,26 @@ export class OrderService {
     private readonly orders: OrderRepository,
     private readonly positions: PositionService,
     private readonly decisions: DecisionService,
-    private readonly broker: TossBrokerService,
+    private readonly toss: TossBrokerService,
+    private readonly paper: PaperBrokerService,
     private readonly risk: RiskService,
     private readonly engineState: EngineStateService,
   ) {}
+
+  // 실전(TossBroker)과 개발 점검(PaperBroker)은 주문 집행만 달라요 (ADR-0005)
+  private get broker(): TossBrokerService | PaperBrokerService {
+    return env.BROKER_MODE === 'paper' ? this.paper : this.toss;
+  }
+
+  // engine 시작: 개발 점검이면 모의 체결을 시작해요. 체결 결과는 personal:order 이벤트처럼 반영해요
+  async startBroker(): Promise<void> {
+    if (env.BROKER_MODE !== 'paper') return;
+    await this.paper.start((report) => this.applyReport(report, 'ws'));
+  }
+
+  stopBroker(): void {
+    this.paper.stop();
+  }
 
   // 진입: 종목 잠금 → 포지션·판단·주문(requested)을 한 트랜잭션으로 저장 → 정지 여부를 마지막으로 보고 주문 (ADR-0003, NFR-02)
   async enter(request: EntryRequest): Promise<EntryResult> {

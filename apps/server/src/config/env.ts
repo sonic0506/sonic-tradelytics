@@ -39,10 +39,22 @@ const envSchema = z
     TOSS_WS_URL: z.url().default('wss://openapi-ws.tossinvest.com/ws/v1'),
     // 발급한 토큰을 저장하는 파일. 재시작해도 다시 발급하지 않게 engine 볼륨에 둬요
     TOSS_TOKEN_FILE: z.string().min(1).default('.toss-token.json'),
+    // 주문 집행: toss(실전) 또는 paper(개발 점검 모의 체결, ADR-0005). paper는 운영과 다른 DB(*_paper)에서만 켜져요
+    BROKER_MODE: z.enum(['toss', 'paper']).default('toss'),
     // 텔레그램 알림(POL-RISK-12). 둘 중 하나라도 없으면 알림을 보내지 않고 로그만 남겨요
     TELEGRAM_BOT_TOKEN: optionalString,
     TELEGRAM_CHAT_ID: optionalString,
   })
+  .refine(
+    (value) =>
+      value.BROKER_MODE !== 'paper' ||
+      new URL(value.DATABASE_URL).pathname.endsWith('_paper'),
+    {
+      message:
+        'BROKER_MODE=paper는 이름이 _paper로 끝나는 DB에서만 써요. 모의 체결 기록이 운영 기록과 섞이지 않게 하기 위해서예요.',
+      path: ['DATABASE_URL'],
+    },
+  )
   .refine(
     (value) =>
       value.NODE_ENV !== 'production' || !value.CORS_ORIGINS.includes('*'),

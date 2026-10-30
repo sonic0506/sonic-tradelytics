@@ -58,6 +58,8 @@ describe('EngineLifecycleService', () => {
   };
   const orders = {
     recoverRequested: vi.fn<OrderService['recoverRequested']>(),
+    startBroker: vi.fn<OrderService['startBroker']>(),
+    stopBroker: vi.fn<OrderService['stopBroker']>(),
   };
   let engineState: EngineStateService;
   let service: EngineLifecycleService;
@@ -114,6 +116,7 @@ describe('EngineLifecycleService', () => {
     expect(commands.restore).toHaveBeenCalledAfter(calendar.ensureToday);
     expect(commands.restore).toHaveBeenCalledBefore(marketCollector.start);
     // 시작 순서 5번: 응답을 못 받은 주문 정리는 정지 상태 복원 뒤, 재동기화 전이에요
+    expect(orders.startBroker).toHaveBeenCalledBefore(orders.recoverRequested);
     expect(orders.recoverRequested).toHaveBeenCalledAfter(commands.restore);
     expect(orders.recoverRequested).toHaveBeenCalledBefore(accountSync.syncAll);
     expect(commands.start).toHaveBeenCalledAfter(accountSync.syncAll);
@@ -192,6 +195,7 @@ describe('EngineLifecycleService', () => {
       expect(commands.stop).toHaveBeenCalledOnce();
       expect(accountSync.stop).toHaveBeenCalledOnce();
       expect(marketCollector.stop).toHaveBeenCalledOnce();
+      expect(orders.stopBroker).toHaveBeenCalledOnce();
       expect(lock.release).toHaveBeenCalledOnce();
     },
   );

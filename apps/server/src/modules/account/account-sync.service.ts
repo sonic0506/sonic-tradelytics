@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 
 import { kstDate } from '@/common/time/kst-date.js';
+import { env } from '@/config/env.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { type OrderReport, OrderService } from '@/modules/order/index.js';
 
@@ -67,6 +68,7 @@ export class AccountSyncService {
 
   // 장중에만 30초마다 OPEN을 맞춰요. 장중 여부는 engine이 장 캘린더로 알려 줘요
   start(isTradingHours: () => boolean): void {
+    if (AccountSyncService.isPaper()) return;
     this.timer = setInterval(() => {
       if (this.isSyncing || !isTradingHours()) return;
       this.isSyncing = true;
@@ -90,6 +92,7 @@ export class AccountSyncService {
 
   // engine 시작, 웹소켓 재연결 직후: OPEN 전량 + 오늘 CLOSED. 실패하면 던져요(시작 순서 6번은 실패 시 종료)
   syncAll(): Promise<void> {
+    if (AccountSyncService.isPaper()) return Promise.resolve();
     return this.enqueue(async () => {
       await this.syncOpen();
       await this.syncClosedToday();
@@ -117,6 +120,11 @@ export class AccountSyncService {
         );
       },
     );
+  }
+
+  // 개발 점검(PaperBroker)은 실제 계좌 주문을 가져오지 않아요. 모의 체결이 결과를 바로 넘겨요 (ADR-0005)
+  private static isPaper(): boolean {
+    return env.BROKER_MODE === 'paper';
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

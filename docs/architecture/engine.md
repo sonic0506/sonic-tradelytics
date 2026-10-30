@@ -105,7 +105,7 @@ flowchart TD
 | 2 | 토큰 파일 읽기, 만료 임박이면 재발급 | 종료 + 알림 |
 | 3 | 오늘 `market_calendars` 확인, 없으면 토스에서 받기 | 종료 + 알림 |
 | 4 | `bot.status`·오늘 `risk_events`로 [정지 상태](#정지-상태-enginestate) 복원 | 종료 + 알림 |
-| 5 | `requested` 주문 정리 ([응답을 못 받았을 때](./order-lifecycle.md#응답을-못-받았을-때)) | 해당 봇 신규 진입 중단 |
+| 5 | 개발 점검이면 [PaperBroker](#개발-점검-paperbroker) 시작, `requested` 주문 정리 ([응답을 못 받았을 때](./order-lifecycle.md#응답을-못-받았을-때)) | PaperBroker는 종료 + 알림, 주문 정리는 해당 봇 신규 진입 중단 |
 | 6 | 웹소켓 연결, 구독 선언 (`trade:kr`·`orderbook:kr`·`personal:order`). 연결을 기다리지 않아요 | 재시도. 계속 실패하면 `feed_stale`로 전체 신규 진입 중단 |
 | 7 | AccountSync 전체 재동기화 (OPEN 전량 + 오늘 CLOSED), 장중 30초 재동기화 시작 | 종료 + 알림 |
 | 8 | `LISTEN command`, 미처리 명령 처리 | 종료 + 알림 |
@@ -172,6 +172,30 @@ Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 
 
 웹소켓 메시지의 숫자는 문자열이에요(`"price":"230000"`). 스냅샷에 넣기 전에 숫자로 바꿔요 ([연동 문서 웹소켓](../integrations/toss-securities-api.md#웹소켓)).
 
+## 개발 점검 (PaperBroker)
+
+[ADR-0005](./adr/0005-in-house-paper-broker.md)의 구현이에요. `BROKER_MODE=paper`면 `OrderService`가 주문·취소·손절 조건주문을 토스 대신 `PaperBrokerService`로 보내요. 나머지 흐름(판단 기록, 주문 저장, 체결 반영, 포지션)은 실전과 같아요.
+
+| 항목 | 정한 것 |
+| --- | --- |
+| 켜는 조건 | `DATABASE_URL`의 DB 이름이 `_paper`로 끝나야 해요(예: `tradelytics_paper`). 아니면 env 검증에서 시작하지 않아요. 운영 기록과 섞이지 않게 하기 위해서예요 |
+| 체결 | 정규장에서 1초마다 MarketCollector 스냅샷으로 맞춰 봐요. 시장가는 상대 1호가에서 1틱 불리하게, 지정가는 상대 1호가가 닿으면 그 호가로 전량 체결해요(`paper.rule.ts`) |
+| 비용 | `fee_schedules`에서 그 날 적용되는 수수료·세금률(세금은 매도만). 없으면 engine이 시작하지 않아요 |
+| 손절 조건주문 | 최근 체결가가 발동가 이하면 시장가 매도를 내고 `stopState`로 발동 주문 id를 알려 줘요 |
+| 거부 | 같은 종목 반대 방향 미체결이 있으면 `opposite-pending-order-exists` |
+| 장 마감 | 정규장이 끝나면 미체결 `DAY` 주문을 취소하고, 만료일이 지난 손절을 지워요 |
+| 결과 전달 | `personal:order` 이벤트처럼 `applyReport(report, 'ws')`로 한 건씩 넘겨요. 실패하면 다음 주기에 다시 넘겨요 |
+| 재시작 | 모의 주문은 메모리에 있어요. 시작할 때 DB의 미체결 봇 주문(오늘 것)과 걸려 있는 손절을 다시 맡고, 지난 날 미체결은 취소해요 |
+| 실제 계좌 | `personal:order` 구독과 AccountSync REST 재동기화를 끄고, 실제 계좌 주문을 가져오지 않아요. 시세와 토큰은 실전 키로 받아요 |
+
+아직 없는 것: 부분 체결(호가 잔량), 상·하한가 거부, 점검용 투자금 상한. 자금 배분의 운용 자산은 지금 실제 계좌 `buying-power`를 읽어요. BotRunner(M3)를 붙일 때 정해요.
+
+실행 준비:
+
+1. 같은 Postgres에 `tradelytics_paper` DB를 만들고 `DATABASE_URL`을 그쪽으로 바꿔 `npm run migration:run`
+2. `fee_schedules`에 수수료율을 넣어요. 값은 토스 `GET /api/v1/commissions`로 확인해요
+3. `BROKER_MODE=paper`로 engine을 켜요. 토스 토큰은 클라이언트당 1개라 실전 engine과 동시에 켜지 않아요 (R-014)
+
 ## 화면용 상태 쓰기
 
 api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 필요한 실시간 값은 engine이 5초마다 DB에 덮어써요.
@@ -209,7 +233,7 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 
 [일일 일정](./overview.md#일일-일정-engine)과 [재평가 일정](../policy/position-reevaluation.md#실행-일정)을 `EngineSchedule`이 실행해요. 시각은 KST(서머타임 없음, `+09:00` 고정)예요. 정해진 시각이 몇 개뿐이라 `@nestjs/schedule` 없이 `setTimeout`으로 다음 시각을 예약해요. 요일 조건(`weekly_check`)처럼 cron 표현이 필요해지면 그때 설치해요([학습 06](../learning/06-scheduling.md)).
 
-M1 현재 등록한 job은 할 일이 있는 `pre_open`(토큰·캘린더 확인)과 `post_close`(오늘 CLOSED로 체결 최종 확정)뿐이에요. 나머지는 그 기능을 만들 때 더해요.
+지금 등록한 job은 할 일이 있는 `pre_open`(토큰·캘린더 확인, 하루 손실 한도 정지 재개)과 `post_close`(오늘 CLOSED로 체결 최종 확정, 닫힌 포지션의 판단 채점)뿐이에요. 나머지는 그 기능을 만들 때 더해요.
 
 | job | 시각 | 하는 일 |
 | --- | --- | --- |
