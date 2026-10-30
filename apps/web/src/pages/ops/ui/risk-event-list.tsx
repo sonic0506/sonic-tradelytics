@@ -19,12 +19,13 @@ import { Search } from 'lucide-react';
 
 import {
   type GetRiskEventHistoryParams,
+  RISK_EVENT_KIND_LABEL,
   type RiskEvent,
   useRiskEventHistoryQuery,
 } from '@/entities/risk-event';
 import { formatHourMinute, formatMonthDayTime } from '@/shared/lib';
 
-import { OPS_KIND_BADGE } from '../lib/ops-text';
+import { OPS_KIND_TONE } from '../lib/ops-text';
 
 function NotifiedText({ event }: { event: RiskEvent }) {
   return event.notifiedAt ? (
@@ -35,8 +36,11 @@ function NotifiedText({ event }: { event: RiskEvent }) {
 }
 
 function KindBadge({ event }: { event: RiskEvent }) {
-  const badge = OPS_KIND_BADGE[event.kind];
-  return <Badge tone={badge.tone}>{badge.label}</Badge>;
+  return (
+    <Badge tone={OPS_KIND_TONE[event.kind]}>
+      {RISK_EVENT_KIND_LABEL[event.kind]}
+    </Badge>
+  );
 }
 
 type RiskEventListProps = {

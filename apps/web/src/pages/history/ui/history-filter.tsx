@@ -144,7 +144,7 @@ export function HistoryFilter({ applied, onApply }: HistoryFilterProps) {
           <FilterField label="종목">
             <Input
               aria-label="종목"
-              placeholder="종목명 또는 코드"
+              placeholder="종목명·코드"
               value={draft.symbol}
               onChange={(event) => update({ symbol: event.target.value })}
             />

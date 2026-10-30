@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -77,6 +77,31 @@ describe('HomeDashboard', () => {
     expect(
       await screen.findByRole('button', { name: '모두 정지' }),
     ).toBeEnabled();
+  });
+
+  it('한 카드에서 다시 시도해 성공하면 같은 요청을 쓰는 카드도 함께 돌아와요', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(
+        mockApiUrl('/v1/home'),
+        () => HttpResponse.json({ code: 'HTTP_500' }, { status: 500 }),
+        { once: true },
+      ),
+    );
+    renderWithQuery(<HomeDashboard />);
+    await screen.findByText('홈 요약을 불러오지 못했어요');
+    await screen.findByText('봇 현황을 불러오지 못했어요');
+    const [retry] = screen.getAllByRole('button', { name: '다시 시도' });
+    if (!retry) throw new Error('다시 시도 버튼이 없어요');
+    await user.click(retry);
+    await waitFor(() => {
+      expect(
+        screen.queryByText('봇 현황을 불러오지 못했어요'),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText('홈 요약을 불러오지 못했어요'),
+    ).not.toBeInTheDocument();
   });
 
   it('긴급 정지를 확인하면 결과를 알려 줘요', async () => {

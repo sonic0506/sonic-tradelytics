@@ -4,7 +4,11 @@ import { Input, Select } from '@xonic0506/sonic-ui';
 import { type SubmitEvent, useState } from 'react';
 
 import { useBotsQuery } from '@/entities/bot';
-import { RISK_EVENT_KINDS, type RiskEventKind } from '@/entities/risk-event';
+import {
+  RISK_EVENT_KIND_LABEL,
+  RISK_EVENT_KINDS,
+  type RiskEventKind,
+} from '@/entities/risk-event';
 import {
   FilterActions,
   FilterField,
@@ -12,14 +16,12 @@ import {
   QueryBoundary,
 } from '@/shared/ui';
 
-import { OPS_KIND_BADGE } from '../lib/ops-text';
-
 const ALL = 'all';
 const KIND_OPTIONS = [
   { value: ALL, label: '전체' },
   ...RISK_EVENT_KINDS.map((kind) => ({
     value: kind,
-    label: OPS_KIND_BADGE[kind].label,
+    label: RISK_EVENT_KIND_LABEL[kind],
   })),
 ];
 

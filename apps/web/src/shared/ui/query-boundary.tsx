@@ -1,9 +1,9 @@
 'use client';
 
-import { QueryErrorResetBoundary } from '@tanstack/react-query';
+import { QueryErrorResetBoundary, useQueryClient } from '@tanstack/react-query';
 import { Card, ErrorState } from '@xonic0506/sonic-ui';
 import { TriangleAlert } from 'lucide-react';
-import { type ReactNode, Suspense } from 'react';
+import { type ReactNode, Suspense, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { HttpError } from '@/shared/api';
@@ -25,6 +25,34 @@ type QueryBoundaryProps = {
   notFoundFallback?: ReactNode;
 };
 
+// 같은 쿼리를 쓰는 다른 블록에서 다시 시도해 성공하면 이 블록도 다시 그려요.
+// 실패 문구를 숨긴 블록(errorFallback={null})과 같은 요청에서 나온 카드가 함께 돌아와요.
+function RecoverOnSuccess({
+  failedQueryHashes,
+  onRecover,
+  children,
+}: {
+  failedQueryHashes: string[];
+  onRecover: () => void;
+  children: ReactNode;
+}) {
+  const queryClient = useQueryClient();
+  const hashKey = failedQueryHashes.join('\n');
+  useEffect(() => {
+    if (!hashKey) return;
+    const failed = new Set(hashKey.split('\n'));
+    return queryClient.getQueryCache().subscribe((event) => {
+      if (
+        failed.has(event.query.queryHash) &&
+        event.query.state.status === 'success'
+      ) {
+        onRecover();
+      }
+    });
+  }, [queryClient, hashKey, onRecover]);
+  return children;
+}
+
 // 데이터를 쓰는 블록 바로 바깥에 두는 Suspense + ErrorBoundary 묶음이에요(하네스 3절).
 export function QueryBoundary({
   children,
@@ -36,6 +64,7 @@ export function QueryBoundary({
   errorFallback,
   notFoundFallback,
 }: QueryBoundaryProps) {
+  const queryClient = useQueryClient();
   return (
     <QueryErrorResetBoundary>
       {({ reset }) => (
@@ -49,7 +78,20 @@ export function QueryBoundary({
             ) {
               return notFoundFallback;
             }
-            if (errorFallback !== undefined) return errorFallback;
+            const recover = (fallback: ReactNode) => (
+              <RecoverOnSuccess
+                failedQueryHashes={queryClient
+                  .getQueryCache()
+                  .findAll({
+                    predicate: (query) => query.state.error === error,
+                  })
+                  .map((query) => query.queryHash)}
+                onRecover={resetErrorBoundary}
+              >
+                {fallback}
+              </RecoverOnSuccess>
+            );
+            if (errorFallback !== undefined) return recover(errorFallback);
             const errorState = (
               <ErrorState
                 title={errorTitle}
@@ -58,7 +100,9 @@ export function QueryBoundary({
                 onRetry={resetErrorBoundary}
               />
             );
-            return isErrorInCard ? <Card>{errorState}</Card> : errorState;
+            return recover(
+              isErrorInCard ? <Card>{errorState}</Card> : errorState,
+            );
           }}
         >
           <Suspense fallback={loading}>{children}</Suspense>

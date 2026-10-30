@@ -28,9 +28,9 @@ export type RiskEvent = z.infer<typeof riskEventSchema>;
 export type RiskEventKind = z.infer<typeof riskEventKindSchema>;
 
 export const RISK_EVENT_KIND_LABEL: Record<RiskEventKind, string> = {
-  daily_loss_limit: '일 손실 한도',
-  cumulative_loss_limit: '누적 손실 한도',
-  consecutive_losses: '연속 손실',
+  daily_loss_limit: '하루 한도',
+  cumulative_loss_limit: '누적 한도',
+  consecutive_losses: '연속 손절',
   feed_stale: '시세 끊김',
   insufficient_funds: '자금 부족',
   order_rejected: '주문 거부',
