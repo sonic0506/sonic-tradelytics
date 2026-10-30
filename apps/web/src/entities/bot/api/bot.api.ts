@@ -11,7 +11,9 @@ export async function getBots() {
 }
 
 export async function getBotById(id: string) {
-  return botDetailSchema.parse(await http<unknown>(`/v1/bots/${id}`));
+  return botDetailSchema.parse(
+    await http<unknown>(`/v1/bots/${encodeURIComponent(id)}`),
+  );
 }
 
 export type GetBotDailyResultsParams = { botId: string; from: string | null };
@@ -22,6 +24,8 @@ export async function getBotDailyResults({
 }: GetBotDailyResultsParams) {
   const query = from ? `?${new URLSearchParams({ from }).toString()}` : '';
   return botDailyResultsSchema.parse(
-    await http<unknown>(`/v1/bots/${botId}/daily-results${query}`),
+    await http<unknown>(
+      `/v1/bots/${encodeURIComponent(botId)}/daily-results${query}`,
+    ),
   );
 }

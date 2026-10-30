@@ -70,6 +70,11 @@ describe('BotDetailBoundary', () => {
     ).toHaveAttribute('href', '/bots');
   });
 
+  it('주소의 봇 id에 경로 문자가 있어도 다른 API로 가지 않고 없는 봇으로 보여 줘요', async () => {
+    renderWithQuery(<BotDetailBoundary botId="../engine-status" />);
+    expect(await screen.findByText('봇을 찾을 수 없어요')).toBeInTheDocument();
+  });
+
   it('봇 정보를 불러오지 못하면 다시 시도를 보여 줘요', async () => {
     server.use(
       http.get(mockApiUrl('/v1/bots/:id'), () =>
