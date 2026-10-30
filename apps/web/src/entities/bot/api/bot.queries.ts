@@ -3,7 +3,13 @@ import { queryOptions } from '@tanstack/react-query';
 import { addDays, toTradeDate } from '@/shared/lib';
 
 import { PNL_PERIOD_DAYS, type PnlPeriod } from '../model/pnl-period';
-import { getBotById, getBotDailyResults, getBots } from './bot.api';
+import {
+  getBotById,
+  getBotDailyResults,
+  getBotDefaults,
+  type GetBotDefaultsParams,
+  getBots,
+} from './bot.api';
 
 export const botQueries = {
   all: () => ['bot'] as const,
@@ -19,6 +25,13 @@ export const botQueries = {
       queryKey: [...botQueries.all(), 'detail', id],
       queryFn: () => getBotById(id),
       refetchInterval: 5_000,
+    }),
+  // 유형·성향별 기본값은 코드 상수라 다시 받지 않아요.
+  defaults: (params: GetBotDefaultsParams) =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'defaults', params],
+      queryFn: () => getBotDefaults(params),
+      staleTime: Infinity,
     }),
   // 기간 시작일은 부를 때 정해요. 렌더 중에 지금 시각을 읽지 않아요.
   dailyResults: (id: string, period: PnlPeriod) =>

@@ -1,6 +1,7 @@
-import { http } from '@/shared/api';
+import { type BotType, http } from '@/shared/api';
 
-import { botsSchema } from '../model/bot.schema';
+import { botsSchema, type RiskProfile } from '../model/bot.schema';
+import { botDefaultsSchema } from '../model/bot-defaults.schema';
 import {
   botDailyResultsSchema,
   botDetailSchema,
@@ -13,6 +14,18 @@ export async function getBots() {
 export async function getBotById(id: string) {
   return botDetailSchema.parse(
     await http<unknown>(`/v1/bots/${encodeURIComponent(id)}`),
+  );
+}
+
+export type GetBotDefaultsParams = { type: BotType; riskProfile: RiskProfile };
+
+export async function getBotDefaults({
+  type,
+  riskProfile,
+}: GetBotDefaultsParams) {
+  const query = new URLSearchParams({ type, riskProfile });
+  return botDefaultsSchema.parse(
+    await http<unknown>(`/v1/bot-defaults?${query.toString()}`),
   );
 }
 

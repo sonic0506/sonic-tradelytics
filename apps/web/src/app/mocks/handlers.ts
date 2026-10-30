@@ -1,12 +1,18 @@
 import type { RequestHandler } from 'msw';
 
-import { botDetailHandlers, botHandlers } from '@/entities/bot';
+import { allocationHandlers } from '@/entities/allocation';
+import {
+  botDefaultsHandlers,
+  botDetailHandlers,
+  botHandlers,
+} from '@/entities/bot';
 import { dailyResultHandlers } from '@/entities/daily-result';
 import { engineStatusHandlers } from '@/entities/engine-status';
 import { homeHandlers } from '@/entities/home';
 import { orderHandlers } from '@/entities/order';
 import { positionHandlers } from '@/entities/position';
 import { riskEventHandlers } from '@/entities/risk-event';
+import { createBotHandlers } from '@/features/bot/create-bot';
 import { killSwitchHandlers } from '@/features/engine/kill-switch';
 
 // 각 slice의 api/*.mock.ts에서 만든 handler(index.ts로 export)를 app 레이어에서 모아요.
@@ -16,6 +22,9 @@ export const handlers: RequestHandler[] = [
   ...homeHandlers,
   ...botHandlers,
   ...botDetailHandlers,
+  ...botDefaultsHandlers,
+  ...allocationHandlers,
+  ...createBotHandlers,
   ...dailyResultHandlers,
   ...positionHandlers,
   ...orderHandlers,
