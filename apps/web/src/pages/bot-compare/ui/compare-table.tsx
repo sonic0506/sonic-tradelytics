@@ -164,7 +164,7 @@ export function CompareTable({
     <div className="flex flex-col gap-4">
       <Benchmark benchmark={data.benchmark} />
       <Card className="overflow-hidden p-0">
-        <Table aria-label="봇 비교">
+        <Table aria-label="봇 비교" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>봇</TableHead>

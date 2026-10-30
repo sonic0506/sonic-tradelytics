@@ -51,7 +51,7 @@ export function VersionHistoryCard({ botId }: { botId: string }) {
         </CardDescription>
       </CardHeader>
       <CardBody>
-        <Table aria-label="규칙 값 버전">
+        <Table aria-label="규칙 값 버전" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>버전</TableHead>

@@ -30,7 +30,7 @@ export function PositionOrders({ positionId }: { positionId: string }) {
         주문 {data.orders.length}건 · 체결 합계예요
       </Text>
       <div className="rounded-lg border border-default bg-surface">
-        <Table aria-label="주문">
+        <Table aria-label="주문" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>구분</TableHead>

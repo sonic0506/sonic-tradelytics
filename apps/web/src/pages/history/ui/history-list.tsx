@@ -93,7 +93,7 @@ export function HistoryList({
   if (data.items.length === 0) {
     return (
       <Card className="p-0">
-        <Table aria-label="투자 내역">
+        <Table aria-label="투자 내역" className="whitespace-nowrap">
           <Header isBotColumnVisible={isBotColumnVisible} />
         </Table>
         {hasFilters ? (
@@ -139,7 +139,7 @@ export function HistoryList({
   return (
     <div className="flex flex-col gap-6">
       <Card className="overflow-hidden p-0">
-        <Table aria-label="투자 내역">
+        <Table aria-label="투자 내역" className="whitespace-nowrap">
           <Header isBotColumnVisible={isBotColumnVisible} />
           <TableBody>
             {holdings.length > 0 && (

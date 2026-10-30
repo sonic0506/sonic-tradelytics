@@ -34,7 +34,7 @@ export function BotAccuracyCard({
         </CardDescription>
       </CardHeader>
       <CardBody>
-        <Table aria-label="봇별 정확도">
+        <Table aria-label="봇별 정확도" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>봇</TableHead>
@@ -183,7 +183,7 @@ export function ConditionCard({
         </CardDescription>
       </CardHeader>
       <CardBody>
-        <Table aria-label="조건별 기여도">
+        <Table aria-label="조건별 기여도" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>조건</TableHead>
@@ -229,7 +229,7 @@ export function SkippedCard({
         </CardDescription>
       </CardHeader>
       <CardBody>
-        <Table aria-label="건너뛴 판단">
+        <Table aria-label="건너뛴 판단" className="whitespace-nowrap">
           <TableHeader>
             <TableRow>
               <TableHead>사유</TableHead>

@@ -117,17 +117,20 @@ export function HistorySummary({
           </Text>
         }
       />
-      <KpiCard
-        icon={Banknote}
-        label="거래 비용"
-        value={<Text variant="title">{formatWon(summary.cost)}</Text>}
-        detail={
-          <Text variant="mono-caption" tone="muted">
-            세금 {formatNumber(summary.tax)} 포함
-          </Text>
-        }
-      />
-      <Card className="gap-2">
+      {/* 좁은 화면에서는 봇별 손익 이름이 잘리지 않게 아래 두 카드를 한 줄씩 써요 */}
+      <div className="col-span-2 lg:col-span-1">
+        <KpiCard
+          icon={Banknote}
+          label="거래 비용"
+          value={<Text variant="title">{formatWon(summary.cost)}</Text>}
+          detail={
+            <Text variant="mono-caption" tone="muted">
+              세금 {formatNumber(summary.tax)} 포함
+            </Text>
+          }
+        />
+      </div>
+      <Card className="col-span-2 gap-2 lg:col-span-1">
         <Text variant="caption" tone="muted">
           봇별 손익
         </Text>
