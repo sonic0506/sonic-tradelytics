@@ -67,6 +67,8 @@
 ### Q-019
 
 **봇이 주문 정정(`/orders/{orderId}/modify`)을 쓰나?**
+
+> **실제 확인 (2026-10-30)**: 정정하면 **새 `orderId`**가 생기고, 새 주문은 `PENDING_REPLACE`로 먼저 나타나며 원주문은 `REPLACED`로 끝나요. 봇이 정정을 썼다면 자기 주문을 모르는 주문으로 봤을 거예요. 아래 결정(정정 안 씀)이 맞았어요 → [연동 문서 남은 확인](../integrations/toss-securities-api.md#남은-확인-실제-호출로)
 정정 응답의 `orderId`가 원주문과 같은지 새 값인지 공식 문서만으로는 알 수 없어요. 새 값이면 AccountSync가 그 주문을 모르는 주문으로 보고 직접 거래로 잘못 분류할 수 있어요. 정정 결과는 `REPLACED`·`REPLACE_REJECTED` 같은 별도 상태와 레코드로도 와서 추적이 복잡해져요.
 
 > **결정 (2026-10-28)**: A. 봇은 정정을 쓰지 않아요. 가격·수량을 바꾸려면 취소를 확인한 뒤 새 판단으로 새 주문을 내요 → [연동 문서 주문 규칙](../integrations/toss-securities-api.md#주문-규칙), [데이터 모델](../architecture/data-model.md#broker_orders)

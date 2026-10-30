@@ -156,14 +156,23 @@ API로 받은 정보는 **투자자 본인의 매매 목적**으로만 쓸 수 �
   - 2026-10-27 개발 PC(허용 IP 등록)에서는 성공 (`spikes/m0/toss-spike.mjs rest`). 고정 IP 서버에서 다시 확인 필요
 - [x] `expires_in` 실제 값 확인 후 재발급 주기 결정 → **86400초(24시간)** (2026-10-27). 하루 1회, 장 시작 전에 재발급하면 장중 토큰 교체가 없어요
   - 함께 확인: 응답 헤더 `X-RateLimit-*`가 실제로 옴 (`ACCOUNT` 1, `ORDER_INFO` 6, `ASSET` 5로 문서 한도와 일치). 보유 조회 `items[].cost`에 매도 시 예상 `commission`·`tax`가 있음
-- [ ] `cashBuyingPower`가 미체결 매수 주문 금액을 이미 빼고 주는지, 당일 매도 대금(D+2 미결제)을 포함하는지 확인. 운용 자산 계산식(POL-FUND-02)의 전제예요
+- [x] `cashBuyingPower`가 미체결 매수 주문 금액을 이미 빼고 주는지, 당일 매도 대금(D+2 미결제)을 포함하는지 확인. 운용 자산 계산식(POL-FUND-02)의 전제예요
+  - 2026-10-30 장중: 미체결 지정가 매수 18,100원을 넣자 208,980 → 190,877원으로 18,103원 줄었어요. **미체결 매수 금액(+수수료 예비 약 3원)을 이미 빼고 줘요.** 당일 매도 대금 포함 여부는 아직 확인하지 않았어요
 - [x] 웹소켓 연결 → `trade:kr` 구독 → PING 유지 1시간 → **성공** (2026-10-28 09:00:30~10:00:30, 005930·000660)
   - 2026-10-27 장 마감 후: 헤더 인증 연결, 구독 ack(`subscribed`), `PING` → `pong` 확인
   - 2026-10-28 장중: 60.0분 유지 후 우리 쪽 `close(1000)`로 정상 종료, 에러·끊김 0. 체결 132,878건(분당 약 1,500~2,100건) 수신
   - 체결 메시지 형태: `{"type":"message","topic":"trade:kr:005930","data":{"price":"230000","volume":"1","timestamp":"2026-10-28T09:00:30.574+09:00","currency":"KRW"}}`. `price`·`volume`은 문자열, `timestamp`는 밀리초까지 와요
-- [ ] `personal:order` 이벤트 형태를 소액 지정가 주문·취소로 확인 (M5 소액 실전 전)
+- [x] `personal:order` 이벤트 형태를 소액 지정가 주문·취소로 확인 (M5 소액 실전 전)
   - 2026-10-28 장 마감 후: 구독 선언 `[{"type":"personal:order","codes":["<accountSeq 문자열>"]}]` → `subscriptions` ack에 `personal:order:{accountSeq}` 확인 (`toss-spike.mjs orders`). 이벤트는 장중 주문으로 확인 필요
   - [AsyncAPI](https://openapi.tossinvest.com/openapi-docs/latest/asyncapi.json) 기준: `data.event`는 `PENDING` `PARTIAL_FILL` `FILL` `CANCELING` `CANCELED` `REJECTED` 등으로 **`OrderStatus`와 이름이 달라요**(`PARTIAL_FILL` ≠ `PARTIAL_FILLED`). 모르는 값이 와도 받아야 해요. `data.order`는 REST 주문 상세와 같은 모양이고 `execution.filledAt`만 없어요. 수신이 2초 넘게 막히면 서버가 연결을 끊어요
+  - **2026-10-30 장중 실제 확인** (engine을 켜 두고 토스 앱에서 직접 소액 주문, 직접 거래로 기록):
+    - 주문 접수 뒤 0.03~0.15초 안에 이벤트가 와요. `data.order`는 REST 주문과 같은 모양이고 숫자는 문자열이에요
+    - 미체결이어도 `execution`의 체결 금액·수수료·세금이 `null`이 아니라 `"0"`이고, `settlementDate`가 이미 채워져 와요
+    - **분할 체결 중간 이벤트의 `order.status`는 `PARTIAL_FILLED`가 아니라 `PENDING`이에요**(15주가 11주·4주로 체결). 체결 여부는 상태가 아니라 누적 `filledQuantity`로 판단해요
+    - 취소: `PENDING_CANCEL` → `CANCELED`. `PENDING_CANCEL` 이벤트에는 시각 필드가 없어요
+    - **정정하면 새 `orderId`가 생기고, 새 주문은 `PENDING_REPLACE`로 먼저 나타나요. 원주문은 `REPLACED`로 끝나요** ([Q-019](../project/open-questions.md#q-019))
+    - **체결 시각(`filledAt`)·수수료·세금은 웹소켓에서 0·없음으로 오고, REST 주문 조회에서 확정돼요**(예: 일반 주식 매도 15주 세금 33원, 수수료 2원). 재동기화가 이 값을 갱신하고 손익에 반영해요
+    - 엔진이 꺼진 동안의 체결은 재시작 재동기화로 채워지고 중복 반영은 없었어요
 - [x] NXT 거래 종목의 08:00~08:50 프리마켓 체결이 통합 현재가(`prices`)에 반영되는지 확인 → **반영됨** (2026-10-28, `toss-spike.mjs prices 005930,000660`, 30초 간격 141회 호출, 에러 0). 장전 갭 추정을 쓸 수 있어요 ([POL-REEV-06](../policy/position-reevaluation.md#장전-점검과-개장-직후-점검-pol-reev-06))
   - 07:44~07:59에는 전날 애프터마켓 마지막 값(`timestamp` 10-27 19:59:59)이 그대로였고, 08:00:01 조회부터 `lastPrice`가 바뀌었어요 (005930 224500 → 227500원). 08:50 뒤에는 `timestamp` 08:49:59에서 멈춰요
   - 주의: 거래 중에는 `timestamp`가 조회 시각과 같게 와요(매 조회 :01·:31초). 마지막 체결 시각으로 쓰지 말고, 값이 갱신 중인지 판단할 때만 써요
