@@ -210,6 +210,11 @@ Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 
 4. `npm run build && npm run start:engine:paper`. 실전 engine을 먼저 내려요. 토스 토큰·웹소켓을 같은 클라이언트로 쓰기 때문이에요 (R-014)
 5. 08:59 `open_snapshot`이 봇 투자금을 확정하고(늦게 켜면 시작할 때 따라잡아요), 정규장에 BotRunner가 돌아요
 
+**리플레이(장 밖에서 미리 점검)**: 지난 장 하루치 1분봉으로 BotRunner·PaperBroker·OrderService를 실제 Postgres(Testcontainers) 위에서 10초 간격으로 다시 돌려요. 진입·분할 익절·VWAP 이탈·15:15 청산·손절 조건주문 순서·채점까지 하루 흐름을 몇십 초 안에 봐요. 시세는 그 날 거래대금 상위 50종목의 1분봉이라 실제 호가보다 거칠어요.
+
+1. 그 날 장 마감 뒤, engine 토큰이 살아 있을 때 받아요(토큰을 새로 발급하지 않아요): `node --env-file=.env scripts/replay-fetch.mjs 2026-10-30 /tmp/replay.json`
+2. `REPLAY_FILE=/tmp/replay.json npm run test:replay`. 봇 예외·기록 실패, 같은 포지션 진입 주문 반복, 장 마감 뒤 남은 보유가 있으면 실패하고, 판단·주문·포지션·손절·채점 요약을 출력해요
+
 ## 화면용 상태 쓰기
 
 api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 필요한 실시간 값은 engine이 5초마다 DB에 덮어써요.
