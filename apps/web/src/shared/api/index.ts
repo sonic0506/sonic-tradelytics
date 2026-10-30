@@ -7,6 +7,12 @@ export {
   botTypeSchema,
   listResponseSchema,
 } from './api-enums';
-export { API_BASE_URL, http, HttpError } from './http';
+export {
+  API_BASE_URL,
+  holdRequests,
+  http,
+  HttpError,
+  releaseRequests,
+} from './http';
 export { mockApiUrl } from './mock-url';
 export { getQueryClient } from './query-client';

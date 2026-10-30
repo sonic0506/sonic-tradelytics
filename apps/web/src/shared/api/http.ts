@@ -35,7 +35,23 @@ async function readErrorCode(response: Response) {
   return null;
 }
 
+// 목 모드 브라우저에서는 MSW가 켜지기 전에 나간 요청이 실제 서버로 가요.
+// 앱이 시작될 때 붙잡아 두고(holdRequests), MSW가 켜지면 놓아줘요(releaseRequests).
+let heldUntil: Promise<void> | null = null;
+let release: (() => void) | null = null;
+
+export function holdRequests() {
+  heldUntil ??= new Promise((resolve) => {
+    release = resolve;
+  });
+}
+
+export function releaseRequests() {
+  release?.();
+}
+
 export async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  if (heldUntil) await heldUntil;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
