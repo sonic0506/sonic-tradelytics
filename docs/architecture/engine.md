@@ -205,8 +205,10 @@ Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 
 실행 준비:
 
 1. 같은 Postgres에 `tradelytics_paper` DB를 만들고 `DATABASE_URL`을 그쪽으로 바꿔 `npm run migration:run`
-2. `fee_schedules`에 수수료율을 넣어요. 값은 토스 `GET /api/v1/commissions`로 확인해요
-3. `BROKER_MODE=paper`로 engine을 켜요. 토스 토큰은 클라이언트당 1개라 실전 engine과 동시에 켜지 않아요 (R-014)
+2. `apps/server/.env.paper`(커밋하지 않아요)에 `.env` 위에 덮어쓸 값을 둬요: `BROKER_MODE=paper`, `DATABASE_URL=…/tradelytics_paper`
+3. `scripts/paper-seed.sql`로 수수료율(0.015%, 세금 0.2%)과 데이 트레이딩 봇 1개(정액 10만 원, 1회 5만 원, 동시 2종목)를 넣어요. `_paper` DB가 아니면 거부하고, 다시 실행해도 같은 행을 넣지 않아요
+4. `npm run build && npm run start:engine:paper`. 실전 engine을 먼저 내려요. 토스 토큰·웹소켓을 같은 클라이언트로 쓰기 때문이에요 (R-014)
+5. 08:59 `open_snapshot`이 봇 투자금을 확정하고(늦게 켜면 시작할 때 따라잡아요), 정규장에 BotRunner가 돌아요
 
 ## 화면용 상태 쓰기
 
@@ -245,12 +247,12 @@ api는 토스를 부르지 않아서([API 원칙](./api.md#원칙)), 화면에 �
 
 [일일 일정](./overview.md#일일-일정-engine)과 [재평가 일정](../policy/position-reevaluation.md#실행-일정)을 `EngineSchedule`이 실행해요. 시각은 KST(서머타임 없음, `+09:00` 고정)예요. 정해진 시각이 몇 개뿐이라 `@nestjs/schedule` 없이 `setTimeout`으로 다음 시각을 예약해요. 요일 조건(`weekly_check`)처럼 cron 표현이 필요해지면 그때 설치해요([학습 06](../learning/06-scheduling.md)).
 
-지금 등록한 job은 할 일이 있는 `pre_open`(토큰·캘린더 확인, 하루 손실 한도 정지 재개)과 `post_close`(오늘 CLOSED로 체결 최종 확정, 닫힌 포지션의 판단 채점)뿐이에요. 나머지는 그 기능을 만들 때 더해요.
+지금 등록한 job은 할 일이 있는 `pre_open`(토큰·캘린더 확인, 하루 손실 한도 정지 재개), `open_snapshot`(봇 투자금 확정), `post_close`(오늘 CLOSED로 체결 최종 확정, 닫힌 포지션의 판단 채점)뿐이에요. 나머지는 그 기능을 만들 때 더해요.
 
 | job | 시각 | 하는 일 |
 | --- | --- | --- |
 | `pre_open` | 08:30 | 토큰·캘린더·수수료율, 웹소켓 확인, 장전 점검 (POL-REEV-06) |
-| `open_snapshot` | 08:59 | 09:00 시작 봇의 운용 자산 스냅샷과 투자금 확정 (POL-FUND) |
+| `open_snapshot` | 08:59 | 실행 중·자금 대기 봇의 운용 자산 스냅샷과 투자금 확정 (POL-FUND). 지금은 봇 시작 시각과 관계없이 한 번에 확정해요 |
 | `open_check` | 09:00~09:05 | 개장 직후 점검 (이월 봇) |
 | `intraday_check` | 11:00, 14:00 | 장중 점검 (스윙) |
 | `post_close` | 15:40 | 체결 최종 동기화, 장후 재평가, 건너뛴 판단 추적, 채점 재시도, 일일 집계 |

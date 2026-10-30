@@ -16,6 +16,7 @@
     "start:prod": "node dist/main",
     "start:engine": "node --env-file-if-exists=.env dist/engine",
     "start:engine:dev": "nest start --watch --entryFile engine --exec \"node --env-file-if-exists=.env\"",
+    "start:engine:paper": "node --env-file-if-exists=.env --env-file=.env.paper dist/engine",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",

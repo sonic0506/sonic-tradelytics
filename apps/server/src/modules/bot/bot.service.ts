@@ -46,6 +46,11 @@ export class BotService {
     return this.findWithVersions(running.map(({ id }) => id));
   }
 
+  // 투자금을 확정할 봇: 실행 중이거나 자금 대기 중 (POL-FUND-15). 이미 확정된 봇은 FundService가 건너뛰어요
+  findFundable(): Promise<Bot[]> {
+    return this.bots.findByStatuses(['running', 'waiting_funds']);
+  }
+
   // 신규 진입을 하지 않는 봇들 (재시작 때 정지 상태 복원)
   findInactive(): Promise<Bot[]> {
     return this.bots.findByStatuses(['paused', 'waiting_funds', 'stopped']);

@@ -74,6 +74,17 @@ describe('BotService', () => {
     expect(bots.findById).toHaveBeenCalledWith(7);
   });
 
+  it('투자금을 확정할 봇은 실행 중·자금 대기 봇이에요', async () => {
+    bots.findByStatuses.mockResolvedValue([]);
+
+    await service.findFundable();
+
+    expect(bots.findByStatuses).toHaveBeenCalledWith([
+      'running',
+      'waiting_funds',
+    ]);
+  });
+
   it('실행 중·일시정지 봇을 지금 버전과 함께 읽어요', async () => {
     const running = Object.assign({ id: 7 }) as Bot;
     bots.findByStatuses.mockResolvedValue([running]);

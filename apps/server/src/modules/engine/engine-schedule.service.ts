@@ -3,6 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { kstAt, kstDate } from '@/common/time/kst-date.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
+import { BotService } from '@/modules/bot/index.js';
+import { FundService } from '@/modules/fund/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
 import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
@@ -35,8 +37,10 @@ export class EngineScheduleService {
     toss: TossClient,
     accountSync: AccountSyncService,
     orders: OrderService,
+    bots: BotService,
+    fund: FundService,
   ) {
-    // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·스냅샷·집계)는 그 기능을 만들 때 더해요
+    // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·장중 점검·집계)는 그 기능을 만들 때 더해요
     this.jobs = [
       // 토큰·오늘 캘린더 확인, 하루 손실 한도로 멈춘 봇 재개 (POL-RISK-02)
       {
@@ -46,6 +50,16 @@ export class EngineScheduleService {
           await toss.ensureToken();
           await this.calendar.ensureToday();
           await this.risk.resumeDailyStops();
+        },
+      },
+      // 봇들의 운용 자산 스냅샷과 투자금 확정 (POL-FUND-01, 13~16). 이미 확정된 봇은 건너뛰어요.
+      // ponytail: 봇 시작 시각과 관계없이 08:59에 한 번에 확정해요. 시작 시각별 스냅샷은 시작 시각이 다른 봇이 생기면 나눠요
+      {
+        job: 'open_snapshot',
+        time: '08:59',
+        run: async () => {
+          const fundable = await bots.findFundable();
+          await fund.allocate(fundable.map(({ id }) => id));
         },
       },
       // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)

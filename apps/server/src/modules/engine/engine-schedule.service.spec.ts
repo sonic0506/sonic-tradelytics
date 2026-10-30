@@ -2,6 +2,8 @@ import { Test } from '@nestjs/testing';
 
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
+import { type Bot, BotService } from '@/modules/bot/index.js';
+import { FundService } from '@/modules/fund/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
 import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
@@ -28,6 +30,8 @@ describe('EngineScheduleService', () => {
   const orders = {
     scoreClosedPositions: vi.fn<OrderService['scoreClosedPositions']>(),
   };
+  const bots = { findFundable: vi.fn<BotService['findFundable']>() };
+  const fund = { allocate: vi.fn<FundService['allocate']>() };
   let schedule: EngineScheduleService;
 
   const MINUTE_MS = 60_000;
@@ -49,6 +53,10 @@ describe('EngineScheduleService', () => {
     vi.useFakeTimers({ now: tenAm });
     runs.find.mockResolvedValue(null);
     calendar.ensureToday.mockResolvedValue(tradingDay(true));
+    bots.findFundable.mockResolvedValue([
+      Object.assign({ id: 7 }) as Bot,
+      Object.assign({ id: 8 }) as Bot,
+    ]);
     const moduleRef = await Test.createTestingModule({
       providers: [
         EngineScheduleService,
@@ -58,6 +66,8 @@ describe('EngineScheduleService', () => {
         { provide: TossClient, useValue: toss },
         { provide: AccountSyncService, useValue: accountSync },
         { provide: OrderService, useValue: orders },
+        { provide: BotService, useValue: bots },
+        { provide: FundService, useValue: fund },
       ],
     }).compile();
     schedule = moduleRef.get(EngineScheduleService);
@@ -68,7 +78,7 @@ describe('EngineScheduleService', () => {
     vi.useRealTimers();
   });
 
-  it('시작할 때 시각이 지난 배치(08:30 pre_open)만 따라잡아요', async () => {
+  it('시작할 때 시각이 지난 배치(08:30 pre_open, 08:59 open_snapshot)만 따라잡아요', async () => {
     await schedule.start();
 
     expect(toss.ensureToken).toHaveBeenCalledOnce();
@@ -78,7 +88,12 @@ describe('EngineScheduleService', () => {
       { job: 'pre_open', tradeDate: '2026-10-29', slot: '' },
       tenAm,
     );
-    expect(finished()).toEqual([['pre_open', 'ok']]);
+    expect(finished()).toEqual([
+      ['pre_open', 'ok'],
+      ['open_snapshot', 'ok'],
+    ]);
+    // 실행 중·자금 대기 봇의 투자금을 확정해요
+    expect(fund.allocate).toHaveBeenCalledWith([7, 8]);
   });
 
   it('15:40에 post_close로 오늘 체결을 최종 동기화하고 판단을 채점해요', async () => {
@@ -117,7 +132,11 @@ describe('EngineScheduleService', () => {
     await schedule.start();
 
     expect(toss.ensureToken).not.toHaveBeenCalled();
-    expect(finished()).toEqual([['pre_open', 'skipped']]);
+    expect(fund.allocate).not.toHaveBeenCalled();
+    expect(finished()).toEqual([
+      ['pre_open', 'skipped'],
+      ['open_snapshot', 'skipped'],
+    ]);
   });
 
   it('실패하면 failed와 batch_fail을 남기고 던지지 않아요', async () => {
@@ -145,12 +164,13 @@ describe('EngineScheduleService', () => {
     await expect(schedule.start()).resolves.toBeUndefined();
   });
 
-  it('장 마감 뒤에 시작하면 두 배치를 순서대로 따라잡아요', async () => {
+  it('장 마감 뒤에 시작하면 세 배치를 순서대로 따라잡아요', async () => {
     // 20:00 KST
     await schedule.start(new Date('2026-10-29T11:00:00Z'));
 
     expect(finished()).toEqual([
       ['pre_open', 'ok'],
+      ['open_snapshot', 'ok'],
       ['post_close', 'ok'],
     ]);
   });
