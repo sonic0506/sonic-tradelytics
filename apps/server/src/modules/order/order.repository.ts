@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import { In, IsNull, LessThanOrEqual, Not, type Repository } from 'typeorm';
+import {
+  In,
+  IsNull,
+  LessThanOrEqual,
+  MoreThan,
+  Not,
+  type Repository,
+} from 'typeorm';
 
 import { BrokerOrder } from './entities/broker-order.entity.js';
 import { OrderEvent } from './entities/order-event.entity.js';
@@ -75,6 +82,14 @@ export class OrderRepository {
         brokerOrderId: Not(IsNull()),
         position: { botId: botId ?? Not(IsNull()) },
       },
+      take: OrderRepository.MAX_OPEN_ORDERS,
+    });
+  }
+
+  // 포지션의 체결된 매도 주문 (평균 청산가 계산)
+  findFilledSells(positionId: number): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      where: { positionId, side: 'SELL', filledQuantity: MoreThan(0) },
       take: OrderRepository.MAX_OPEN_ORDERS,
     });
   }

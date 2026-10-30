@@ -6,11 +6,31 @@ import {
   type DecisionFields,
   DecisionRepository,
 } from './decision.repository.js';
+import type { Decision } from './entities/decision.entity.js';
+import type { PredictionScore } from './scoring.rule.js';
 
 // 판단 기록 (ADR-0003). 주문 전에 저장하고, id가 그대로 clientOrderId가 돼요 (POL-RISK-07)
 @Injectable()
 export class DecisionService {
   constructor(private readonly decisions: DecisionRepository) {}
+
+  findUnscored(take: number): Promise<Decision[]> {
+    return this.decisions.findUnscored(take);
+  }
+
+  // 채점 결과는 추가만 해요 (판단 1개 = 채점 1개, decision_id unique)
+  saveScore(
+    decision: Pick<Decision, 'id' | 'positionId'>,
+    score: PredictionScore,
+  ): Promise<void> {
+    if (decision.positionId === null) return Promise.resolve();
+    return this.decisions.addScore({
+      positionId: decision.positionId,
+      decisionId: decision.id,
+      ...score,
+      scoredAt: new Date(),
+    });
+  }
 
   // 그 포지션 첫 진입 판단의 봇 버전 (청산 판단도 진입 때 버전으로 남겨요)
   async entryVersionId(positionId: number): Promise<number | null> {

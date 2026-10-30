@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
+
 import type { INestApplication } from '@nestjs/common';
 import { DataSource, IsNull } from 'typeorm';
 
 import { Bot, BotVersion } from '@/modules/bot/index.js';
-import { Decision } from '@/modules/decision/index.js';
+import { Decision, PredictionScore } from '@/modules/decision/index.js';
 import {
   BrokerOrder,
   type EntryRequest,
@@ -142,5 +144,51 @@ describe('진입 주문 (e2e)', () => {
         .getRepository(Decision)
         .countBy({ kind: 'skip', skipReason: 'symbol_lock' }),
     ).resolves.toBe(1);
+  });
+
+  it('장후 채점은 닫힌 포지션의 진입 판단을 평균 매도가로 한 번만 채점해요', async () => {
+    const buy = await dataSource
+      .getRepository(BrokerOrder)
+      .findOneByOrFail({ symbol: '005930', side: 'BUY' });
+    const entry = await dataSource
+      .getRepository(Decision)
+      .findOneByOrFail({ id: buy.decisionId ?? '' });
+    // 청산 판단과 그 매도 주문 (주문 1개 = 판단 1개)
+    const exitId = randomUUID();
+    await dataSource
+      .getRepository(Decision)
+      .save({ ...entry, id: exitId, kind: 'exit' });
+    await dataSource.getRepository(BrokerOrder).save({
+      ...buy,
+      id: undefined,
+      decisionId: exitId,
+      brokerOrderId: 'sell-1',
+      side: 'SELL',
+      status: 'FILLED',
+      filledQuantity: 3,
+      filledAmount: 216_000,
+    });
+    await dataSource
+      .getRepository(Position)
+      .update(
+        { id: buy.positionId },
+        { status: 'closed', quantity: 0, closedAt: new Date() },
+      );
+
+    await expect(orders.scoreClosedPositions()).resolves.toBe(1);
+    await expect(orders.scoreClosedPositions()).resolves.toBe(0);
+
+    // 평균 매도가 72,000: 상승 적중, 목표(73,000)까지 2/3, 목표보다 진입가의 1.429% 낮음
+    await expect(
+      dataSource.getRepository(PredictionScore).find({ take: 2 }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        positionId: buy.positionId,
+        decisionId: buy.decisionId,
+        directionHit: true,
+        targetReachPct: 66.67,
+        errorPct: -1.429,
+      }),
+    ]);
   });
 });

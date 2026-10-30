@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
+import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { BatchRunRepository } from './batch-run.repository.js';
@@ -24,6 +25,9 @@ describe('EngineScheduleService', () => {
   };
   const toss = { ensureToken: vi.fn<TossClient['ensureToken']>() };
   const accountSync = { syncAll: vi.fn<AccountSyncService['syncAll']>() };
+  const orders = {
+    scoreClosedPositions: vi.fn<OrderService['scoreClosedPositions']>(),
+  };
   let schedule: EngineScheduleService;
 
   const MINUTE_MS = 60_000;
@@ -53,6 +57,7 @@ describe('EngineScheduleService', () => {
         { provide: RiskService, useValue: risk },
         { provide: TossClient, useValue: toss },
         { provide: AccountSyncService, useValue: accountSync },
+        { provide: OrderService, useValue: orders },
       ],
     }).compile();
     schedule = moduleRef.get(EngineScheduleService);
@@ -76,7 +81,7 @@ describe('EngineScheduleService', () => {
     expect(finished()).toEqual([['pre_open', 'ok']]);
   });
 
-  it('15:40에 post_close로 오늘 체결을 최종 동기화해요', async () => {
+  it('15:40에 post_close로 오늘 체결을 최종 동기화하고 판단을 채점해요', async () => {
     await schedule.start();
 
     await vi.advanceTimersByTimeAsync(339 * MINUTE_MS);
@@ -84,6 +89,7 @@ describe('EngineScheduleService', () => {
 
     await vi.advanceTimersByTimeAsync(MINUTE_MS);
     expect(accountSync.syncAll).toHaveBeenCalledOnce();
+    expect(orders.scoreClosedPositions).toHaveBeenCalledOnce();
     expect(finished()).toContainEqual(['post_close', 'ok']);
   });
 

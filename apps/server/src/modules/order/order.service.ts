@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 
 import { kstDate } from '@/common/time/kst-date.js';
-import { DecisionService } from '@/modules/decision/index.js';
+import { DecisionService, scorePrediction } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { type ExitReason, PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
@@ -99,6 +99,9 @@ const NOTHING_FILLED: Filled = {
 // 주문 생성·취소와 손절 조건주문은 BotRunner를 만들 때 여기에 더해요.
 @Injectable()
 export class OrderService {
+  // 한 번에 채점하는 판단 수 (남으면 다음 장후 배치가 이어서 해요)
+  private static readonly SCORE_BATCH = 500;
+
   private readonly logger = new Logger(OrderService.name);
 
   constructor(
@@ -426,6 +429,47 @@ export class OrderService {
     this.logger.warn(
       `position ${positionId}: 손절 응답을 못 받았어요(${result.reason})`,
     );
+  }
+
+  // 장후 배치: 닫힌 포지션의 진입·재평가 판단을 채점해요 (FR-RAT-02, POL-REEV-04). 채점한 수를 돌려줘요
+  async scoreClosedPositions(): Promise<number> {
+    const unscored = await this.decisions.findUnscored(
+      OrderService.SCORE_BATCH,
+    );
+    const scored = await unscored.reduce<Promise<number>>(
+      (previous, decision) =>
+        previous.then(async (count) => {
+          const { positionId, direction, targetPrice } = decision;
+          if (positionId === null || direction === null || targetPrice === null)
+            return count;
+          const sells = await this.orders.findFilledSells(positionId);
+          const quantity = sells.reduce(
+            (sum, { filledQuantity }) => sum + filledQuantity,
+            0,
+          );
+          // 한 주도 팔지 않고 닫힌 포지션(not_filled)은 채점하지 않아요
+          if (quantity === 0) return count;
+          const amount = sells.reduce(
+            (sum, { filledAmount }) => sum + (filledAmount ?? 0),
+            0,
+          );
+          const position = await this.positions.find(positionId);
+          await this.decisions.saveScore(
+            decision,
+            scorePrediction({
+              direction,
+              entryPrice: decision.price,
+              targetPrice,
+              exitPrice: amount / quantity,
+              highPrice: position?.highPrice ?? null,
+              lowPrice: position?.lowPrice ?? null,
+            }),
+          );
+          return count + 1;
+        }),
+      Promise.resolve(0),
+    );
+    return scored;
   }
 
   // 일시정지·청산·킬 스위치: 봇 미체결 주문을 취소해요. 결과(CANCELED)는 재동기화로 반영돼요. 취소하지 못한 수를 돌려줘요

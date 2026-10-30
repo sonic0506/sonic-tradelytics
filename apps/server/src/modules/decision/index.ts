@@ -5,3 +5,4 @@ export { DecisionService } from './decision.service.js';
 export { Decision } from './entities/decision.entity.js';
 export { PredictionScore } from './entities/prediction-score.entity.js';
 export { SkipFollowup } from './entities/skip-followup.entity.js';
+export * from './scoring.rule.js';

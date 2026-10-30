@@ -4,6 +4,7 @@ import { kstAt, kstDate } from '@/common/time/kst-date.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
+import { OrderService } from '@/modules/order/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { type BatchKey, BatchRunRepository } from './batch-run.repository.js';
@@ -33,6 +34,7 @@ export class EngineScheduleService {
     private readonly risk: RiskService,
     toss: TossClient,
     accountSync: AccountSyncService,
+    orders: OrderService,
   ) {
     // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·스냅샷·집계)는 그 기능을 만들 때 더해요
     this.jobs = [
@@ -46,8 +48,15 @@ export class EngineScheduleService {
           await this.risk.resumeDailyStops();
         },
       },
-      // 오늘 CLOSED 전량으로 체결 최종 확정
-      { job: 'post_close', time: '15:40', run: () => accountSync.syncAll() },
+      // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)
+      {
+        job: 'post_close',
+        time: '15:40',
+        run: async () => {
+          await accountSync.syncAll();
+          await orders.scoreClosedPositions();
+        },
+      },
     ];
   }
 

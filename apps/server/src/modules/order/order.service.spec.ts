@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { DecisionService } from '@/modules/decision/index.js';
+import { type Decision, DecisionService } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { type Position, PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
@@ -34,11 +34,14 @@ describe('OrderService', () => {
     updateProtective: vi.fn<OrderRepository['updateProtective']>(),
     hasOpenOrders: vi.fn<OrderRepository['hasOpenOrders']>(),
     findOpenBotOrders: vi.fn<OrderRepository['findOpenBotOrders']>(),
+    findFilledSells: vi.fn<OrderRepository['findFilledSells']>(),
   };
   const decisions = {
     record: vi.fn<DecisionService['record']>(),
     entryStopPrice: vi.fn<DecisionService['entryStopPrice']>(),
     entryVersionId: vi.fn<DecisionService['entryVersionId']>(),
+    findUnscored: vi.fn<DecisionService['findUnscored']>(),
+    saveScore: vi.fn<DecisionService['saveScore']>(),
   };
   const broker = {
     place: vi.fn<TossBrokerService['place']>(),
@@ -1085,5 +1088,52 @@ describe('OrderService', () => {
 
     expect(positions.closeFlat).toHaveBeenCalledWith(4, 'not_filled', now);
     expect(risk.releaseLock).not.toHaveBeenCalled();
+  });
+
+  describe('판단 채점 (장후 배치)', () => {
+    const decision = (fields: Partial<Decision> = {}): Decision =>
+      Object.assign(
+        {
+          id: 'd-1',
+          positionId: 4,
+          direction: 'up',
+          price: 10_000,
+          targetPrice: 10_300,
+        },
+        fields,
+      ) as Decision;
+    const sell = (filledQuantity: number, filledAmount: number): BrokerOrder =>
+      known({ side: 'SELL', filledQuantity, filledAmount });
+
+    it('매도 체결의 평균가로 진입 판단을 채점해 저장해요', async () => {
+      decisions.findUnscored.mockResolvedValue([decision()]);
+      orders.findFilledSells.mockResolvedValue([
+        sell(2, 20_300),
+        sell(1, 10_100),
+      ]);
+      positions.find.mockResolvedValue(
+        Object.assign({ highPrice: 10_200, lowPrice: 9_900 }) as Position,
+      );
+
+      await expect(service.scoreClosedPositions()).resolves.toBe(1);
+
+      expect(decisions.saveScore).toHaveBeenCalledWith(decision(), {
+        directionHit: true,
+        targetReachPct: 66.67,
+        errorPct: -1.667,
+      });
+    });
+
+    it('한 주도 팔지 않았거나 예측값이 없는 판단은 건너뛰어요', async () => {
+      decisions.findUnscored.mockResolvedValue([
+        decision(),
+        decision({ id: 'd-2', targetPrice: null }),
+      ]);
+      orders.findFilledSells.mockResolvedValue([]);
+
+      await expect(service.scoreClosedPositions()).resolves.toBe(0);
+
+      expect(decisions.saveScore).not.toHaveBeenCalled();
+    });
   });
 });
