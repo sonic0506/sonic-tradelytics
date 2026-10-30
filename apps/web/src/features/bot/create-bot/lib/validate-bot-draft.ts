@@ -1,12 +1,12 @@
-import type { RuleField } from '@/entities/bot';
+import {
+  getRuleValueError,
+  getTradingHoursErrors,
+  type RuleField,
+} from '@/entities/bot';
 
 import type { BotDraft, DraftErrors } from '../model/bot-draft';
 
 const MAX_NAME_LENGTH = 30;
-// KRX 정규장 안에서만 운영해요 (POL-RISK-15)
-const MARKET_OPEN = '09:00';
-const MARKET_CLOSE = '15:30';
-const TIME_PATTERN = /^\d{2}:\d{2}$/;
 
 const isNumber = (text: string) =>
   text.trim() !== '' && Number.isFinite(Number(text));
@@ -55,14 +55,9 @@ function validatePeriod(draft: BotDraft, errors: DraftErrors) {
 }
 
 function validateTradingHours(draft: BotDraft, errors: DraftErrors) {
-  const isInMarket = (time: string) =>
-    TIME_PATTERN.test(time) && time >= MARKET_OPEN && time <= MARKET_CLOSE;
-  const range = `${MARKET_OPEN}~${MARKET_CLOSE} 안으로 입력해 주세요.`;
-  if (!isInMarket(draft.tradingStart)) errors.tradingStart = range;
-  if (!isInMarket(draft.tradingEnd)) errors.tradingEnd = range;
-  else if (draft.tradingStart >= draft.tradingEnd) {
-    errors.tradingEnd = '운영 시작보다 뒤 시각으로 입력해 주세요.';
-  }
+  const hours = getTradingHoursErrors(draft.tradingStart, draft.tradingEnd);
+  if (hours.start) errors.tradingStart = hours.start;
+  if (hours.end) errors.tradingEnd = hours.end;
 }
 
 function validateRules(
@@ -71,13 +66,8 @@ function validateRules(
   errors: DraftErrors,
 ) {
   for (const field of ruleFields) {
-    const text = draft.rules[field.key] ?? '';
-    if (field.kind === 'number' && !isNumber(text)) {
-      errors[`rule.${field.key}`] = '숫자를 입력해 주세요.';
-    }
-    if (field.kind === 'time' && !TIME_PATTERN.test(text)) {
-      errors[`rule.${field.key}`] = '시각을 입력해 주세요.';
-    }
+    const error = getRuleValueError(field, draft.rules[field.key] ?? '');
+    if (error) errors[`rule.${field.key}`] = error;
   }
 }
 

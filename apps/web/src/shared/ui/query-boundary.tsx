@@ -6,6 +6,8 @@ import { TriangleAlert } from 'lucide-react';
 import { type ReactNode, Suspense } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
+import { HttpError } from '@/shared/api';
+
 type QueryBoundaryProps = {
   children: ReactNode;
   // 처음 불러오는 동안 같은 자리에 보여 줄 Skeleton
@@ -19,6 +21,8 @@ type QueryBoundaryProps = {
   isErrorInCard?: boolean;
   // 실패 문구 대신 그릴 것. 다시 시도 없이 다른 모양으로 대신할 때 써요(null이면 비워요)
   errorFallback?: ReactNode;
+  // 404면 다시 시도 대신 그릴 것(없는 봇 같은 페이지 에러)
+  notFoundFallback?: ReactNode;
 };
 
 // 데이터를 쓰는 블록 바로 바깥에 두는 Suspense + ErrorBoundary 묶음이에요(하네스 3절).
@@ -30,13 +34,21 @@ export function QueryBoundary({
   isCompact = false,
   isErrorInCard = false,
   errorFallback,
+  notFoundFallback,
 }: QueryBoundaryProps) {
   return (
     <QueryErrorResetBoundary>
       {({ reset }) => (
         <ErrorBoundary
           onReset={reset}
-          fallbackRender={({ resetErrorBoundary }) => {
+          fallbackRender={({ error, resetErrorBoundary }) => {
+            if (
+              notFoundFallback !== undefined &&
+              error instanceof HttpError &&
+              error.status === 404
+            ) {
+              return notFoundFallback;
+            }
             if (errorFallback !== undefined) return errorFallback;
             const errorState = (
               <ErrorState

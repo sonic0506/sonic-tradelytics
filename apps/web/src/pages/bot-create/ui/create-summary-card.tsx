@@ -9,12 +9,11 @@ import {
 import {
   BOT_TYPE_LABEL,
   type BotDefaults,
+  isRuleChanged,
   RISK_PROFILE_LABEL,
 } from '@/entities/bot';
 import type { BotDraft } from '@/features/bot/create-bot';
 import { formatMonthDay, formatWon } from '@/shared/lib';
-
-import { isRuleChanged } from '../lib/bot-create-copy';
 
 const formatLoss = (text: string) => `−${Math.abs(Number(text))}%`;
 

@@ -7,6 +7,28 @@ import {
 } from '@/shared/lib';
 
 import type { BotListItem, StatusReason } from '../model/bot.schema';
+import type { BotDetail } from '../model/bot-detail.schema';
+
+// "한화오션 3주, 현대차 5주"
+export function formatHoldings(holdings: BotDetail['holdings']) {
+  return holdings
+    .map((holding) => `${holding.symbolName} ${holding.quantity}주`)
+    .join(', ');
+}
+
+// 쉬는 중이 아닌 이유 한 문장. 쉬는 중이면 null (FR-BOT-12)
+export function formatNotRestingReason(
+  bot: Pick<BotDetail, 'notRestingReasons' | 'holdings' | 'tradingHours'>,
+) {
+  const reason = bot.notRestingReasons[0];
+  if (reason === 'holding')
+    return `${formatHoldings(bot.holdings)}를 들고 있어요.`;
+  if (reason === 'pending_order') return '체결을 기다리는 주문이 있어요.';
+  if (reason === 'trading_hours') {
+    return `운영 시간(${bot.tradingHours.start}–${bot.tradingHours.end}) 안이에요.`;
+  }
+  return null;
+}
 
 const DAY_MS = 86_400_000;
 const runDayFormat = new Intl.DateTimeFormat('ko-KR', {

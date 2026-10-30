@@ -1,6 +1,4 @@
-import type { RuleField } from '@/entities/bot';
 import type { BotType } from '@/shared/api';
-import { formatWon } from '@/shared/lib';
 
 // 봇 유형 카드 설명 (Figma Bot Create / 1 유형)
 export const TYPE_DESCRIPTION: Record<BotType, string> = {
@@ -25,20 +23,3 @@ export const FIRST_LOSS_EFFECT: Record<BotType, string> = {
   swing: '그 종목을 팔아요',
   closing: '그 거래를 끝내요',
 };
-
-const MINUS = '−';
-
-// 규칙 값 표시: 5% → "5%", -2% → "−2%", 2000원 → "2,000원", 10분 → "10분"
-export function formatRuleValue(field: RuleField, text: string) {
-  if (field.kind === 'time') return text;
-  const value = Number(text);
-  if (field.unit === '원') return formatWon(value);
-  const sign = value < 0 ? MINUS : '';
-  return `${sign}${Math.abs(value)}${field.unit ?? ''}`;
-}
-
-// 입력값이 기본값과 다른지. 숫자는 "5"와 "5.0"을 같게 봐요.
-export function isRuleChanged(field: RuleField, text: string) {
-  if (field.kind === 'time') return text !== field.value;
-  return text.trim() === '' || Number(text) !== Number(field.value);
-}
