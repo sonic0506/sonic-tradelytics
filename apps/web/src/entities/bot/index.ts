@@ -2,9 +2,11 @@ export { botHandlers, BOTS_FIXTURE } from './api/bot.mock';
 export { botQueries } from './api/bot.queries';
 export { botDefaultsHandlers } from './api/bot-defaults.mock';
 export { BOT_DETAILS_FIXTURE, botDetailHandlers } from './api/bot-detail.mock';
+export { botStatHandlers } from './api/bot-stat.mock';
 export { botVersionHandlers } from './api/bot-version.mock';
 export { useBotDailyResultsQuery } from './hooks/use-bot-daily-results-query';
 export { type BotDetailView, useBotQuery } from './hooks/use-bot-query';
+export { useBotStatsQuery } from './hooks/use-bot-stats-query';
 export { useBotVersionsQuery } from './hooks/use-bot-versions-query';
 export { type BotListRow, useBotsQuery } from './hooks/use-bots-query';
 export { useVersionPreviewQuery } from './hooks/use-version-preview-query';
@@ -37,6 +39,7 @@ export {
   BOT_TYPE_LABEL,
   RISK_PROFILE_LABEL,
 } from './model/bot-labels';
+export type { BotStat, GetBotStatsParams } from './model/bot-stat.schema';
 export {
   IS_CARRY_OVER,
   LOSS_SCOPE_LABEL,

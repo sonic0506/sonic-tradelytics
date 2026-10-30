@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { addDays, toTradeDate } from '@/shared/lib';
 
+import type { GetBotStatsParams } from '../model/bot-stat.schema';
 import type { GetVersionPreview } from '../model/bot-version.schema';
 import { PNL_PERIOD_DAYS, type PnlPeriod } from '../model/pnl-period';
 import {
@@ -11,6 +12,7 @@ import {
   type GetBotDefaultsParams,
   getBots,
 } from './bot.api';
+import { getBotStats } from './bot-stat.api';
 import { getBotVersions, getVersionPreview } from './bot-version.api';
 
 export const botQueries = {
@@ -27,6 +29,12 @@ export const botQueries = {
       queryKey: [...botQueries.all(), 'detail', id],
       queryFn: () => getBotById(id),
       refetchInterval: 5_000,
+    }),
+  // 봇 비교 표 (FR-PERF-02)
+  stats: (params: GetBotStatsParams) =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'stats', params],
+      queryFn: () => getBotStats(params),
     }),
   versions: (id: string) =>
     queryOptions({

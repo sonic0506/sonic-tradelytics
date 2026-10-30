@@ -5,6 +5,7 @@ import {
   botDefaultsHandlers,
   botDetailHandlers,
   botHandlers,
+  botStatHandlers,
   botVersionHandlers,
 } from '@/entities/bot';
 import { dailyResultHandlers } from '@/entities/daily-result';
@@ -25,6 +26,7 @@ export const handlers: RequestHandler[] = [
   ...botDetailHandlers,
   ...botDefaultsHandlers,
   ...botVersionHandlers,
+  ...botStatHandlers,
   ...allocationHandlers,
   ...createBotHandlers,
   ...dailyResultHandlers,
