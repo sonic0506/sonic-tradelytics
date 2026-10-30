@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 
+import { kstAt } from '@/common/time/kst-date.js';
 import { BotService } from '@/modules/bot/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 
@@ -19,6 +20,8 @@ const STOPPED_STATUS = {
 
 // 리스크 기록, 종목 잠금, 한도에 걸린 봇 정지 (docs/policy/risk-management.md).
 // 한도 판단은 limits.rule.ts·entry.rule.ts가 하고, 여기서는 결과를 상태와 기록으로 남겨요.
+const DAY_MS = 86_400_000;
+
 @Injectable()
 export class RiskService {
   constructor(
@@ -83,6 +86,28 @@ export class RiskService {
     detail: Record<string, unknown>,
   ): Promise<void> {
     await this.events.add({ kind, botId, occurredAt: new Date(), detail });
+  }
+
+  // GET /v1/risk-events. 기간은 KST 거래일(둘 다 포함)이에요
+  findPage(query: {
+    botIds?: string[];
+    kinds?: RiskEventKind[];
+    from?: string;
+    to?: string;
+    skip: number;
+    size: number;
+  }): Promise<[RiskEvent[], number]> {
+    return this.events.findPage({
+      botIds: query.botIds?.map(Number),
+      kinds: query.kinds,
+      from: query.from === undefined ? undefined : kstAt(query.from, '00:00'),
+      until:
+        query.to === undefined
+          ? undefined
+          : new Date(kstAt(query.to, '00:00').getTime() + DAY_MS),
+      skip: query.skip,
+      take: query.size,
+    });
   }
 
   // 알림(NotificationService)이 보낼 차례인 이벤트

@@ -2,4 +2,5 @@
 export * from './command.constants.js';
 export { CommandModule } from './command.module.js';
 export { CommandService } from './command.service.js';
+export { CommandApiModule } from './command-api.module.js';
 export { Command } from './entities/command.entity.js';

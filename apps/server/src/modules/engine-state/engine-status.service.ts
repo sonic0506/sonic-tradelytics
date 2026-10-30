@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
+import { kstDate } from '@/common/time/kst-date.js';
+import {
+  type MarketCalendar,
+  MarketCalendarQueryService,
+} from '@/modules/market-data/index.js';
+
+import { EngineStatusNotFoundException } from './engine-state.exception.js';
 import { EngineStateService } from './engine-state.service.js';
 import { EngineStatusRepository } from './engine-status.repository.js';
+import type { EngineStatus } from './entities/engine-status.entity.js';
 
 // engine 밖(시세·계좌)에서 모은 값
 export interface EngineStatusReport {
@@ -16,7 +24,21 @@ export class EngineStatusService {
   constructor(
     private readonly engineState: EngineStateService,
     private readonly statuses: EngineStatusRepository,
+    private readonly calendars: MarketCalendarQueryService,
   ) {}
+
+  // GET /v1/engine-status: engine이 쓴 상태와 오늘 장 일정. engine이 한 번도 쓰지 않았으면 404
+  async current(): Promise<{
+    status: EngineStatus;
+    today: MarketCalendar | null;
+  }> {
+    const [status, today] = await Promise.all([
+      this.statuses.findCurrent(),
+      this.calendars.findDay(kstDate()),
+    ]);
+    if (!status) throw new EngineStatusNotFoundException();
+    return { status, today };
+  }
 
   // ponytail: 주문 가능 금액·평가금액은 아직 잔고를 조회하지 않아 null이에요. 잔고 재동기화를 만들면 채워요
   async write(report: EngineStatusReport): Promise<void> {

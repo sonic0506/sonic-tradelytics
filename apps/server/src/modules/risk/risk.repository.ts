@@ -36,6 +36,31 @@ export class RiskRepository {
     await this.events.update({ id, notifiedAt: IsNull() }, { notifiedAt });
   }
 
+  // 화면 목록: 최신순. 봇·종류·기간(occurredAt 범위)으로 걸러요
+  findPage(filter: {
+    botIds?: number[];
+    kinds?: RiskEventKind[];
+    from?: Date;
+    until?: Date;
+    skip: number;
+    take: number;
+  }): Promise<[RiskEvent[], number]> {
+    const query = this.events
+      .createQueryBuilder('event')
+      .leftJoinAndSelect('event.bot', 'bot')
+      .orderBy('event.occurredAt', 'DESC')
+      .addOrderBy('event.id', 'DESC');
+    if (filter.botIds?.length)
+      query.andWhere('event.botId IN (:...botIds)', { botIds: filter.botIds });
+    if (filter.kinds?.length)
+      query.andWhere('event.kind IN (:...kinds)', { kinds: filter.kinds });
+    if (filter.from)
+      query.andWhere('event.occurredAt >= :from', { from: filter.from });
+    if (filter.until)
+      query.andWhere('event.occurredAt < :until', { until: filter.until });
+    return query.skip(filter.skip).take(filter.take).getManyAndCount();
+  }
+
   findLatest(kind: RiskEventKind): Promise<RiskEvent | null> {
     return this.events.findOne({
       where: { kind },

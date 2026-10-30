@@ -16,6 +16,24 @@ export class CommandRepository {
     return this.txHost.tx.getRepository(Command);
   }
 
+  add(
+    fields: Pick<
+      Command,
+      'kind' | 'botId' | 'liquidateAll' | 'budget' | 'requestedAt'
+    >,
+  ): Promise<Command> {
+    return this.commands.save(this.commands.create(fields));
+  }
+
+  findById(id: number): Promise<Command | null> {
+    return this.commands.findOneBy({ id });
+  }
+
+  // engine이 LISTEN command로 받아요. 트랜잭션 안에서 보내면 커밋할 때 전달돼요 (ADR-0004)
+  async notify(): Promise<void> {
+    await this.txHost.tx.query(`SELECT pg_notify('command', '')`);
+  }
+
   // 미처리 명령을 요청 순서대로
   findPending(take: number): Promise<Command[]> {
     return this.commands.find({

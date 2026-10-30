@@ -20,6 +20,10 @@ export class EngineStatusRepository {
     return this.txHost.tx.getRepository(EngineStatus);
   }
 
+  findCurrent(): Promise<EngineStatus | null> {
+    return this.statuses.findOneBy({ id: EngineStatusRepository.ROW_ID });
+  }
+
   async save(fields: EngineStatusFields): Promise<void> {
     await this.statuses.upsert(
       { id: EngineStatusRepository.ROW_ID, ...fields },

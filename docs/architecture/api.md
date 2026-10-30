@@ -23,6 +23,7 @@ web(Next.js)이 부르는 api 프로세스의 엔드포인트 목록이에요. *
 | 성공 | 조회 200, 생성 201, 수정 200, 삭제 204. 성공 응답은 감싸지 않아요 |
 | 목록 | `?page&size`(size ≤ 100), 응답 `{ items, meta: { page, size, total } }` |
 | 에러 | RFC 9457 `application/problem+json`, `code`는 아래 [에러 코드](#에러-코드) |
+| id | DB의 bigint id는 문자열로 주고받아요(`"7"`). JSON 숫자로 다루기 어려운 크기까지 안전하게 쓰기 위해서예요. 판단 id는 uuid 문자열이에요 |
 | 금액 | 원 단위 정수(number). 비율은 0~1, 손익률·손실 한도는 % 값 ([데이터 모델 공통 규칙](./data-model.md#공통-규칙)) |
 | 시각 | ISO 8601 (`+09:00`). 날짜 필터는 `from`, `to` (거래일, `YYYY-MM-DD`, 둘 다 포함) |
 | 인증 | 모든 경로에 `Authorization: Bearer <web 토큰>`이 필요해요. 아래 [인증](#인증) |
@@ -34,7 +35,7 @@ web(Next.js)이 부르는 api 프로세스의 엔드포인트 목록이에요. *
 | 항목 | 정한 것 |
 | --- | --- |
 | 토큰 | 서버 비밀 키(`JWT_SECRET`)로 서명한 JWT 하나. payload `{ sub: 'web', roles: ['admin'] }`, 만료 1년 |
-| 발급 | 로그인 API 없음. 서버 저장소의 스크립트로 한 번 만들어요(M1). 만든 값은 출력만 하고 파일에 남기지 않아요 |
+| 발급 | 로그인 API 없음. `node --env-file=.env scripts/issue-web-token.mjs`로 만들어요. 만든 값은 출력만 하고 파일에 남기지 않아요 |
 | 보관 | web 서버 쪽 환경 변수(예: `API_TOKEN`)에만 둬요. `NEXT_PUBLIC_` 접두사를 붙이지 않아서 브라우저 번들에 들어가지 않아요 |
 | 호출 경로 | 브라우저 → web 서버(Next.js 서버 쪽 코드) → api. web 서버가 토큰을 붙여요. 브라우저가 api를 직접 부르지 않아요 |
 | 교체 | 새 토큰을 만들어 web 환경 변수를 바꾸고 재배포해요. 토큰이 새었으면 `JWT_SECRET`을 바꿔 기존 토큰을 모두 무효로 만들어요 |
@@ -83,7 +84,9 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 | `haltReasons` | 전체 정지 사유 코드 목록 |
 | `heartbeatAt` | engine 마지막 기록 시각. **30초 넘게 오래되면 web이 "엔진 응답 없음"으로 표시**해요 |
 | `staleSymbols` | 시세가 끊긴 종목 (`feed_stale`) |
-| `marketOpen` | 오늘 정규장 여부와 시각 (`market_calendars`) |
+| `marketOpen` | 오늘 정규장 여부와 시각 (`market_calendars`): `isTradingDay`, `openAt`, `closeAt`. engine이 오늘 일정을 아직 받지 않았으면 `isTradingDay: false` |
+
+engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FOUND`예요.
 
 ### `POST /v1/commands`
 
@@ -100,6 +103,7 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 - **쉬는 중**(`resting`)은 봇 상태가 아니라 계산값이에요: `running`·`paused`이고, 보유 종목·미체결 주문이 없고, 운영 시간 밖(장 마감 뒤·휴장일·하루 한도로 신규 진입 중단)일 때 참이에요. `GET /v1/bots/:id`와 같은 함수로 계산해요
 
 - 응답은 넣은 `commands` 행이에요(`id`, `handledAt: null`). web은 `GET /v1/commands/:id`를 0.5초 간격으로 불러 `handledAt`·`result`를 확인해요. 킬 스위치는 1초 안에 `handledAt`이 차는 것이 정상이에요 (NFR-02)
+- M4 현재: `rebudget`의 쉬는 중·운용 자산 검사(`BOT_NOT_RESTING`·`BUDGET_INSUFFICIENT`)는 아직 engine만 해서, 막히면 HTTP 에러 대신 `result = failed`와 `error`로 와요. 봇 API(4b)에서 api 쪽 검사를 붙여요
 - 같은 버튼을 두 번 눌러도 engine이 같은 결과를 내요([엔진 명령 처리](./engine.md#명령-처리-command)). api는 중복을 막지 않아요
 - 킬 스위치를 누른 뒤 봇을 다시 돌리려면 봇마다 `resume`해요
 
@@ -311,7 +315,7 @@ Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중�
 
 ### `GET /v1/risk-events?botIds&kinds&from&to`
 
-리스크·장애 이벤트와 알림 발송 여부 (POL-RISK-12). 최신순, 페이지 나눔.
+리스크·장애 이벤트와 알림 발송 여부 (POL-RISK-12). 최신순, 페이지 나눔. `botIds`·`kinds`는 쉼표로 여러 개, `kind`는 [`risk_events.kind`](./data-model.md) 그대로예요. 화면 문구는 web이 `kind`와 숫자 `detail`로 만들어요 ([ADR-0008](./adr/0008-external-data-numeric-only.md)).
 
 ## 에러 코드
 
@@ -323,6 +327,7 @@ Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중�
 | `POSITION_NOT_FOUND` | 404 | 없는 포지션 |
 | `DECISION_NOT_FOUND` | 404 | 없는 판단 |
 | `COMMAND_NOT_FOUND` | 404 | 없는 명령 |
+| `ENGINE_STATUS_NOT_FOUND` | 404 | engine이 아직 상태를 쓰지 않음 |
 | `BUDGET_RATIO_EXCEEDED` | 422 | 정률 합 100% 초과 (POL-FUND-03) |
 | `TRADING_HOURS_OUT_OF_RANGE` | 422 | 운영 시간이 정규장 밖 (POL-RISK-15) |
 | `BOT_BUDGET_LOCKED` | 409 | `running`·`paused` 봇의 투자금을 `PATCH`로 수정 (`rebudget` 명령을 써요) |

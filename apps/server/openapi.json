@@ -1,0 +1,1106 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "degraded"
+                      ],
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up",
+                          "responseTime": 12
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up",
+                          "responseTime": 12
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "error",
+                        "shutting_down"
+                      ],
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up",
+                          "responseTime": 12
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect",
+                          "responseTime": 3005
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up",
+                          "responseTime": 12
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect",
+                          "responseTime": 3005
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "up",
+                              "degraded",
+                              "down"
+                            ]
+                          },
+                          "responseTime": {
+                            "type": "number",
+                            "description": "Time the health indicator took to respond, in ms"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Health"
+        ],
+        "security": []
+      }
+    },
+    "/v1/commands": {
+      "post": {
+        "operationId": "CommandController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommandDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/commands",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/commands",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_NOT_FOUND": {
+                    "summary": "봇 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "봇 1을(를) 찾을 수 없어요.",
+                      "code": "BOT_NOT_FOUND",
+                      "instance": "/v1/commands",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "COMMAND_NOT_ALLOWED": {
+                    "summary": "stopped 봇에는 pause 명령을 보낼 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Conflict",
+                      "status": 409,
+                      "detail": "stopped 봇에는 pause 명령을 보낼 수 없어요.",
+                      "code": "COMMAND_NOT_ALLOWED",
+                      "instance": "/v1/commands",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "봇 정지·재개·청산, 킬 스위치, 투자금 다시 정하기를 engine에 보내요. 결과는 GET으로 확인해요",
+        "tags": [
+          "commands"
+        ]
+      }
+    },
+    "/v1/commands/{id}": {
+      "get": {
+        "operationId": "CommandController_find_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_400": {
+                    "summary": "Validation failed (numeric string is expected)",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "Validation failed (numeric string is expected)",
+                      "code": "HTTP_400",
+                      "instance": "/v1/commands/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/commands/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "COMMAND_NOT_FOUND": {
+                    "summary": "명령 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "명령 1을(를) 찾을 수 없어요.",
+                      "code": "COMMAND_NOT_FOUND",
+                      "instance": "/v1/commands/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "명령 처리 결과 (web이 0.5초 간격으로 확인해요)",
+        "tags": [
+          "commands"
+        ]
+      }
+    },
+    "/v1/engine-status": {
+      "get": {
+        "operationId": "EngineStatusController_find_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineStatusResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/engine-status",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "ENGINE_STATUS_NOT_FOUND": {
+                    "summary": "engine이 아직 상태를 쓰지 않았어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "engine이 아직 상태를 쓰지 않았어요.",
+                      "code": "ENGINE_STATUS_NOT_FOUND",
+                      "instance": "/v1/engine-status",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "engine 상태와 오늘 장 일정 (모든 화면 머리 띠, 10초마다)",
+        "tags": [
+          "engine"
+        ]
+      }
+    },
+    "/v1/risk-events": {
+      "get": {
+        "operationId": "RiskEventController_findPage_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "페이지(1부터)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기(최대 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "botIds",
+            "required": false,
+            "in": "query",
+            "description": "봇 id (쉼표로 여러 개)",
+            "schema": {
+              "example": "1,2",
+              "type": "string"
+            }
+          },
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "이벤트 종류 (쉼표로 여러 개)",
+            "schema": {
+              "example": "daily_stop,feed_stale",
+              "type": "string",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "daily_stop",
+                  "total_stop",
+                  "streak_pause",
+                  "rate_cap",
+                  "kill_switch",
+                  "batch_fail",
+                  "feed_stale",
+                  "record_fail",
+                  "order_rejected",
+                  "funds_waiting",
+                  "bot_error"
+                ]
+              }
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskEventPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/risk-events",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/risk-events",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "리스크·장애 이벤트와 알림 여부 (POL-RISK-12). 최신순",
+        "tags": [
+          "risk-events"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "API",
+    "description": "",
+    "version": "1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "CommandBudgetDto": {
+        "type": "object",
+        "properties": {
+          "budgetType": {
+            "description": "정률(ratio)·정액(fixed)",
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "orderSizeType": {
+            "description": "1회 주문 금액 방식. 지금 버전과 다르면 engine이 거부해요",
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "budgetRatio": {
+            "type": "number",
+            "description": "정률이면 운용 자산 대비 비율 (0~1]",
+            "minimum": 0.0001,
+            "maximum": 1
+          },
+          "budgetAmount": {
+            "type": "number",
+            "description": "정액이면 금액(원)",
+            "minimum": 1
+          },
+          "orderSizeValue": {
+            "type": "number",
+            "description": "1회 주문 금액(정률이면 0~1, 정액이면 원)",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "budgetType"
+        ]
+      },
+      "CreateCommandDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "명령 종류",
+            "enum": [
+              "pause",
+              "resume",
+              "liquidate",
+              "kill",
+              "rebudget"
+            ],
+            "type": "string"
+          },
+          "botId": {
+            "type": "string",
+            "description": "대상 봇 id. kill이 아니면 필수"
+          },
+          "liquidateAll": {
+            "type": "boolean",
+            "description": "kill에서 보유 종목도 모두 시장가로 청산할지"
+          },
+          "budget": {
+            "description": "rebudget의 새 투자금 설정",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommandBudgetDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "CommandResponseDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "pause",
+              "resume",
+              "liquidate",
+              "kill",
+              "rebudget"
+            ],
+            "type": "string"
+          },
+          "result": {
+            "nullable": true,
+            "description": "처리 결과",
+            "enum": [
+              "ok",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "description": "명령 id"
+          },
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "대상 봇 id. kill은 null"
+          },
+          "liquidateAll": {
+            "type": "boolean",
+            "description": "kill에서 전량 청산을 골랐는지"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "넣은 시각"
+          },
+          "handledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "engine이 처리한 시각. 처리 전이면 null (킬 스위치는 1초 안)"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "실패 이유 (예: BOT_NOT_RESTING:holding)"
+          }
+        },
+        "required": [
+          "kind",
+          "result",
+          "id",
+          "botId",
+          "liquidateAll",
+          "requestedAt",
+          "handledAt",
+          "error"
+        ]
+      },
+      "MarketOpenDto": {
+        "type": "object",
+        "properties": {
+          "isTradingDay": {
+            "type": "boolean",
+            "description": "오늘 정규장이 열리는 날인지. engine이 오늘 일정을 아직 받지 않았으면 false"
+          },
+          "openAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "정규장 시작 시각"
+          },
+          "closeAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "정규장 끝 시각"
+          }
+        },
+        "required": [
+          "isTradingDay",
+          "openAt",
+          "closeAt"
+        ]
+      },
+      "EngineStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "description": "engine 상태. halted는 전체 정지(킬 스위치·토큰·기록 실패)",
+            "enum": [
+              "running",
+              "stopping",
+              "halted"
+            ],
+            "type": "string"
+          },
+          "haltReasons": {
+            "description": "전체 정지 사유 코드",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "heartbeatAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "engine 마지막 기록 시각. 30초 넘게 오래되면 \"엔진 응답 없음\"이에요"
+          },
+          "staleSymbols": {
+            "description": "시세가 끊긴 종목 (feed_stale)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketOpen": {
+            "description": "오늘 정규장",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarketOpenDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "haltReasons",
+          "heartbeatAt",
+          "staleSymbols",
+          "marketOpen"
+        ]
+      },
+      "RiskEventResponseDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "daily_stop",
+              "total_stop",
+              "streak_pause",
+              "rate_cap",
+              "kill_switch",
+              "batch_fail",
+              "feed_stale",
+              "record_fail",
+              "order_rejected",
+              "funds_waiting",
+              "bot_error"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "숫자·코드로 된 상세 (예: 손실 한도의 amount·dailyPnl). 화면 문구는 web이 kind로 만들어요"
+          },
+          "id": {
+            "type": "string"
+          },
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "봇 이벤트면 봇 id, 계좌·engine 전체 이벤트면 null"
+          },
+          "botName": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notifiedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "텔레그램으로 알린 시각. 아직이면 null (POL-RISK-12)"
+          }
+        },
+        "required": [
+          "kind",
+          "detail",
+          "id",
+          "botId",
+          "botName",
+          "occurredAt",
+          "notifiedAt"
+        ]
+      },
+      "PageMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "size": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "size",
+          "total"
+        ]
+      },
+      "RiskEventPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskEventResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "FieldErrorDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "요청 필드 이름"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "field",
+          "messages"
+        ]
+      },
+      "ProblemDetailsDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "늘 about:blank"
+          },
+          "title": {
+            "type": "string",
+            "description": "HTTP 상태 이름(예: Not Found)"
+          },
+          "status": {
+            "type": "number"
+          },
+          "detail": {
+            "type": "string",
+            "description": "사람이 읽는 설명"
+          },
+          "code": {
+            "type": "string",
+            "description": "에러 코드. 클라이언트는 이 값으로 분기해요(예: ORDER_ITEM_NOT_FOUND)."
+          },
+          "instance": {
+            "type": "string",
+            "description": "요청 경로"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "요청 ID(X-Request-Id). 로그를 찾을 때 써요."
+          },
+          "errors": {
+            "description": "검증 실패(VALIDATION_FAILED)일 때 필드별 메시지",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldErrorDto"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code",
+          "instance",
+          "requestId"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ]
+}

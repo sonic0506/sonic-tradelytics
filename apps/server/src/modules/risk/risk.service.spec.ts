@@ -16,6 +16,7 @@ describe('RiskService', () => {
     findLatest: vi.fn<RiskRepository['findLatest']>(),
     findUnnotified: vi.fn<RiskRepository['findUnnotified']>(),
     markNotified: vi.fn<RiskRepository['markNotified']>(),
+    findPage: vi.fn<RiskRepository['findPage']>(),
   };
   const locks = {
     findActive: vi.fn<SymbolLockRepository['findActive']>(),
@@ -172,6 +173,28 @@ describe('RiskService', () => {
       );
       expect(state.canEnter(1)).toBe(true);
       expect(state.canEnter(2)).toBe(false);
+    });
+  });
+
+  it('목록은 봇 id를 숫자로, 거래일 기간을 KST 하루 범위로 바꿔 찾아요', async () => {
+    events.findPage.mockResolvedValue([[], 0]);
+
+    await service.findPage({
+      botIds: ['7', '8'],
+      kinds: ['daily_stop'],
+      from: '2026-10-29',
+      to: '2026-10-30',
+      skip: 20,
+      size: 20,
+    });
+
+    expect(events.findPage).toHaveBeenCalledWith({
+      botIds: [7, 8],
+      kinds: ['daily_stop'],
+      from: new Date('2026-10-28T15:00:00Z'),
+      until: new Date('2026-10-30T15:00:00Z'),
+      skip: 20,
+      take: 20,
     });
   });
 });
