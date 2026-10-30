@@ -1,9 +1,6 @@
-import {
-  isStopTriggered,
-  paperCosts,
-  paperFillPrice,
-  tickSize,
-} from './paper.rule.js';
+import { tickSize } from '@/common/market/tick-size.js';
+
+import { isStopTriggered, paperCosts, paperFillPrice } from './paper.rule.js';
 
 describe('paper.rule', () => {
   const quote = { bestAsk: 70_100, bestBid: 70_000, lastPrice: 70_000 };

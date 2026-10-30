@@ -77,6 +77,21 @@ export class PositionRepository {
     });
   }
 
+  // since 이후 닫힌 봇 포지션의 청산 사유. 최근이 앞이에요 (POL-RISK-04)
+  async recentExitReasons(
+    botId: number,
+    since: Date,
+    take: number,
+  ): Promise<(string | null)[]> {
+    const closed = await this.positions.find({
+      select: { id: true, exitReason: true },
+      where: { botId, status: 'closed', closedAt: MoreThan(since) },
+      order: { closedAt: 'DESC' },
+      take,
+    });
+    return closed.map(({ exitReason }) => exitReason);
+  }
+
   findById(id: number): Promise<Position | null> {
     return this.positions.findOneBy({ id });
   }

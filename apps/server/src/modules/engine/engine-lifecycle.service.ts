@@ -5,6 +5,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 
+import { env } from '@/config/env.js';
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
@@ -17,12 +18,13 @@ import {
 import { NotificationService } from '@/modules/notification/index.js';
 import { OrderService } from '@/modules/order/index.js';
 
+import { BotRunnerService } from './bot-runner.service.js';
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineScheduleService } from './engine-schedule.service.js';
 import { StatusReporterService } from './status-reporter.service.js';
 
 // engine의 시작·종료 순서 (docs/architecture/engine.md 시작 순서·종료 순서).
-// 지금은 1~9번이 있어요. 10번(BotRunner)은 그 기능을 만들 때 더해요.
+// 10번 BotRunner는 M5 전까지 개발 점검(PaperBroker)에서만 켜요.
 @Injectable()
 export class EngineLifecycleService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -41,6 +43,7 @@ export class EngineLifecycleService
     private readonly statusReporter: StatusReporterService,
     private readonly schedule: EngineScheduleService,
     private readonly orders: OrderService,
+    private readonly botRunner: BotRunnerService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -70,6 +73,9 @@ export class EngineLifecycleService
     await this.commands.start();
     this.statusReporter.start();
     await this.schedule.start();
+    // 실제 돈으로 봇을 돌리는 건 M5(소액 실전)부터예요. 그 전에는 개발 점검(PaperBroker)에서만 봇이 주문해요
+    if (env.BROKER_MODE === 'paper') this.botRunner.start();
+    else this.logger.warn('실전 모드라 BotRunner를 켜지 않아요 (M5 전)');
     this.logger.log('engine 시작');
   }
 
@@ -78,6 +84,7 @@ export class EngineLifecycleService
     this.logger.log(`engine 종료 (${signal ?? '신호 없음'})`);
     // 신규 판단과 주문을 먼저 막아요 (종료 순서 1번)
     this.engineState.halt('stopping');
+    this.botRunner.stop();
     this.schedule.stop();
     this.commands.stop();
     this.accountSync.stop();

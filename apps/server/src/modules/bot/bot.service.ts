@@ -40,6 +40,12 @@ export class BotService {
     return this.bots.findById(id);
   }
 
+  // 실행 중·일시정지 봇과 지금 버전 (BotRunner가 주기마다 다시 읽어요). 일시정지 봇은 청산만 해요
+  async findTrading(): Promise<BotWithVersion[]> {
+    const running = await this.bots.findByStatuses(['running', 'paused']);
+    return this.findWithVersions(running.map(({ id }) => id));
+  }
+
   // 신규 진입을 하지 않는 봇들 (재시작 때 정지 상태 복원)
   findInactive(): Promise<Bot[]> {
     return this.bots.findByStatuses(['paused', 'waiting_funds', 'stopped']);

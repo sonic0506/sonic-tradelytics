@@ -46,6 +46,19 @@ export class MarketCalendarService {
     return today;
   }
 
+  // 오늘 정규장 시작·끝 시각. 휴장이거나 오늘 캘린더가 없으면 null
+  regularSession(): { openAt: Date; closeAt: Date } | null {
+    const today = this.today;
+    if (
+      today?.tradeDate !== kstDate() ||
+      !today.isOpen ||
+      today.regularOpenAt === null ||
+      today.regularCloseAt === null
+    )
+      return null;
+    return { openAt: today.regularOpenAt, closeAt: today.regularCloseAt };
+  }
+
   // 지금이 정규장 시간인지. 오늘 캘린더가 없으면 매매하지 않는 쪽(false)으로 봐요
   isRegularSession(at: Date = new Date()): boolean {
     const today = this.today;

@@ -3,6 +3,7 @@ import {
   canBuy,
   canRebudget,
   cashShare,
+  entryAmount,
   isRatioSumValid,
   planAllocation,
   releaseAmount,
@@ -355,5 +356,27 @@ describe('자금 배분 규칙', () => {
     expect(planAllocation(333_333, [ratio(1, 0.3333)]).outcomes).toEqual([
       allocated(1, 111_099),
     ]);
+  });
+
+  describe('진입 1회 금액', () => {
+    it('1회 주문 금액과 남은 한도 중 작은 쪽에서 수수료 예비(0.1%)를 빼요', () => {
+      const bot = funds({ amount: 100_000, holdingsCost: 30_000 });
+
+      expect(entryAmount(bot, 20_000)).toBe(19_980);
+      expect(entryAmount(bot, 90_000)).toBe(69_930);
+    });
+
+    it('미체결 매수까지 한도를 다 쓰면 0이에요', () => {
+      expect(
+        entryAmount(
+          funds({
+            amount: 100_000,
+            holdingsCost: 60_000,
+            openBuyAmount: 50_000,
+          }),
+          20_000,
+        ),
+      ).toBe(0);
+    });
   });
 });

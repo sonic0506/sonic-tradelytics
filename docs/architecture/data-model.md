@@ -291,7 +291,7 @@ erDiagram
 | low_price | bigint | | 보유 중 최저가 |
 | opened_at | timestamptz | not null | |
 | closed_at | timestamptz | | |
-| exit_reason | text | CHECK `take_profit` `stop_loss` `time_exit` `market_close` `reeval` `manual` `kill_switch` `not_filled` | F2 청산 사유. `not_filled`는 한 주도 체결되지 않고 끝난 포지션 (F2에서 "취소") |
+| exit_reason | text | CHECK `take_profit` `stop_loss` `time_exit` `market_close` `rule_exit` `loss_limit` `reeval` `manual` `kill_switch` `not_filled` | F2 청산 사유. `not_filled`는 한 주도 체결되지 않고 끝난 포지션 (F2에서 "취소"). `rule_exit`는 익절·손절이 아닌 규칙 청산(예: 데이 트레이딩 VWAP 이탈), `loss_limit`는 손실 한도 도달 청산 (POL-RISK-02, 03) |
 | created_at, updated_at | timestamptz | not null | |
 
 - CHECK: `(status = 'closed') = (closed_at is not null)`, `status = 'open' or quantity = 0`

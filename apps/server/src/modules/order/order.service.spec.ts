@@ -37,6 +37,7 @@ describe('OrderService', () => {
     hasOpenOrders: vi.fn<OrderRepository['hasOpenOrders']>(),
     findOpenBotOrders: vi.fn<OrderRepository['findOpenBotOrders']>(),
     findFilledSells: vi.fn<OrderRepository['findFilledSells']>(),
+    countBotOrdersSince: vi.fn<OrderRepository['countBotOrdersSince']>(),
   };
   const decisions = {
     record: vi.fn<DecisionService['record']>(),
@@ -62,6 +63,7 @@ describe('OrderService', () => {
     acquireLock: vi.fn<RiskService['acquireLock']>(),
     releaseLock: vi.fn<RiskService['releaseLock']>(),
     record: vi.fn<RiskService['record']>(),
+    stopBot: vi.fn<RiskService['stopBot']>(),
   };
   let state: EngineStateService;
   const positions = {
@@ -422,6 +424,32 @@ describe('OrderService', () => {
         quantity: 3,
       });
     const enter = () => runInCls(moduleRef, () => service.enter(request));
+
+    it('봇 분당 주문 수가 상한(6)이면 주문하지 않고 봇을 rate_cap으로 멈춰요', async () => {
+      orders.countBotOrdersSince.mockImplementation((_, botId) =>
+        Promise.resolve(botId === undefined ? 10 : 6),
+      );
+
+      await expect(enter()).resolves.toEqual({ status: 'blocked' });
+
+      expect(risk.stopBot).toHaveBeenCalledWith(7, 'rate_cap', {
+        verdict: 'bot_rate',
+        botOrdersLastMinute: 6,
+        accountOrdersToday: 10,
+      });
+      expect(risk.acquireLock).not.toHaveBeenCalled();
+    });
+
+    it('계좌 하루 주문 수가 상한(300)이어도 멈춰요', async () => {
+      orders.countBotOrdersSince.mockImplementation((_, botId) =>
+        Promise.resolve(botId === undefined ? 300 : 0),
+      );
+
+      await expect(enter()).resolves.toEqual({ status: 'blocked' });
+      expect(risk.stopBot.mock.lastCall?.[2]).toMatchObject({
+        verdict: 'account_daily',
+      });
+    });
 
     beforeEach(() => {
       risk.acquireLock.mockResolvedValue(true);
@@ -840,6 +868,41 @@ describe('OrderService', () => {
           price: null,
         }),
       );
+    });
+
+    it('분할 익절은 요청한 수량만 팔고, 보유보다 많으면 보유 수량까지만 팔아요', async () => {
+      positions.find.mockResolvedValue(position());
+      orders.findLiveProtective.mockResolvedValue(null);
+      decisions.record.mockResolvedValue('d-exit');
+      orders.create.mockResolvedValue(known({ id: 60, decisionId: 'd-exit' }));
+      broker.place.mockResolvedValue({
+        outcome: 'accepted',
+        brokerOrderId: 'o-sell',
+      });
+
+      await runInCls(moduleRef, () =>
+        service.exit({ ...exitRequest, quantity: 1 }),
+      );
+      await runInCls(moduleRef, () =>
+        service.exit({ ...exitRequest, quantity: 9 }),
+      );
+
+      expect(
+        orders.create.mock.calls.map(([fields]) => fields.quantity),
+      ).toEqual([1, 3]);
+    });
+
+    it('청산 판단 재료로 미체결 여부와 체결된 봇 매도(분할 익절) 수를 줘요', async () => {
+      orders.hasOpenOrders.mockResolvedValue(false);
+      orders.findFilledSells.mockResolvedValue([
+        known({ origin: 'bot', side: 'SELL' }),
+        known({ origin: 'protective', side: 'SELL' }),
+      ]);
+
+      await expect(service.exitState(2)).resolves.toEqual({
+        hasOpenOrders: false,
+        takenSteps: 1,
+      });
     });
 
     it('손절이 이미 발동됐으면 팔지 않고 손절 청산으로 기록해요', async () => {

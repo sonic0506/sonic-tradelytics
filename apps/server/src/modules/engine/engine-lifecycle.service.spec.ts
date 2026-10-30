@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 
+import { env } from '@/config/env.js';
 import { EngineLock } from '@/infra/database/engine-lock.js';
 import { TossClient } from '@/infra/toss/toss.client.js';
 import { AccountSyncService } from '@/modules/account/index.js';
@@ -12,6 +13,7 @@ import {
 import { NotificationService } from '@/modules/notification/index.js';
 import { OrderService } from '@/modules/order/index.js';
 
+import { BotRunnerService } from './bot-runner.service.js';
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
 import { EngineScheduleService } from './engine-schedule.service.js';
@@ -61,6 +63,10 @@ describe('EngineLifecycleService', () => {
     startBroker: vi.fn<OrderService['startBroker']>(),
     stopBroker: vi.fn<OrderService['stopBroker']>(),
   };
+  const botRunner = {
+    start: vi.fn<BotRunnerService['start']>(),
+    stop: vi.fn<BotRunnerService['stop']>(),
+  };
   let engineState: EngineStateService;
   let service: EngineLifecycleService;
 
@@ -79,6 +85,7 @@ describe('EngineLifecycleService', () => {
         { provide: StatusReporterService, useValue: statusReporter },
         { provide: EngineScheduleService, useValue: schedule },
         { provide: OrderService, useValue: orders },
+        { provide: BotRunnerService, useValue: botRunner },
         EngineStateService,
       ],
     }).compile();
@@ -94,6 +101,31 @@ describe('EngineLifecycleService', () => {
     );
     expect(toss.ensureToken).not.toHaveBeenCalled();
     expect(marketCollector.start).not.toHaveBeenCalled();
+  });
+
+  describe('BotRunner (시작 순서 10번)', () => {
+    afterEach(() => {
+      env.BROKER_MODE = 'toss';
+    });
+
+    it('실전 모드에서는 M5 전이라 봇을 돌리지 않아요', async () => {
+      lock.acquire.mockResolvedValue(true);
+
+      await service.onApplicationBootstrap();
+
+      expect(botRunner.start).not.toHaveBeenCalled();
+    });
+
+    it('개발 점검 모드에서는 배치 일정 뒤에 봇을 돌리고, 종료할 때 가장 먼저 멈춰요', async () => {
+      env.BROKER_MODE = 'paper';
+      lock.acquire.mockResolvedValue(true);
+
+      await service.onApplicationBootstrap();
+      await service.onApplicationShutdown('SIGTERM');
+
+      expect(botRunner.start).toHaveBeenCalledAfter(schedule.start);
+      expect(botRunner.stop).toHaveBeenCalledBefore(schedule.stop);
+    });
   });
 
   it('잠금을 얻은 뒤에 토큰을 준비하고, 웹소켓을 연 다음 주문을 재동기화해요', async () => {

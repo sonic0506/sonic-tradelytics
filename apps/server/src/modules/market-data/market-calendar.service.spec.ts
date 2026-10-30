@@ -155,4 +155,24 @@ describe('MarketCalendarService', () => {
     });
     expect(service.isRegularSession()).toBe(false);
   });
+
+  it('오늘 정규장 시작·끝 시각을 주고, 휴장이거나 캘린더가 없으면 null이에요', async () => {
+    expect(service.regularSession()).toBeNull();
+
+    calendars.findByDate.mockResolvedValue(openToday);
+    await service.ensureToday();
+    expect(service.regularSession()).toEqual({
+      openAt: openToday.regularOpenAt,
+      closeAt: openToday.regularCloseAt,
+    });
+
+    calendars.findByDate.mockResolvedValue({
+      ...openToday,
+      isOpen: false,
+      regularOpenAt: null,
+      regularCloseAt: null,
+    });
+    await service.ensureToday();
+    expect(service.regularSession()).toBeNull();
+  });
 });

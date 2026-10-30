@@ -13,6 +13,7 @@ import { AllocationRepository } from './allocation.repository.js';
 import {
   canRebudget,
   cashShare,
+  entryAmount,
   isRatioSumValid,
   planAllocation,
   releaseAmount,
@@ -94,6 +95,32 @@ export class FundService {
     const amount = releaseAmount(funds);
     await this.allocations.release(allocation.id, amount, new Date());
     return amount;
+  }
+
+  // 지금 확정 투자금과 확정 시각 (손실 한도 기준, POL-RISK-01). 없으면 null
+  async activeAllocation(
+    botId: number,
+  ): Promise<{ amount: number; since: Date } | null> {
+    const allocation = await this.allocations.findActiveByBot(botId);
+    return allocation
+      ? { amount: allocation.amount, since: allocation.createdAt }
+      : null;
+  }
+
+  // 진입 1회에 쓸 금액 (POL-FUND-05, 16). 확정 투자금이 없으면 0이에요
+  async entryBudget(
+    botId: number,
+    orderSize: { type: 'ratio' | 'fixed'; value: number },
+  ): Promise<number> {
+    const allocation = await this.allocations.findActiveByBot(botId);
+    if (!allocation) return 0;
+    const funds = (await this.fundsOf([allocation])).get(botId);
+    if (!funds) return 0;
+    const size =
+      orderSize.type === 'ratio'
+        ? Math.floor(funds.amount * orderSize.value)
+        : orderSize.value;
+    return entryAmount(funds, size);
   }
 
   // POL-FUND-12: 쉬는 중이면 지금 투자금을 반환하고 새 설정으로 다시 확정해요. 모자라면 기존 투자금을 그대로 둬요

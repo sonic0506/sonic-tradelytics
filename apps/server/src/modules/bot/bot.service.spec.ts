@@ -73,4 +73,17 @@ describe('BotService', () => {
     expect(bots.stopAll).toHaveBeenCalledWith('kill_switch');
     expect(bots.findById).toHaveBeenCalledWith(7);
   });
+
+  it('실행 중·일시정지 봇을 지금 버전과 함께 읽어요', async () => {
+    const running = Object.assign({ id: 7 }) as Bot;
+    bots.findByStatuses.mockResolvedValue([running]);
+    bots.findByIds.mockResolvedValue([running]);
+    bots.findAppliedVersions.mockResolvedValue([]);
+
+    await expect(service.findTrading()).resolves.toEqual([
+      { bot: running, version: null },
+    ]);
+    expect(bots.findByStatuses).toHaveBeenCalledWith(['running', 'paused']);
+    expect(bots.findByIds).toHaveBeenCalledWith([7]);
+  });
 });

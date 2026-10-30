@@ -38,3 +38,21 @@ export const VERSION_CHANGE_KINDS = [
   'risk_only',
 ] as const;
 export type VersionChangeKind = (typeof VERSION_CHANGE_KINDS)[number];
+
+// 분할 익절 1·2단계(%)
+const FIRST_TAKE_PROFIT_PCT = 2;
+const SECOND_TAKE_PROFIT_PCT = 4;
+
+// 데이 트레이딩 기본 규칙 값 (중립 성향, 2026-10-30 확정). F1 3단계에서 숫자만 바꿔요
+export const DAY_TRADING_DEFAULTS = {
+  maxRank: 30,
+  minPrice: 1_000,
+  maxPrice: 200_000,
+  minRisePct: 2,
+  maxRisePct: 10,
+  vwapBandPct: 1,
+  takeProfitPcts: [FIRST_TAKE_PROFIT_PCT, SECOND_TAKE_PROFIT_PCT],
+  vwapExitPct: 0.5,
+  stopLossPct: 2,
+  exitAt: '15:15:00',
+};

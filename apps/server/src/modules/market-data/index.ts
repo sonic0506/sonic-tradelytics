@@ -6,3 +6,8 @@ export { MarketCalendarService } from './market-calendar.service.js';
 export { MarketCollectorService } from './market-collector.service.js';
 export { MarketDataModule } from './market-data.module.js';
 export type { MarketSnapshot, OrderbookLevel } from './market-data.types.js';
+export {
+  MarketScanService,
+  type RankedSymbol,
+  type StockStatus,
+} from './market-scan.service.js';

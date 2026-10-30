@@ -11,8 +11,9 @@ import {
   OrderModule,
   OrderService,
 } from '@/modules/order/index.js';
-import { Position } from '@/modules/position/index.js';
+import { Position, PositionService } from '@/modules/position/index.js';
 import { SymbolLock } from '@/modules/risk/index.js';
+import { OrderRepository } from '@/modules/order/order.repository.js';
 
 import { FakeTossModule } from './setup/fake-toss.js';
 import { createTestApp, resetDatabase } from './setup/test-app.js';
@@ -190,5 +191,32 @@ describe('진입 주문 (e2e)', () => {
         errorPct: -1.429,
       }),
     ]);
+  });
+
+  it('주문 횟수 상한은 봇별·계좌 전체 봇 주문을 세고, 연속 손절은 닫힌 포지션의 최근 청산 사유를 봐요', async () => {
+    const counts = app.get(OrderRepository);
+    const [first, second] = bots;
+    const since = new Date(Date.now() - 60_000);
+
+    await expect(counts.countBotOrdersSince(since, first?.botId)).resolves.toBe(
+      2,
+    );
+    await expect(
+      counts.countBotOrdersSince(since, second?.botId),
+    ).resolves.toBe(0);
+    await expect(counts.countBotOrdersSince(since)).resolves.toBe(2);
+
+    // 새 청산 사유(rule_exit)도 CHECK를 통과해요
+    const buy = await dataSource
+      .getRepository(BrokerOrder)
+      .findOneByOrFail({ symbol: '005930', side: 'BUY' });
+    await dataSource
+      .getRepository(Position)
+      .update({ id: buy.positionId }, { exitReason: 'rule_exit' });
+    await expect(
+      app
+        .get(PositionService)
+        .recentExitReasons(first?.botId ?? 0, new Date(0), 3),
+    ).resolves.toEqual(['rule_exit']);
   });
 });

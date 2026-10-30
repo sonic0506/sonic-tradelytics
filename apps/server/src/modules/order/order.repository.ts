@@ -6,6 +6,7 @@ import {
   IsNull,
   LessThanOrEqual,
   MoreThan,
+  MoreThanOrEqual,
   Not,
   type Repository,
 } from 'typeorm';
@@ -116,6 +117,18 @@ export class OrderRepository {
     return this.orders.find({
       where: { positionId, side: 'SELL', filledQuantity: MoreThan(0) },
       take: OrderRepository.MAX_OPEN_ORDERS,
+    });
+  }
+
+  // POL-RISK-08: since 이후 봇이 낸 주문 수. botId가 없으면 계좌 전체
+  countBotOrdersSince(since: Date, botId?: number): Promise<number> {
+    return this.orders.count({
+      relations: { position: true },
+      where: {
+        origin: 'bot',
+        createdAt: MoreThanOrEqual(since),
+        ...(botId === undefined ? {} : { position: { botId } }),
+      },
     });
   }
 

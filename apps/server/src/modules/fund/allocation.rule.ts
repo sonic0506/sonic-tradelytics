@@ -1,4 +1,8 @@
-import { RATIO_SCALE, VERIFICATION_CAP } from './fund.constants.js';
+import {
+  FEE_RESERVE_RATE,
+  RATIO_SCALE,
+  VERIFICATION_CAP,
+} from './fund.constants.js';
 import type {
   AllocationOutcome,
   AllocationPlan,
@@ -102,6 +106,15 @@ export function canBuy(
   return (
     funds.holdingsCost + funds.openBuyAmount + orderAmount + estimatedFee <=
     funds.amount
+  );
+}
+
+// POL-FUND-05, 16: 진입 1회에 쓸 금액. 1회 주문 금액과 남은 한도 중 작은 쪽에서 수수료 예비를 빼요
+export function entryAmount(funds: BotFunds, orderSize: number): number {
+  const room = funds.amount - funds.holdingsCost - funds.openBuyAmount;
+  return Math.max(
+    Math.floor(Math.min(orderSize, room) / (1 + FEE_RESERVE_RATE)),
+    0,
   );
 }
 

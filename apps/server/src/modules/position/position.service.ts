@@ -73,6 +73,14 @@ export class PositionService {
     return this.positions.findHeldByBot(botId);
   }
 
+  recentExitReasons(
+    botId: number,
+    since: Date,
+    take: number,
+  ): Promise<(string | null)[]> {
+    return this.positions.recentExitReasons(botId, since, take);
+  }
+
   find(positionId: number): Promise<Position | null> {
     return this.positions.findById(positionId);
   }

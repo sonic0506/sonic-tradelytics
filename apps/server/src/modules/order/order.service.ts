@@ -3,12 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 
-import { kstDate } from '@/common/time/kst-date.js';
+import { kstAt, kstDate } from '@/common/time/kst-date.js';
 import { env } from '@/config/env.js';
 import { DecisionService, scorePrediction } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
 import { type ExitReason, PositionService } from '@/modules/position/index.js';
-import { RiskService } from '@/modules/risk/index.js';
+import { checkOrderRate, RiskService } from '@/modules/risk/index.js';
 
 import type { BrokerOrder } from './entities/broker-order.entity.js';
 import type { ProtectiveOrder } from './entities/protective-order.entity.js';
@@ -23,6 +23,7 @@ import { TossBrokerService } from './toss-broker.service.js';
 
 // 토스의 clientOrderId 중복 방지는 10분만 유효해요 (POL-RISK-07). 재전송은 여유를 두고 8분 안에서만 해요
 const RESEND_WINDOW_MS = 480_000;
+const MINUTE_MS = 60_000;
 
 type DecisionRecord = Parameters<DecisionService['record']>[0];
 
@@ -57,6 +58,8 @@ export interface ExitRequest {
   price: number | null;
   // 판단 기록의 기준 가격(지금가)
   markPrice: number;
+  // 팔 수량. 없으면 보유 수량 전부 (분할 익절은 일부만 팔아요)
+  quantity?: number;
   rationale: Pick<DecisionRecord, 'passed' | 'failed' | 'score'>;
 }
 
@@ -134,6 +137,7 @@ export class OrderService {
   // 진입: 종목 잠금 → 포지션·판단·주문(requested)을 한 트랜잭션으로 저장 → 정지 여부를 마지막으로 보고 주문 (ADR-0003, NFR-02)
   async enter(request: EntryRequest): Promise<EntryResult> {
     if (!this.canEnter(request.botId)) return { status: 'blocked' };
+    if (await this.isRateCapped(request.botId)) return { status: 'blocked' };
     const base = {
       botVersionId: request.botVersionId,
       symbol: request.symbol,
@@ -562,7 +566,7 @@ export class OrderService {
     const order = await this.saveExit(
       request,
       position.symbol,
-      position.quantity,
+      Math.min(request.quantity ?? position.quantity, position.quantity),
     );
     const result = await this.send(order, botId);
     if (result.status === 'rejected') {
@@ -575,6 +579,37 @@ export class OrderService {
       await this.protect(position.id);
     }
     return result;
+  }
+
+  // BotRunner 청산 판단 재료: 미체결 주문이 있는지(있으면 이번 주기는 기다려요), 체결된 봇 매도(= 이미 한 분할 익절) 수
+  async exitState(
+    positionId: number,
+  ): Promise<{ hasOpenOrders: boolean; takenSteps: number }> {
+    const [hasOpenOrders, sells] = await Promise.all([
+      this.orders.hasOpenOrders(positionId),
+      this.orders.findFilledSells(positionId),
+    ]);
+    return {
+      hasOpenOrders,
+      takenSteps: sells.filter(({ origin }) => origin === 'bot').length,
+    };
+  }
+
+  // POL-RISK-08: 봇 분당·계좌 하루 주문 수가 상한이면 주문하지 않고 봇을 멈춰요. 진입에만 걸어요(청산은 막지 않아요)
+  private async isRateCapped(botId: number): Promise<boolean> {
+    const now = Date.now();
+    const [botOrdersLastMinute, accountOrdersToday] = await Promise.all([
+      this.orders.countBotOrdersSince(new Date(now - MINUTE_MS), botId),
+      this.orders.countBotOrdersSince(kstAt(kstDate(), '00:00')),
+    ]);
+    const verdict = checkOrderRate({ botOrdersLastMinute, accountOrdersToday });
+    if (verdict === 'ok') return false;
+    await this.risk.stopBot(botId, 'rate_cap', {
+      verdict,
+      botOrdersLastMinute,
+      accountOrdersToday,
+    });
+    return true;
   }
 
   // 취소를 확인하면 canceled, 이미 발동됐으면 triggered, 확인하지 못하면 unknown

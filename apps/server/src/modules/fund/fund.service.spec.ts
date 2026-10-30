@@ -380,4 +380,30 @@ describe('FundService', () => {
       ).resolves.toEqual({ ok: false, error: 'BOT_NOT_FOUND' });
     });
   });
+
+  describe('진입 1회 금액', () => {
+    it('정률이면 확정 투자금 × 비율에서 보유·미체결을 뺀 한도 안으로 줄여요', async () => {
+      allocations.findActiveByBot.mockResolvedValue(allocation(7, 100_000));
+      positions.botHoldings.mockResolvedValue(
+        holdings([
+          [7, { holdingsCost: 85_000, realizedPnl: 0, hasHoldings: true }],
+        ]),
+      );
+
+      await expect(
+        service.entryBudget(7, { type: 'ratio', value: 0.2 }),
+      ).resolves.toBe(14_985);
+      await expect(
+        service.entryBudget(7, { type: 'fixed', value: 10_000 }),
+      ).resolves.toBe(9_990);
+    });
+
+    it('확정 투자금이 없으면 0이에요', async () => {
+      allocations.findActiveByBot.mockResolvedValue(null);
+
+      await expect(
+        service.entryBudget(7, { type: 'fixed', value: 10_000 }),
+      ).resolves.toBe(0);
+    });
+  });
 });
