@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mockApiUrl } from '@/shared/api';
 import { renderWithQuery, server } from '@/shared/testing';
 
-import { BotListContent } from './bot-list-content';
+import { BotListContent, BotListContentSkeleton } from './bot-list-content';
 
 // 테스트에는 Next App Router가 없어서 메뉴의 페이지 이동(useRouter)만 바꿔 끼워요(외부 모듈).
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -19,6 +19,18 @@ async function tableRowNames() {
     .slice(1)
     .map((row) => within(row).getAllByRole('link')[0]?.textContent);
 }
+
+describe('BotListContentSkeleton', () => {
+  it('목록을 불러오는 동안에도 필터를 보여 줘요', () => {
+    renderWithQuery(<BotListContentSkeleton />);
+    expect(
+      screen.getByRole('textbox', { name: '봇 이름' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '조회하기' }),
+    ).toBeInTheDocument();
+  });
+});
 
 describe('BotListContent', () => {
   it('기본은 오늘 손익이 큰 봇부터 보여 줘요', async () => {

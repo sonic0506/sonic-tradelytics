@@ -2,11 +2,10 @@ import { Suspense } from 'react';
 
 import { QueryBoundary } from '@/shared/ui';
 
-import { BotListContent } from './bot-list-content';
+import { BotListContent, BotListContentSkeleton } from './bot-list-content';
 import { BotListPrefetch } from './bot-list-prefetch';
 import { BotListSummary, BotListSummarySkeleton } from './bot-list-summary';
 import { BotListView } from './bot-list-view';
-import { BotResultsSkeleton } from './bot-results';
 
 export function BotListPage() {
   return (
@@ -14,7 +13,7 @@ export function BotListPage() {
       fallback={
         <BotListView
           summary={<BotListSummarySkeleton />}
-          content={<BotResultsSkeleton />}
+          content={<BotListContentSkeleton />}
         />
       }
     >
