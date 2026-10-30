@@ -218,5 +218,22 @@ describe('진입 주문 (e2e)', () => {
         .get(PositionService)
         .recentExitReasons(first?.botId ?? 0, new Date(0), 3),
     ).resolves.toEqual(['rule_exit']);
+    // 재진입 대기: 최근에 닫은 종목
+    await expect(
+      app
+        .get(PositionService)
+        .findClosedSymbolsSince(
+          first?.botId ?? 0,
+          new Date(Date.now() - 60_000),
+        ),
+    ).resolves.toEqual(['005930']);
+    await expect(
+      app
+        .get(PositionService)
+        .findClosedSymbolsSince(
+          first?.botId ?? 0,
+          new Date(Date.now() + 60_000),
+        ),
+    ).resolves.toEqual([]);
   });
 });

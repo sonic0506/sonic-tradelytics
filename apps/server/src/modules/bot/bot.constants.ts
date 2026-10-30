@@ -55,4 +55,5 @@ export const DAY_TRADING_DEFAULTS = {
   vwapExitPct: 0.5,
   stopLossPct: 2,
   exitAt: '15:15:00',
+  reentryCooldownMinutes: 30,
 };

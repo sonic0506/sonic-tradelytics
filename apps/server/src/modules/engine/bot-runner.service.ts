@@ -50,6 +50,7 @@ const paramsSchema = z
     vwapExitPct: z.number().positive(),
     stopLossPct: z.number().positive(),
     exitAt: z.string().regex(/^\d{2}:\d{2}:\d{2}$/),
+    reentryCooldownMinutes: z.number().int().nonnegative(),
   })
   .partial();
 
@@ -69,6 +70,8 @@ const EXIT_REASON = {
   Extract<ExitSignal, { action: 'sell' }>['reason'],
   ExitReason
 >;
+
+const MINUTE_MS = 60_000;
 
 type SkipBase = Pick<
   Parameters<DecisionService['record']>[0],
@@ -303,9 +306,14 @@ export class BotRunnerService {
     // 확정 투자금이 없어요. 자금 대기는 배분(FundService)이 알려요
     if (budget === 0) return;
 
+    // 보유 중인 종목과 재진입 대기 중(최근 청산)인 종목은 사지 않아요
+    const cooling = await this.positions.findClosedSymbolsSince(
+      bot.id,
+      new Date(now.getTime() - params.reentryCooldownMinutes * MINUTE_MS),
+    );
     const candidate = await this.findCandidate(
       params,
-      new Set(held.map(({ symbol }) => symbol)),
+      new Set([...held.map(({ symbol }) => symbol), ...cooling]),
     );
     if (!candidate) return;
     const { symbol, price, evaluation } = candidate;
@@ -340,15 +348,16 @@ export class BotRunnerService {
     });
   }
 
-  // 거래대금 순위대로 보면서 진입 조건을 모두 충족한 첫 종목. 보유 중인 종목과 순위 밖은 보지 않아요
+  // 거래대금 순위대로 보면서 진입 조건을 모두 충족한 첫 종목. 제외 종목과 순위 밖은 보지 않아요
   private findCandidate(
     params: DayTradingParams,
-    held: Set<string>,
+    excluded: Set<string>,
   ): Promise<Candidate | undefined> {
     return this.ranked.reduce<Promise<Candidate | undefined>>(
       (previous, { symbol, rank }) =>
         previous.then(async (found) => {
-          if (found || held.has(symbol) || rank > params.maxRank) return found;
+          if (found || excluded.has(symbol) || rank > params.maxRank)
+            return found;
           const snapshot = this.collector.snapshot(symbol);
           if (snapshot?.price === undefined) return undefined;
           const stats = await this.scanner.intradayStats(symbol);

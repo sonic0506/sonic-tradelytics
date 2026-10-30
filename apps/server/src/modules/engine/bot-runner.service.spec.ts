@@ -38,6 +38,7 @@ describe('BotRunnerService', () => {
     findHeldByBot: vi.fn<PositionService['findHeldByBot']>(),
     botHoldings: vi.fn<PositionService['botHoldings']>(),
     recentExitReasons: vi.fn<PositionService['recentExitReasons']>(),
+    findClosedSymbolsSince: vi.fn<PositionService['findClosedSymbolsSince']>(),
   };
   const fund = {
     entryBudget: vi.fn<FundService['entryBudget']>(),
@@ -113,6 +114,7 @@ describe('BotRunnerService', () => {
     });
     scanner.stockStatus.mockResolvedValue(clean);
     positions.findHeldByBot.mockResolvedValue([]);
+    positions.findClosedSymbolsSince.mockResolvedValue([]);
     fund.entryBudget.mockResolvedValue(49_950);
     fund.activeAllocation.mockResolvedValue(null);
     orders.exitState.mockResolvedValue({ hasOpenOrders: false, takenSteps: 0 });
@@ -186,6 +188,18 @@ describe('BotRunnerService', () => {
     ]);
     await runner.cycle(new Date(now.getTime() + 10_000));
     expect(scanner.intradayStats).toHaveBeenCalledOnce();
+  });
+
+  it('최근 30분 안에 청산한 종목은 다시 사지 않아요', async () => {
+    positions.findClosedSymbolsSince.mockResolvedValue(['005930']);
+
+    await runner.cycle(now);
+
+    expect(positions.findClosedSymbolsSince).toHaveBeenCalledWith(
+      7,
+      new Date('2026-10-30T00:30:00Z'),
+    );
+    expect(orders.enter).not.toHaveBeenCalled();
   });
 
   it('확정 투자금이 없으면 후보를 보지 않아요', async () => {

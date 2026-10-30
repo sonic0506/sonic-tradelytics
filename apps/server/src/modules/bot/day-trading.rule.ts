@@ -26,6 +26,8 @@ export interface DayTradingParams {
   stopLossPct: number;
   // 이 시각(KST HH:mm:ss)부터 전량 청산하고 신규 진입하지 않아요
   exitAt: string;
+  // 청산한 종목은 이 시간(분) 동안 다시 사지 않아요 (같은 종목 반복 진입 방지)
+  reentryCooldownMinutes: number;
 }
 
 // 종목 하나의 판단 재료

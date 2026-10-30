@@ -77,6 +77,16 @@ export class PositionRepository {
     });
   }
 
+  // since 이후 닫힌 봇 포지션의 종목 (재진입 대기)
+  async findClosedSymbolsSince(botId: number, since: Date): Promise<string[]> {
+    const closed = await this.positions.find({
+      select: { id: true, symbol: true },
+      where: { botId, status: 'closed', closedAt: MoreThan(since) },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+    return [...new Set(closed.map(({ symbol }) => symbol))];
+  }
+
   // since 이후 닫힌 봇 포지션의 청산 사유. 최근이 앞이에요 (POL-RISK-04)
   async recentExitReasons(
     botId: number,
