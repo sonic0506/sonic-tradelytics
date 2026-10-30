@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'msw';
 
+import { accuracyHandlers } from '@/entities/accuracy';
 import { allocationHandlers } from '@/entities/allocation';
 import {
   botDefaultsHandlers,
@@ -21,6 +22,7 @@ import { killSwitchHandlers } from '@/features/engine/kill-switch';
 // shared는 entities를 모르기 때문에 여기서 모아요.
 export const handlers: RequestHandler[] = [
   ...engineStatusHandlers,
+  ...accuracyHandlers,
   ...homeHandlers,
   ...botHandlers,
   ...botDetailHandlers,
