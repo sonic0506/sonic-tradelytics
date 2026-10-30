@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { mockApiUrl } from '@/shared/api';
 import { renderWithQuery, server } from '@/shared/testing';
 
-import { CompareContent } from './compare-content';
+import { CompareContent, CompareContentSkeleton } from './compare-content';
 
 async function rowNames() {
   const table = await screen.findByRole('table', { name: '봇 비교' });
@@ -62,6 +62,16 @@ describe('CompareContent', () => {
     renderWithQuery(<CompareContent />);
     expect(
       await screen.findByText('봇 비교를 불러오지 못했어요'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('CompareContentSkeleton', () => {
+  it('목록을 불러오는 동안에도 필터를 보여 줘요', () => {
+    renderWithQuery(<CompareContentSkeleton />);
+    expect(screen.getAllByLabelText('단계')).not.toHaveLength(0);
+    expect(
+      screen.getByRole('button', { name: '조회하기' }),
     ).toBeInTheDocument();
   });
 });

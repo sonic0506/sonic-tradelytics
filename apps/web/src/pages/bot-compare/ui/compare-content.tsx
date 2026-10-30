@@ -48,3 +48,15 @@ export function CompareContent() {
     </div>
   );
 }
+
+const ignore = () => undefined;
+
+// 주소를 읽기 전 첫 로딩: 필터는 그대로 보여 주고 표 자리만 Skeleton이에요
+export function CompareContentSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <CompareFilter applied={EMPTY_COMPARE_FILTERS} onApply={ignore} />
+      <CompareTableSkeleton />
+    </div>
+  );
+}

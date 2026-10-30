@@ -1,8 +1,7 @@
 import { Text } from '@xonic0506/sonic-ui';
 import { Suspense } from 'react';
 
-import { AccuracyContent } from './accuracy-content';
-import { AccuracyReportSkeleton } from './accuracy-report';
+import { AccuracyContent, AccuracyContentSkeleton } from './accuracy-content';
 
 // 정확도 분석 (F3, Figma Accuracy)
 export function AccuracyPage() {
@@ -16,7 +15,7 @@ export function AccuracyPage() {
           봇이 남긴 예측이 실제로 맞았는지 모아서 봐요. 청산한 거래만 채점해요.
         </Text>
       </header>
-      <Suspense fallback={<AccuracyReportSkeleton />}>
+      <Suspense fallback={<AccuracyContentSkeleton />}>
         <AccuracyContent />
       </Suspense>
     </div>

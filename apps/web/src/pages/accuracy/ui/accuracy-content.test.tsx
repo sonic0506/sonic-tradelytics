@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { mockApiUrl } from '@/shared/api';
 import { renderWithQuery, server } from '@/shared/testing';
 
-import { AccuracyContent } from './accuracy-content';
+import { AccuracyContent, AccuracyContentSkeleton } from './accuracy-content';
 
 describe('AccuracyContent', () => {
   it('봇별 정확도와 점수 구간별 승률, 재평가 비교를 보여 줘요', async () => {
@@ -78,6 +78,16 @@ describe('AccuracyContent', () => {
     renderWithQuery(<AccuracyContent />);
     expect(
       await screen.findByText('정확도 분석을 불러오지 못했어요'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('AccuracyContentSkeleton', () => {
+  it('목록을 불러오는 동안에도 필터를 보여 줘요', () => {
+    renderWithQuery(<AccuracyContentSkeleton />);
+    expect(screen.getAllByLabelText('시작일')).not.toHaveLength(0);
+    expect(
+      screen.getByRole('button', { name: '조회하기' }),
     ).toBeInTheDocument();
   });
 });

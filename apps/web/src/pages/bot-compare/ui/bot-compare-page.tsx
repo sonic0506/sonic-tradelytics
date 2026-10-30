@@ -1,8 +1,7 @@
 import { Text } from '@xonic0506/sonic-ui';
 import { Suspense } from 'react';
 
-import { CompareContent } from './compare-content';
-import { CompareTableSkeleton } from './compare-table';
+import { CompareContent, CompareContentSkeleton } from './compare-content';
 
 // 봇 비교 (F2, Figma Compare)
 export function BotComparePage() {
@@ -17,7 +16,7 @@ export function BotComparePage() {
           금액이에요.
         </Text>
       </header>
-      <Suspense fallback={<CompareTableSkeleton />}>
+      <Suspense fallback={<CompareContentSkeleton />}>
         <CompareContent />
       </Suspense>
     </div>

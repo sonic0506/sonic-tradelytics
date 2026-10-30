@@ -4,7 +4,7 @@ import type { GetAccuracyStatsParams } from '@/entities/accuracy';
 import { QueryBoundary } from '@/shared/ui';
 
 import { useAccuracySearchParams } from '../model/use-accuracy-search-params';
-import { AccuracyFilter } from './accuracy-filter';
+import { AccuracyFilter, EMPTY_ACCURACY_FILTERS } from './accuracy-filter';
 import { AccuracyReport, AccuracyReportSkeleton } from './accuracy-report';
 
 export function AccuracyContent() {
@@ -29,6 +29,18 @@ export function AccuracyContent() {
       >
         <AccuracyReport params={filters} />
       </QueryBoundary>
+    </div>
+  );
+}
+
+const ignore = () => undefined;
+
+// 주소를 읽기 전 첫 로딩: 필터는 그대로 보여 주고 분석 자리만 Skeleton이에요
+export function AccuracyContentSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <AccuracyFilter applied={EMPTY_ACCURACY_FILTERS} onApply={ignore} />
+      <AccuracyReportSkeleton />
     </div>
   );
 }

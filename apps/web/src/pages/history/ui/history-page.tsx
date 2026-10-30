@@ -1,9 +1,7 @@
 import { Text } from '@xonic0506/sonic-ui';
 import { Suspense } from 'react';
 
-import { HistoryContent } from './history-content';
-import { HistoryListSkeleton } from './history-list';
-import { HistorySummarySkeleton } from './history-summary';
+import { HistoryContent, HistoryContentSkeleton } from './history-content';
 
 // 투자 내역 (F2, Figma History)
 export function HistoryPage() {
@@ -18,14 +16,7 @@ export function HistoryPage() {
           뺀 금액이에요.
         </Text>
       </header>
-      <Suspense
-        fallback={
-          <div className="flex flex-col gap-6">
-            <HistorySummarySkeleton />
-            <HistoryListSkeleton />
-          </div>
-        }
-      >
+      <Suspense fallback={<HistoryContentSkeleton />}>
         <HistoryContent />
       </Suspense>
     </div>

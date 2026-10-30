@@ -1,8 +1,7 @@
 import { Text } from '@xonic0506/sonic-ui';
 import { Suspense } from 'react';
 
-import { OpsContent } from './ops-content';
-import { RiskEventListSkeleton } from './risk-event-list';
+import { OpsContent, OpsContentSkeleton } from './ops-content';
 
 // 운영 (Figma Ops)
 export function OpsPage() {
@@ -17,7 +16,7 @@ export function OpsPage() {
           텔레그램 알림을 보냈는지도 함께 봐요.
         </Text>
       </header>
-      <Suspense fallback={<RiskEventListSkeleton />}>
+      <Suspense fallback={<OpsContentSkeleton />}>
         <OpsContent />
       </Suspense>
     </div>

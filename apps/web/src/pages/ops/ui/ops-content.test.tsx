@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { mockApiUrl } from '@/shared/api';
 import { renderWithQuery, server } from '@/shared/testing';
 
-import { OpsContent } from './ops-content';
+import { OpsContent, OpsContentSkeleton } from './ops-content';
 
 describe('OpsContent', () => {
   it('리스크 이벤트와 알림 발송 여부를 보여 줘요', async () => {
@@ -55,6 +55,16 @@ describe('OpsContent', () => {
     renderWithQuery(<OpsContent />);
     expect(
       await screen.findByText('운영 기록을 불러오지 못했어요'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('OpsContentSkeleton', () => {
+  it('목록을 불러오는 동안에도 필터를 보여 줘요', () => {
+    renderWithQuery(<OpsContentSkeleton />);
+    expect(screen.getAllByLabelText('종류')).not.toHaveLength(0);
+    expect(
+      screen.getByRole('button', { name: '조회하기' }),
     ).toBeInTheDocument();
   });
 });

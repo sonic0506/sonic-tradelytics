@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { mockApiUrl } from '@/shared/api';
 import { renderWithQuery, server } from '@/shared/testing';
 
-import { HistoryContent } from './history-content';
+import { HistoryContent, HistoryContentSkeleton } from './history-content';
 
 describe('HistoryContent', () => {
   it('보유 중을 맨 위에 두고 그 밖의 거래를 이어서 보여 줘요', async () => {
@@ -72,6 +72,16 @@ describe('HistoryContent', () => {
     renderWithQuery(<HistoryContent />);
     expect(
       await screen.findByText('투자 내역을 불러오지 못했어요'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('HistoryContentSkeleton', () => {
+  it('목록을 불러오는 동안에도 필터를 보여 줘요', () => {
+    renderWithQuery(<HistoryContentSkeleton />);
+    expect(screen.getAllByLabelText('종목')).not.toHaveLength(0);
+    expect(
+      screen.getByRole('button', { name: '조회하기' }),
     ).toBeInTheDocument();
   });
 });

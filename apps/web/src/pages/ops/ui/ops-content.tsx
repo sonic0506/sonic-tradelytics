@@ -44,3 +44,15 @@ export function OpsContent() {
     </div>
   );
 }
+
+const ignore = () => undefined;
+
+// 주소를 읽기 전 첫 로딩: 필터는 그대로 보여 주고 기록 자리만 Skeleton이에요
+export function OpsContentSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <OpsFilter applied={EMPTY_OPS_FILTERS} onApply={ignore} />
+      <RiskEventListSkeleton />
+    </div>
+  );
+}
