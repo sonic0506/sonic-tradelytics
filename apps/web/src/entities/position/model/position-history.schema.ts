@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { botTypeSchema, listResponseSchema } from '@/shared/api';
 
 import { exitReasonSchema } from './position.schema';
+import {
+  decisionTimelineSchema,
+  entryDecisionSchema,
+  positionOutcomeSchema,
+  positionScoringSchema,
+} from './position-rationale.schema';
 
 // 화면 상태 (api.md 투자 내역): 보유 중 · 미체결 · 청산 완료 · 취소
 export const POSITION_STATUSES = [
@@ -97,7 +103,7 @@ export const positionSummarySchema = z.discriminatedUnion('kind', [
 ]);
 export type PositionSummary = z.infer<typeof positionSummarySchema>;
 
-// GET /v1/positions/:id 주문 목록 (FR-PERF-04). 근거 카드 값은 근거 화면에서 더해요
+// GET /v1/positions/:id 주문 목록 (FR-PERF-04)
 export const positionOrderSchema = z.object({
   id: z.string(),
   side: z.enum(['BUY', 'SELL']),
@@ -115,7 +121,17 @@ export const positionOrderSchema = z.object({
 });
 export type PositionOrder = z.infer<typeof positionOrderSchema>;
 
+// GET /v1/positions/:id: 펼친 거래의 주문과 근거 카드 (api.md, F3)
 export const positionDetailSchema = z.object({
   id: z.string(),
+  position: positionRowSchema,
+  // 판단에 쓴 규칙 값 버전. 직접 거래면 null
+  botVersion: z.number().int().nullable(),
   orders: z.array(positionOrderSchema),
+  // 직접 거래면 판단 기록이 없어요
+  entry: entryDecisionSchema.nullable(),
+  // 청산 전이면 결과와 채점이 비어 있어요
+  outcome: positionOutcomeSchema.nullable(),
+  scoring: positionScoringSchema.nullable(),
+  timeline: decisionTimelineSchema,
 });

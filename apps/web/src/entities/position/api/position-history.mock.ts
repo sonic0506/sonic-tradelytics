@@ -7,6 +7,12 @@ import type {
   PositionRow,
   PositionSummary,
 } from '../model/position-history.schema';
+import type {
+  DecisionTimeline,
+  EntryDecision,
+  PositionOutcome,
+  PositionScoring,
+} from '../model/position-rationale.schema';
 
 type Seed = [
   id: string,
@@ -409,6 +415,168 @@ function getOrders(row: PositionRow): PositionOrder[] {
   return [buy, stop, sell];
 }
 
+const roundTen = (value: number) => Math.round(value / 10) * 10;
+const addMinutes = (iso: string, minutes: number) =>
+  new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
+
+// 종가 베팅 판단 근거 (Figma Rationale / 정상 — 한화오션). 다른 거래도 같은 모양으로 만들어요
+function getEntry(row: PositionRow): EntryDecision {
+  const targetPrice = Math.round((row.entryPrice * 1.019) / 100) * 100;
+  const stopPrice = roundTen(row.entryPrice * 0.98);
+  return {
+    decidedAt: addMinutes(row.enteredAt, 0.07),
+    price: row.entryPrice,
+    score: 78,
+    conditions: [
+      {
+        label: '당일 상승률',
+        rule: '기준 5% 이상',
+        value: '6.2%',
+        passed: true,
+      },
+      {
+        label: '고가 대비 위치',
+        rule: '기준 2% 이내',
+        value: '0.8%',
+        passed: true,
+      },
+      {
+        label: '진입 시간',
+        rule: '기준 15:10–15:19',
+        value: '15:18',
+        passed: true,
+      },
+      {
+        label: '거래대금 순위',
+        rule: '기준 30위 이내',
+        value: '12위',
+        passed: true,
+      },
+      {
+        label: '거래대금 증가',
+        rule: '기준 1.5배 이상 · 가중치가 낮아 진입',
+        value: '1.4배',
+        passed: false,
+      },
+    ],
+    prediction: {
+      direction: 'up',
+      targetPrice,
+      targetRate:
+        Math.round(((targetPrice - row.entryPrice) / row.entryPrice) * 1_000) /
+        10,
+      stopPrice,
+      stopRate:
+        Math.round(((stopPrice - row.entryPrice) / row.entryPrice) * 1_000) /
+        10,
+      holdUntil: '다음 날 09:05까지',
+    },
+  };
+}
+
+function getOutcome(row: PositionRow, entry: EntryDecision) {
+  if (row.status !== 'closed' || !row.exitedAt || row.exitPrice === null) {
+    return { outcome: null, scoring: null };
+  }
+  const exitPrice = row.exitPrice;
+  const highPrice =
+    Math.round((Math.max(exitPrice, row.entryPrice) * 1.0016) / 50) * 50;
+  const outcome: PositionOutcome = {
+    exitPrice,
+    holdingMinutes: Math.round(
+      (new Date(row.exitedAt).getTime() - new Date(row.enteredAt).getTime()) /
+        60_000,
+    ),
+    highPrice,
+    highAt: addMinutes(row.exitedAt, -3),
+    lowPrice:
+      Math.round((Math.min(exitPrice, row.entryPrice) * 0.995) / 50) * 50,
+    lowAt: addMinutes(row.enteredAt, 7),
+  };
+  const { targetPrice } = entry.prediction;
+  const actualDirection =
+    exitPrice > row.entryPrice
+      ? 'up'
+      : exitPrice < row.entryPrice
+        ? 'down'
+        : 'flat';
+  const scoring: PositionScoring = {
+    directionHit: actualDirection === 'up',
+    actualDirection,
+    targetReachPct: Math.round(
+      Math.min(
+        100,
+        Math.max(
+          0,
+          ((highPrice - row.entryPrice) / (targetPrice - row.entryPrice)) * 100,
+        ),
+      ),
+    ),
+    errorPct:
+      Math.round(((exitPrice - targetPrice) / row.entryPrice) * 10_000) / 100,
+  };
+  return { outcome, scoring };
+}
+
+function getTimeline(row: PositionRow, entry: EntryDecision): DecisionTimeline {
+  const { targetPrice, stopPrice } = entry.prediction;
+  const won = (value: number) => `${value.toLocaleString('ko-KR')}원`;
+  const timeline: DecisionTimeline = [
+    {
+      at: row.enteredAt,
+      kind: 'enter',
+      title: '진입 판단',
+      detail: `점수 ${entry.score} · 목표가 ${won(targetPrice)} · 손절가 ${won(stopPrice)}`,
+    },
+  ];
+  if (row.status !== 'holding' && row.status !== 'closed') return timeline;
+  timeline.push({
+    at: addMinutes(row.enteredAt, 17),
+    kind: 'reeval',
+    title: '장 마감 재평가 · 유지',
+    detail: `점수 74 · 종가 ${won(roundTen(row.entryPrice * 1.0048))} · 목표가 ${won(targetPrice)} 유지`,
+  });
+  if (row.status !== 'closed' || !row.exitedAt || row.exitPrice === null)
+    return timeline;
+  timeline.push(
+    {
+      at: addMinutes(row.exitedAt, -10),
+      kind: 'reeval',
+      title: '장전 점검 · 유지',
+      detail: `예상 시초가 ${won(roundTen(row.entryPrice * 1.008))} · 갭 하락 아님 · 손절가 ${won(stopPrice)} 유지`,
+    },
+    {
+      at: row.exitedAt,
+      kind: 'exit',
+      title: '청산 판단 · 시간 청산',
+      detail: `다음 날 매도 시각에 ${won(row.exitPrice)}으로 청산`,
+    },
+  );
+  return timeline;
+}
+
+function getDetail(row: PositionRow) {
+  const base = { id: row.id, position: row, orders: getOrders(row) };
+  if (!row.botId) {
+    return {
+      ...base,
+      botVersion: null,
+      entry: null,
+      outcome: null,
+      scoring: null,
+      timeline: [],
+    };
+  }
+  const entry = getEntry(row);
+  return {
+    ...base,
+    botVersion: 1,
+    entry,
+    ...getOutcome(row, entry),
+    timeline: getTimeline(row, entry),
+  };
+}
+
 // 투자 내역 요청(page가 있는 요청)만 받아요. 나머지는 positionHandlers로 넘겨요
 export const positionHistoryHandlers = [
   http.get(mockApiUrl('/v1/positions'), ({ request }) => {
@@ -435,6 +603,6 @@ export const positionHistoryHandlers = [
     if (!row) {
       return HttpResponse.json({ code: 'POSITION_NOT_FOUND' }, { status: 404 });
     }
-    return HttpResponse.json({ id: row.id, orders: getOrders(row) });
+    return HttpResponse.json(getDetail(row));
   }),
 ];

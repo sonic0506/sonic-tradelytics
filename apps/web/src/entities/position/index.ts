@@ -26,3 +26,9 @@ export {
   type PositionRow,
   type PositionStatus,
 } from './model/position-history.schema';
+export type {
+  DecisionTimeline,
+  EntryDecision,
+  PositionOutcome,
+  PositionScoring,
+} from './model/position-rationale.schema';
