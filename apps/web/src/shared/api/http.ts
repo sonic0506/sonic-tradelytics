@@ -7,12 +7,32 @@ export const API_BASE_URL = `${ORIGIN}/api`;
 export class HttpError extends Error {
   readonly status: number;
   readonly path: string;
+  // 서버가 알려 준 실패 이유. 에러 몸체 { code }에서 읽어요(api.md 공통 규칙)
+  readonly code: string | null;
 
-  constructor(status: number, path: string) {
+  constructor(status: number, path: string, code: string | null = null) {
     super(`${status} ${path}`);
     this.status = status;
     this.path = path;
+    this.code = code;
   }
+}
+
+async function readErrorCode(response: Response) {
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'code' in body &&
+      typeof body.code === 'string'
+    ) {
+      return body.code;
+    }
+  } catch {
+    // 몸체가 JSON이 아니면 이유 없이 넘겨요.
+  }
+  return null;
 }
 
 export async function http<T>(path: string, init?: RequestInit): Promise<T> {
@@ -20,7 +40,9 @@ export async function http<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
-  if (!response.ok) throw new HttpError(response.status, path);
+  if (!response.ok) {
+    throw new HttpError(response.status, path, await readErrorCode(response));
+  }
   if (response.status === 204) return undefined as T; // 본문 없는 응답(DELETE 등): http<void>(…)
   return (await response.json()) as T;
 }
