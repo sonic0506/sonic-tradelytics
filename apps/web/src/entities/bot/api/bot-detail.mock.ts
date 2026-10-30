@@ -6,7 +6,113 @@ import type { BotListItem } from '../model/bot.schema';
 import type { BotDailyResult, BotDetail } from '../model/bot-detail.schema';
 import { BOTS_FIXTURE } from './bot.mock';
 
-type DetailExtra = Omit<BotDetail, keyof BotListItem>;
+type SettingsExtra = Pick<
+  BotDetail,
+  'pendingVersion' | 'notRestingReasons' | 'settings'
+>;
+type DetailExtra = Omit<BotDetail, keyof BotListItem | keyof SettingsExtra>;
+
+// 종가 베팅 규칙 값 칸 (Figma Bot Settings / 규칙 값 바꾸기)
+const FIELDS_CLOSING: BotDetail['ruleVersion']['fields'] = [
+  {
+    key: 'dayRise',
+    group: 'filter',
+    label: '당일 상승률 하한',
+    kind: 'number',
+    unit: '%',
+    value: 5,
+  },
+  {
+    key: 'highGap',
+    group: 'filter',
+    label: '고가 대비 위치',
+    kind: 'number',
+    unit: '%',
+    value: 2,
+  },
+  {
+    key: 'entryStart',
+    group: 'entry',
+    label: '진입 시작',
+    kind: 'time',
+    unit: null,
+    value: '15:10',
+  },
+  {
+    key: 'entryEnd',
+    group: 'entry',
+    label: '진입 끝',
+    kind: 'time',
+    unit: null,
+    value: '15:19',
+  },
+  {
+    key: 'sellAt',
+    group: 'exit',
+    label: '다음 날 매도 시각',
+    kind: 'time',
+    unit: null,
+    value: '09:05',
+  },
+  {
+    key: 'gapStop',
+    group: 'exit',
+    label: '갭 하락 손절',
+    kind: 'number',
+    unit: '%',
+    value: -2,
+  },
+  {
+    key: 'firstLossPct',
+    group: 'safety',
+    label: '1회 손실 한도',
+    kind: 'number',
+    unit: '%',
+    value: -3,
+  },
+  {
+    key: 'totalLossPct',
+    group: 'safety',
+    label: '누적 손실 한도',
+    kind: 'number',
+    unit: '%',
+    value: -10,
+  },
+  {
+    key: 'stopStreak',
+    group: 'safety',
+    label: '연속 손절 횟수',
+    kind: 'number',
+    unit: null,
+    value: 3,
+  },
+  {
+    key: 'orderAmount',
+    group: 'safety',
+    label: '1회 주문 금액',
+    kind: 'number',
+    unit: '원',
+    value: 100_000,
+  },
+];
+
+const SETTINGS_DEFAULT: SettingsExtra = {
+  pendingVersion: null,
+  notRestingReasons: [],
+  settings: {
+    periodEnd: '2026-12-31',
+    onPeriodEnd: 'liquidate',
+    startPriority: null,
+    orderAmount: 100_000,
+  },
+};
+
+// 보유 종목이 있는 봇은 쉬는 중이 아니에요. bot-b는 정액이라 시작 우선순위가 있어요
+const SETTINGS_EXTRAS: Record<string, Partial<SettingsExtra>> = {
+  'bot-a': { notRestingReasons: ['holding'] },
+  'bot-b': { settings: { ...SETTINGS_DEFAULT.settings, startPriority: 2 } },
+  'bot-c': { notRestingReasons: ['holding'] },
+};
 
 const CRITERIA_B: BotDetail['releaseCriteria'] = [
   { key: 'period', value: 20, threshold: 10, passed: true },
@@ -27,6 +133,7 @@ const CRITERIA_NOT_STARTED: BotDetail['releaseCriteria'] = [
 const RULES_CLOSING = {
   version: 1,
   appliedAt: '2026-10-01T15:00:00+09:00',
+  fields: FIELDS_CLOSING,
   values: [
     { label: '당일 상승률', display: '≥ 5%' },
     { label: '고가 대비 위치', display: '≤ 2%' },
@@ -150,7 +257,9 @@ const DETAIL_EXTRAS: Record<string, DetailExtra> = {
 
 export const BOT_DETAILS_FIXTURE: BotDetail[] = BOTS_FIXTURE.map((bot) => ({
   ...bot,
+  ...SETTINGS_DEFAULT,
   ...(DETAIL_EXTRAS[bot.id] ?? NOT_STARTED_EXTRA),
+  ...SETTINGS_EXTRAS[bot.id],
 }));
 
 const SAMPLE_PNL: [string, number][] = [

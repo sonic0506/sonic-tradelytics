@@ -11,7 +11,8 @@ export type HoldingAction = z.infer<typeof holdingActionSchema>;
 // 규칙 값 한 칸. 이름·단위·묶음은 유형별 규칙을 아는 서버가 줘요.
 export const ruleFieldSchema = z.object({
   key: z.string(),
-  group: z.enum(['filter', 'entry', 'exit']),
+  // safety는 손실 한도·연속 손절·1회 주문 금액처럼 규칙 값 버전에 함께 저장하는 안전장치예요
+  group: z.enum(['filter', 'entry', 'exit', 'safety']),
   label: z.string(),
   kind: z.enum(['number', 'time']),
   // '%', '배', '분'처럼 숫자 뒤에 붙는 단위. 시각이면 null

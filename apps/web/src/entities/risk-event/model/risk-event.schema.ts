@@ -2,14 +2,15 @@ import { z } from 'zod';
 
 import { listResponseSchema } from '@/shared/api';
 
-export const riskEventKindSchema = z.enum([
+export const RISK_EVENT_KINDS = [
   'daily_loss_limit',
   'cumulative_loss_limit',
   'consecutive_losses',
   'feed_stale',
   'insufficient_funds',
   'order_rejected',
-]);
+] as const;
+export const riskEventKindSchema = z.enum(RISK_EVENT_KINDS);
 
 // GET /v1/risk-events 한 줄 (POL-RISK-12)
 export const riskEventSchema = z.object({

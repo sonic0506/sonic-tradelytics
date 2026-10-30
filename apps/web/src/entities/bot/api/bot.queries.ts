@@ -2,6 +2,8 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { addDays, toTradeDate } from '@/shared/lib';
 
+import type { GetBotStatsParams } from '../model/bot-stat.schema';
+import type { GetVersionPreview } from '../model/bot-version.schema';
 import { PNL_PERIOD_DAYS, type PnlPeriod } from '../model/pnl-period';
 import {
   getBotById,
@@ -10,6 +12,8 @@ import {
   type GetBotDefaultsParams,
   getBots,
 } from './bot.api';
+import { getBotStats } from './bot-stat.api';
+import { getBotVersions, getVersionPreview } from './bot-version.api';
 
 export const botQueries = {
   all: () => ['bot'] as const,
@@ -25,6 +29,23 @@ export const botQueries = {
       queryKey: [...botQueries.all(), 'detail', id],
       queryFn: () => getBotById(id),
       refetchInterval: 5_000,
+    }),
+  // 봇 비교 표 (FR-PERF-02)
+  stats: (params: GetBotStatsParams) =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'stats', params],
+      queryFn: () => getBotStats(params),
+    }),
+  versions: (id: string) =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'versions', id],
+      queryFn: () => getBotVersions(id),
+    }),
+  // 바꾸려는 값마다 서버가 결과를 계산해요. 저장하지 않아요
+  versionPreview: (params: GetVersionPreview) =>
+    queryOptions({
+      queryKey: [...botQueries.all(), 'version-preview', params],
+      queryFn: () => getVersionPreview(params),
     }),
   // 유형·성향별 기본값은 코드 상수라 다시 받지 않아요.
   defaults: (params: GetBotDefaultsParams) =>

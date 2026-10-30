@@ -1,17 +1,23 @@
 import type { RequestHandler } from 'msw';
 
+import { accuracyHandlers } from '@/entities/accuracy';
 import { allocationHandlers } from '@/entities/allocation';
 import {
   botDefaultsHandlers,
   botDetailHandlers,
   botHandlers,
+  botStatHandlers,
+  botVersionHandlers,
 } from '@/entities/bot';
 import { dailyResultHandlers } from '@/entities/daily-result';
 import { engineStatusHandlers } from '@/entities/engine-status';
 import { homeHandlers } from '@/entities/home';
 import { orderHandlers } from '@/entities/order';
-import { positionHandlers } from '@/entities/position';
-import { riskEventHandlers } from '@/entities/risk-event';
+import { positionHandlers, positionHistoryHandlers } from '@/entities/position';
+import {
+  riskEventHandlers,
+  riskEventHistoryHandlers,
+} from '@/entities/risk-event';
 import { createBotHandlers } from '@/features/bot/create-bot';
 import { killSwitchHandlers } from '@/features/engine/kill-switch';
 
@@ -19,15 +25,20 @@ import { killSwitchHandlers } from '@/features/engine/kill-switch';
 // shared는 entities를 모르기 때문에 여기서 모아요.
 export const handlers: RequestHandler[] = [
   ...engineStatusHandlers,
+  ...accuracyHandlers,
   ...homeHandlers,
   ...botHandlers,
   ...botDetailHandlers,
   ...botDefaultsHandlers,
+  ...botVersionHandlers,
+  ...botStatHandlers,
   ...allocationHandlers,
   ...createBotHandlers,
   ...dailyResultHandlers,
+  ...positionHistoryHandlers,
   ...positionHandlers,
   ...orderHandlers,
+  ...riskEventHistoryHandlers,
   ...riskEventHandlers,
   ...killSwitchHandlers,
 ];

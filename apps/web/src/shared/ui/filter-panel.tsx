@@ -6,9 +6,17 @@ import type { ReactNode } from 'react';
 
 // 목록 화면 필터(Figma App / FilterField · FilterActions).
 // 데스크톱은 한 줄, 좁은 화면은 칸마다 한 줄씩 쌓고 위아래 1px 선으로 묶어요.
-export function FilterPanel({ children }: { children: ReactNode }) {
+export function FilterPanel({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex border-y border-default max-sm:flex-col">
+    <div
+      className={`flex border-y border-default max-sm:flex-col ${className}`}
+    >
       {children}
     </div>
   );

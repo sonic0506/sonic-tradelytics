@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { botListItemSchema } from './bot.schema';
+import { holdingActionSchema, ruleFieldSchema } from './bot-defaults.schema';
 
 // 상한 해제 기준 한 줄 (POL-RISK-13, FR-BOT-06)
 export const releaseCriterionSchema = z.object({
@@ -42,6 +43,21 @@ export const botDetailSchema = botListItemSchema.extend({
     version: z.number().int(),
     appliedAt: z.string(),
     values: z.array(z.object({ label: z.string(), display: z.string() })),
+    // 규칙 값 바꾸기에 쓰는 칸과 지금 값
+    fields: z.array(ruleFieldSchema),
+  }),
+  // 적용을 기다리는 버전 번호. 없으면 null (POL-RISK-13)
+  pendingVersion: z.number().int().nullable(),
+  // 쉬는 중이 아닌 이유 (FR-BOT-12). 쉬는 중이면 빈 배열
+  notRestingReasons: z.array(
+    z.enum(['holding', 'pending_order', 'trading_hours']),
+  ),
+  // 봇 설정 화면의 기본 설정 값 (api.md PATCH)
+  settings: z.object({
+    periodEnd: z.string().nullable(),
+    onPeriodEnd: holdingActionSchema,
+    startPriority: z.number().int().nullable(),
+    orderAmount: z.number(),
   }),
   holdings: z.array(
     z.object({ symbolName: z.string(), quantity: z.number().int() }),

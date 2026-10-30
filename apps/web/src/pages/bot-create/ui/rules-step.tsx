@@ -11,12 +11,12 @@ import {
 
 import {
   BOT_TYPE_LABEL,
+  formatRuleValue,
+  isRuleChanged,
   RISK_PROFILE_LABEL,
   type RuleField,
 } from '@/entities/bot';
 import type { BotDraft, DraftErrors } from '@/features/bot/create-bot';
-
-import { formatRuleValue, isRuleChanged } from '../lib/bot-create-copy';
 
 const GROUPS: { key: RuleField['group']; title: string }[] = [
   { key: 'filter', title: '종목 필터' },

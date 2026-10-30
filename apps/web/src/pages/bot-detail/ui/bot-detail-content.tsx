@@ -1,12 +1,11 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { connection } from 'next/server';
 
-import { botQueries } from '@/entities/bot';
+import { BotNotFound, botQueries } from '@/entities/bot';
 import { positionQueries } from '@/entities/position';
 import { getQueryClient, HttpError } from '@/shared/api';
 
 import { BotDetailBoundary } from './bot-detail-boundary';
-import { BotNotFound } from './bot-not-found';
 
 const ignore = () => undefined;
 
