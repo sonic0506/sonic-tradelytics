@@ -202,10 +202,13 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - 자금: 확정 투자금, 사용 중 금액, 남은 한도, 누적 손익, 손실 중지까지 남은 여유 ([자금 정보 표시](../policy/fund-allocation.md#봇-화면에-표시할-자금-정보))
 - 검증 구간이면 [상한 해제 기준](../policy/risk-management.md#9-검증-구간과-상한-해제-pol-risk-13)별 현재 값과 통과 여부 (FR-BOT-06)
 - `waiting_funds`면 사유와 부족 금액 (FR-BOT-10)
+- `statusReason.code`는 `bots.status_reason` 그대로예요(`daily_stop`·`total_stop`·`streak_pause`·`rate_cap`·`kill_switch`·`bot_error`·`insufficient_funds`·`pause`·`liquidate` 등). 화면 문구는 web이 만들어요
+- 오늘 손익은 오늘 연 포지션의 실현 손익 + 보유분 평가 손익(`quote_caches` 최근가를 아는 종목)이에요
+- M4 현재(4b-2a): 상한 해제 기준(`releaseProgress`·`releaseCriteria`), 자금 대기 부족 금액(`fundShortfall`)은 아직 계산하지 않아 `null`·빈 목록이에요. `releasedAt`·`endedAt`·`waitingSince`는 기록하는 컬럼이 없어 `null`이에요. 종목 이름을 저장하지 않아 `holdings[].symbolName`은 종목 코드예요
 
 ### `PATCH /v1/bots/:id`
 
-판단에 쓰이지 않는 설정만 바꿔요: 이름, 운용 종료일, 종료 시 처리, 시작 우선순위, 운영 시간. 투자금 설정(`budget_*`)은 `ready`·`waiting_funds`일 때만 `PATCH`로 바꿀 수 있어요 (`BOT_BUDGET_LOCKED`, F1 수용 기준). `running`·`paused` 봇은 쉬는 중일 때 `rebudget` 명령으로 반환 후 다시 확정해요 (POL-FUND-12). 운영 시간은 POST와 같이 검사해요. engine은 다음 주기에 `updated_at`을 보고 다시 읽어요.
+판단에 쓰이지 않는 설정만 바꿔요: 이름, 운용 종료일, 종료 시 처리, 시작 우선순위, 운영 시간. 1회 주문 금액은 규칙 값 버전 필드라 여기서 바꾸지 않아요(보내면 400). 운영 시간·투자금이 바뀌면 같은 시각 정률 합도 다시 검사해요(`BUDGET_RATIO_EXCEEDED`). 투자금 설정(`budget_*`)은 `ready`·`waiting_funds`일 때만 `PATCH`로 바꿀 수 있어요 (`BOT_BUDGET_LOCKED`, F1 수용 기준). `running`·`paused` 봇은 쉬는 중일 때 `rebudget` 명령으로 반환 후 다시 확정해요 (POL-FUND-12). 운영 시간은 POST와 같이 검사해요. engine은 다음 주기에 `updated_at`을 보고 다시 읽어요.
 
 ### 규칙 값 버전
 

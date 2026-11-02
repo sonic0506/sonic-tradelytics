@@ -157,4 +157,64 @@ describe('봇 만들기 (e2e)', () => {
       // 먼저 만든 봇(우선순위 1)보다 앞이에요
     ).resolves.toMatchObject({ budgetAmount: 100_000, startPriority: -1 });
   });
+
+  describe('PATCH /v1/bots/:id', () => {
+    const patch = (id: number | string, payload: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .patch(`/v1/bots/${id}`)
+        .set('Authorization', bearer(app))
+        .send(payload);
+    // 먼저 만든 day-1 (정률 60%, ready)
+    const firstId = async () =>
+      (await dataSource.getRepository(Bot).findOneByOrFail({ name: 'day-1' }))
+        .id;
+
+    it('판단에 쓰이지 않는 설정과 시작 전 봇의 투자금을 바꿔요', async () => {
+      const id = await firstId();
+
+      const response = await patch(id, {
+        periodEnd: '2026-12-31',
+        tradingHours: { start: '09:10', end: '15:15' },
+        budget: { type: 'ratio', value: 0.4 },
+      }).expect(200);
+
+      expect(response.body).toEqual({
+        id: String(id),
+        tradingHours: { start: '09:10', end: '15:15' },
+      });
+      await expect(
+        dataSource.getRepository(Bot).findOneByOrFail({ id }),
+      ).resolves.toMatchObject({
+        periodEnd: '2026-12-31',
+        tradingStart: '09:10:00',
+        tradingEnd: '15:15:00',
+        budgetRatio: 0.4,
+      });
+    });
+
+    it('실행 중 봇의 투자금은 409 BOT_BUDGET_LOCKED예요', async () => {
+      const id = await firstId();
+      await dataSource.getRepository(Bot).update({ id }, { status: 'running' });
+
+      const response = await patch(id, {
+        budget: { type: 'fixed', value: 50_000 },
+      }).expect(409);
+
+      expect(response.body).toMatchObject({ code: 'BOT_BUDGET_LOCKED' });
+    });
+
+    it('운영 시간이 정규장 밖이면 422, 없는 봇은 404, 1회 주문 금액은 400이에요', async () => {
+      const id = await firstId();
+
+      const outside = await patch(id, {
+        tradingHours: { start: '08:00', end: '15:00' },
+      }).expect(422);
+      expect(outside.body).toMatchObject({
+        code: 'TRADING_HOURS_OUT_OF_RANGE',
+      });
+      await patch(999, { periodEnd: null }).expect(404);
+      // 1회 주문 금액은 규칙 값 버전으로 바꿔요
+      await patch(id, { orderAmount: 30_000 }).expect(400);
+    });
+  });
 });

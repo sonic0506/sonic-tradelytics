@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import { IsNull, type Repository } from 'typeorm';
+import { In, IsNull, type Repository } from 'typeorm';
 
 import { Allocation } from './entities/allocation.entity.js';
 
@@ -22,6 +22,15 @@ export class AllocationRepository {
   findActive(): Promise<Allocation[]> {
     return this.allocations.find({
       where: { releasedAt: IsNull() },
+      take: AllocationRepository.MAX_ACTIVE,
+    });
+  }
+
+  // 화면용: 봇들의 지금 배분과 그때 스냅샷(당시 운용 자산)
+  findActiveByBots(botIds: number[]): Promise<Allocation[]> {
+    return this.allocations.find({
+      relations: { snapshot: true },
+      where: { botId: In(botIds), releasedAt: IsNull() },
       take: AllocationRepository.MAX_ACTIVE,
     });
   }

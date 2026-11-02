@@ -76,6 +76,21 @@ export class BotService {
     });
   }
 
+  findPage(skip: number, take: number): Promise<[Bot[], number]> {
+    return this.bots.findPage(skip, take);
+  }
+
+  // 봇마다 적용 대기 중인 버전 (있으면 하나예요, BOT_VERSION_PENDING)
+  async findPendingVersions(
+    botIds: number[],
+  ): Promise<Map<number, BotVersion>> {
+    const pending = await this.bots.findPendingVersions(botIds);
+    const result = new Map<number, BotVersion>();
+    for (const version of pending)
+      if (!result.has(version.botId)) result.set(version.botId, version);
+    return result;
+  }
+
   findOptions(): Promise<Pick<Bot, 'id' | 'name'>[]> {
     return this.bots.findAllNames();
   }
@@ -99,6 +114,14 @@ export class BotService {
       { ...bot, stage: 'verifying', status: 'ready', statusReason: null },
       version,
     );
+  }
+
+  // 판단에 쓰이지 않는 설정과(시작 전이면) 투자금 설정. engine은 다음 주기에 다시 읽어요
+  update(
+    id: number,
+    fields: Parameters<BotRepository['update']>[1],
+  ): Promise<void> {
+    return this.bots.update(id, fields);
   }
 
   findById(id: number): Promise<Bot | null> {

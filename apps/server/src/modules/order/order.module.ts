@@ -13,6 +13,7 @@ import { OrderEvent } from './entities/order-event.entity.js';
 import { ProtectiveOrder } from './entities/protective-order.entity.js';
 import { OrderRepository } from './order.repository.js';
 import { OrderService } from './order.service.js';
+import { OrderQueryService } from './order-query.service.js';
 import { PaperBrokerService } from './paper-broker.service.js';
 import { TossBrokerService } from './toss-broker.service.js';
 
@@ -33,11 +34,12 @@ import { TossBrokerService } from './toss-broker.service.js';
     RiskModule,
   ],
   providers: [
+    OrderQueryService,
     OrderService,
     OrderRepository,
     TossBrokerService,
     PaperBrokerService,
   ],
-  exports: [OrderService],
+  exports: [OrderService, OrderQueryService],
 })
 export class OrderModule {}

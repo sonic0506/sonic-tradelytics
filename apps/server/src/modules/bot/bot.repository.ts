@@ -73,6 +73,41 @@ export class BotRepository {
     return saved;
   }
 
+  async update(
+    id: number,
+    fields: Partial<
+      Pick<
+        Bot,
+        | 'name'
+        | 'periodEnd'
+        | 'onPeriodEnd'
+        | 'startPriority'
+        | 'tradingStart'
+        | 'tradingEnd'
+        | 'budgetType'
+        | 'budgetRatio'
+        | 'budgetAmount'
+      >
+    >,
+  ): Promise<void> {
+    await this.bots.update({ id }, fields);
+  }
+
+  // 화면 목록: 만든 순서
+  findPage(skip: number, take: number): Promise<[Bot[], number]> {
+    return this.bots.findAndCount({ order: { id: 'ASC' }, skip, take });
+  }
+
+  // 적용을 기다리는 버전 (applied_at null, POL-RISK-13)
+  findPendingVersions(botIds: number[]): Promise<BotVersion[]> {
+    if (botIds.length === 0) return Promise.resolve([]);
+    return this.versions.find({
+      where: { botId: In(botIds), appliedAt: IsNull() },
+      order: { version: 'DESC' },
+      take: botIds.length * BotRepository.MAX_VERSIONS_PER_BOT,
+    });
+  }
+
   findByIds(ids: number[]): Promise<Bot[]> {
     return this.bots.find({
       where: { id: In(ids) },

@@ -6,9 +6,13 @@ export { ProtectiveOrder } from './entities/protective-order.entity.js';
 export * from './order.constants.js';
 export { OrderModule } from './order.module.js';
 export {
-  type BotOpenOrders,
   type EntryRequest,
   type EntryResult,
   OrderService,
 } from './order.service.js';
 export type { ApplyResult, OrderReport } from './order.types.js';
+export { OrderQueryModule } from './order-query.module.js';
+export {
+  type BotOpenOrders,
+  OrderQueryService,
+} from './order-query.service.js';

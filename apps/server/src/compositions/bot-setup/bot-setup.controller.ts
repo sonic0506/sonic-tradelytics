@@ -4,6 +4,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -12,6 +15,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { ApiErrors } from '@/common/exceptions/api-errors.js';
 
 import {
+  BotBudgetLockedException,
+  BotNotFoundException,
   BotParamsInvalidException,
   BotSetupService,
   BotTypeNotSupportedException,
@@ -21,6 +26,10 @@ import {
 import { BotDefaultsQueryDto } from './dto/bot-defaults-query.dto.js';
 import { BotDefaultsResponseDto } from './dto/bot-defaults-response.dto.js';
 import { CreateBotDto, CreatedBotDto } from './dto/create-bot.dto.js';
+import { UpdateBotDto, UpdatedBotDto } from './dto/update-bot.dto.js';
+
+// "HH:mm:ss" → "HH:mm"
+const HH_MM = 5;
 
 @ApiTags('bots')
 @Controller()
@@ -46,5 +55,27 @@ export class BotSetupController {
   async create(@Body() body: CreateBotDto): Promise<CreatedBotDto> {
     const bot = await this.setup.create(body);
     return { id: String(bot.id) };
+  }
+
+  /** 판단에 쓰이지 않는 설정 바꾸기. 투자금은 시작 전(ready·waiting_funds)만 */
+  @ApiErrors(
+    BotNotFoundException,
+    BotBudgetLockedException,
+    TradingHoursOutOfRangeException,
+    BudgetRatioExceededException,
+  )
+  @Patch('bots/:id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateBotDto,
+  ): Promise<UpdatedBotDto> {
+    const bot = await this.setup.update(id, body);
+    return {
+      id: String(bot.id),
+      tradingHours: {
+        start: bot.tradingStart.slice(0, HH_MM),
+        end: bot.tradingEnd.slice(0, HH_MM),
+      },
+    };
   }
 }

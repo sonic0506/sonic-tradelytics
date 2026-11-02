@@ -5,8 +5,6 @@ import { z } from 'zod';
 import { kstTime } from '@/common/time/kst-date.js';
 import { AccountSnapshotService } from '@/modules/account/index.js';
 import { BotService, type BotWithVersion } from '@/modules/bot/index.js';
-import { OrderService } from '@/modules/order/index.js';
-import { PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { AllocationRepository } from './allocation.repository.js';
@@ -21,6 +19,7 @@ import {
 import type { Allocation } from './entities/allocation.entity.js';
 import { FundRatioExceededException } from './fund.exception.js';
 import type { AllocationOutcome, BotBudget, BotFunds } from './fund.types.js';
+import { FundQueryService } from './fund-query.service.js';
 
 // rebudget 명령의 새 투자금 설정 (commands.budget)
 const budgetSchema = z.intersection(
@@ -41,7 +40,6 @@ const budgetSchema = z.intersection(
 );
 
 // 봇 하나의 지금 돈 상태와 쉬는 중 판단에 쓰는 값
-type RunningFunds = BotFunds & { hasHoldings: boolean; hasOpenOrders: boolean };
 
 // commands.error에 남는 rebudget 실패 코드 (docs/architecture/api.md 에러 코드)
 export type RebudgetResult = { ok: true } | { ok: false; error: string };
@@ -59,8 +57,7 @@ export class FundService {
     private readonly allocations: AllocationRepository,
     private readonly snapshots: AccountSnapshotService,
     private readonly bots: BotService,
-    private readonly positions: PositionService,
-    private readonly orders: OrderService,
+    private readonly query: FundQueryService,
     private readonly risk: RiskService,
   ) {}
 
@@ -79,7 +76,7 @@ export class FundService {
     );
     if (!isRatioSumValid(ratios)) throw new FundRatioExceededException();
 
-    const running = await this.fundsOf(active);
+    const running = await this.query.fundsOf(active);
     const snapshot = await this.snapshots.take(totalCashShare(running));
     const plan = planAllocation(snapshot.availableCapital, budgets);
     await this.saveAllocation(snapshot.id, plan.outcomes, targets);
@@ -90,7 +87,7 @@ export class FundService {
   async release(botId: number): Promise<number | null> {
     const allocation = await this.allocations.findActiveByBot(botId);
     if (!allocation) return null;
-    const funds = (await this.fundsOf([allocation])).get(botId);
+    const funds = (await this.query.fundsOf([allocation])).get(botId);
     if (!funds || funds.hasHoldings || funds.hasOpenOrders) return null;
     const amount = releaseAmount(funds);
     await this.allocations.release(allocation.id, amount, new Date());
@@ -114,7 +111,7 @@ export class FundService {
   ): Promise<number> {
     const allocation = await this.allocations.findActiveByBot(botId);
     if (!allocation) return 0;
-    const funds = (await this.fundsOf([allocation])).get(botId);
+    const funds = (await this.query.fundsOf([allocation])).get(botId);
     if (!funds) return 0;
     const size =
       orderSize.type === 'ratio'
@@ -145,7 +142,7 @@ export class FundService {
     const current = await this.allocations.findActiveByBot(botId);
     if (!current) return failure('NO_ALLOCATION');
     const active = await this.allocations.findActive();
-    const funds = await this.fundsOf(active);
+    const funds = await this.query.fundsOf(active);
     const own = funds.get(botId);
     if (!own) return failure('NO_ALLOCATION');
     const resting = canRebudget({
@@ -241,39 +238,6 @@ export class FundService {
     await this.allocations.release(allocationId, releasedAmount, new Date());
     await this.allocations.add([next]);
     await this.bots.updateBudget(next.botId, fields);
-  }
-
-  // 배분마다 확정 이후 실현 손익, 보유 매수 금액, 미체결 매수 금액을 모아요 (POL-FUND-02)
-  private async fundsOf(
-    allocations: Allocation[],
-  ): Promise<Map<number, RunningFunds>> {
-    const botIds = allocations.map(({ botId }) => botId);
-    const [holdings, openOrders] = await Promise.all([
-      this.positions.botHoldings(
-        allocations.map(({ botId, createdAt }) => ({
-          botId,
-          since: createdAt,
-        })),
-      ),
-      this.orders.openOrdersByBot(botIds),
-    ]);
-    return new Map(
-      allocations.map(({ botId, amount }) => {
-        const held = holdings.get(botId);
-        const open = openOrders.get(botId);
-        return [
-          botId,
-          {
-            amount,
-            realizedPnl: held?.realizedPnl ?? 0,
-            holdingsCost: held?.holdingsCost ?? 0,
-            openBuyAmount: open?.openBuyAmount ?? 0,
-            hasHoldings: held?.hasHoldings ?? false,
-            hasOpenOrders: open?.hasOpenOrders ?? false,
-          },
-        ];
-      }),
-    );
   }
 }
 

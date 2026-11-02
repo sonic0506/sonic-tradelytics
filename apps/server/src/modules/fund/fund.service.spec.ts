@@ -10,7 +10,7 @@ import {
   type BotVersion,
   type BotWithVersion,
 } from '@/modules/bot/index.js';
-import { OrderService } from '@/modules/order/index.js';
+import { OrderQueryService } from '@/modules/order/index.js';
 import { PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
@@ -19,6 +19,7 @@ import { AllocationRepository } from './allocation.repository.js';
 import type { Allocation } from './entities/allocation.entity.js';
 import { FundRatioExceededException } from './fund.exception.js';
 import { FundService } from './fund.service.js';
+import { FundQueryService } from './fund-query.service.js';
 
 describe('FundService', () => {
   const allocations = {
@@ -34,7 +35,9 @@ describe('FundService', () => {
     updateBudget: vi.fn<BotService['updateBudget']>(),
   };
   const positions = { botHoldings: vi.fn<PositionService['botHoldings']>() };
-  const orders = { openOrdersByBot: vi.fn<OrderService['openOrdersByBot']>() };
+  const orders = {
+    openOrdersByBot: vi.fn<OrderQueryService['openOrdersByBot']>(),
+  };
   const risk = { record: vi.fn<RiskService['record']>() };
   let service: FundService;
 
@@ -103,7 +106,8 @@ describe('FundService', () => {
         { provide: AccountSnapshotService, useValue: snapshots },
         { provide: BotService, useValue: bots },
         { provide: PositionService, useValue: positions },
-        { provide: OrderService, useValue: orders },
+        { provide: OrderQueryService, useValue: orders },
+        FundQueryService,
         { provide: RiskService, useValue: risk },
       ],
     }).compile();

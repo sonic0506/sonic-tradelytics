@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import type { Repository } from 'typeorm';
+import { Between, MoreThan, type Repository } from 'typeorm';
 
 import { MarketCalendar } from './entities/market-calendar.entity.js';
 
@@ -17,6 +17,22 @@ export class MarketCalendarRepository {
 
   findByDate(tradeDate: string): Promise<MarketCalendar | null> {
     return this.calendars.findOneBy({ tradeDate });
+  }
+
+  // after 다음의 첫 개장일 (engine이 받아 둔 익일 영업일)
+  findNextOpen(after: string): Promise<MarketCalendar | null> {
+    return this.calendars.findOne({
+      where: { tradeDate: MoreThan(after), isOpen: true },
+      order: { tradeDate: 'ASC' },
+    });
+  }
+
+  // from~to(둘 다 포함) 개장일 수
+  countOpen(from: string, to: string): Promise<number> {
+    return this.calendars.countBy({
+      tradeDate: Between(from, to),
+      isOpen: true,
+    });
   }
 
   async upsert(rows: Omit<MarketCalendar, 'createdAt'>[]): Promise<void> {

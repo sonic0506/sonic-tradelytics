@@ -79,3 +79,19 @@ export class BotParamsInvalidException extends AppException {
     );
   }
 }
+
+// running·paused 봇의 투자금은 PATCH로 못 바꿔요. 쉬는 중에 rebudget 명령을 써요 (POL-FUND-12)
+export class BotBudgetLockedException extends AppException {
+  static readonly code = 'BOT_BUDGET_LOCKED';
+  static readonly status = HttpStatus.CONFLICT;
+  static readonly example =
+    'running 봇의 투자금은 바꿀 수 없어요. 쉬는 중에 투자금 다시 정하기를 써요.';
+
+  constructor(status: string) {
+    super(
+      BotBudgetLockedException.code,
+      BotBudgetLockedException.status,
+      `${status} 봇의 투자금은 바꿀 수 없어요. 쉬는 중에 투자금 다시 정하기를 써요.`,
+    );
+  }
+}

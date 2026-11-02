@@ -13,6 +13,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard.js';
 import { RolesGuard } from './common/auth/roles.guard.js';
 import { AppExceptionFilter } from './common/filters/app-exception.filter.js';
+import { BotOverviewModule } from './compositions/bot-overview/bot-overview.module.js';
 import { BotSetupModule } from './compositions/bot-setup/bot-setup.module.js';
 import { env } from './config/env.js';
 import { dataSourceOptions } from './infra/database/data-source.js';
@@ -86,6 +87,8 @@ const REQUEST_ID = /^[\w-]{1,128}$/;
     // feature 모듈은 여기에 더해요: import { UserModule } from './modules/user/index.js';
     BotModule,
     BotSetupModule,
+    // GET /v1/bots/options가 /v1/bots/:id보다 먼저 등록되도록 BotModule 뒤에 둬요
+    BotOverviewModule,
     CommandApiModule,
     EngineStateModule,
     RiskModule,

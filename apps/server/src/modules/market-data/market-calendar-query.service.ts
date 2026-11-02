@@ -12,4 +12,14 @@ export class MarketCalendarQueryService {
   findDay(tradeDate: string): Promise<MarketCalendar | null> {
     return this.calendars.findByDate(tradeDate);
   }
+
+  // 그 날 다음의 첫 개장일. 모르면 null
+  findNextOpen(after: string): Promise<MarketCalendar | null> {
+    return this.calendars.findNextOpen(after);
+  }
+
+  // ponytail: engine이 받아 둔 날만 세요(engine이 꺼져 있던 날은 빠져요). 검증 구간 기간 기준을 엄밀히 세려면 캘린더를 미리 채워요
+  countOpenDays(from: string, to: string): Promise<number> {
+    return this.calendars.countOpen(from, to);
+  }
 }

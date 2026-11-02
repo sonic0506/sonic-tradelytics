@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
-import type { Repository } from 'typeorm';
+import { In, type Repository } from 'typeorm';
 
 import { QuoteCache } from './entities/quote-cache.entity.js';
 
@@ -13,6 +13,13 @@ export class QuoteCacheRepository {
 
   private get quotes(): Repository<QuoteCache> {
     return this.txHost.tx.getRepository(QuoteCache);
+  }
+
+  findBySymbols(symbols: string[]): Promise<QuoteCache[]> {
+    return this.quotes.find({
+      where: { symbol: In(symbols) },
+      take: symbols.length,
+    });
   }
 
   async upsert(

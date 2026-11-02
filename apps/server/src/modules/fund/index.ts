@@ -4,3 +4,5 @@ export { Allocation } from './entities/allocation.entity.js';
 export { VERIFICATION_CAP } from './fund.constants.js';
 export { FundModule } from './fund.module.js';
 export { FundService, type RebudgetResult } from './fund.service.js';
+export { FundQueryModule } from './fund-query.module.js';
+export { type BotFundsView, FundQueryService } from './fund-query.service.js';
