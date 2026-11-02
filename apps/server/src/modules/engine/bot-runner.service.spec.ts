@@ -42,6 +42,7 @@ describe('BotRunnerService', () => {
   };
   const positions = {
     findHeldByBot: vi.fn<PositionService['findHeldByBot']>(),
+    findOpenByBot: vi.fn<PositionService['findOpenByBot']>(),
     botHoldings: vi.fn<PositionService['botHoldings']>(),
     recentExitReasons: vi.fn<PositionService['recentExitReasons']>(),
     findClosedSymbolsSince: vi.fn<PositionService['findClosedSymbolsSince']>(),
@@ -126,6 +127,7 @@ describe('BotRunnerService', () => {
     });
     scanner.stockStatus.mockResolvedValue(clean);
     positions.findHeldByBot.mockResolvedValue([]);
+    positions.findOpenByBot.mockResolvedValue([]);
     positions.findClosedSymbolsSince.mockResolvedValue([]);
     fund.entryBudget.mockResolvedValue(49_950);
     fund.activeAllocation.mockResolvedValue(null);
@@ -186,8 +188,9 @@ describe('BotRunnerService', () => {
     });
   });
 
-  it('보유 중인 종목은 다시 사지 않고, 동시 보유 수가 차면 후보를 보지 않아요', async () => {
-    positions.findHeldByBot.mockResolvedValue([
+  it('보유 중이거나 진입 주문이 체결을 기다리는 종목은 다시 사지 않고, 동시 보유 수가 차면 후보를 보지 않아요', async () => {
+    // 진입 주문이 아직 체결되지 않아 수량 0이에요
+    positions.findOpenByBot.mockResolvedValue([
       Object.assign({ symbol: '005930', quantity: 0 }) as Position,
     ]);
     await runner.cycle(now);

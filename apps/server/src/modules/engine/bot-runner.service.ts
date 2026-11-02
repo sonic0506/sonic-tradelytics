@@ -164,7 +164,7 @@ export class BotRunnerService {
       const isRunning = bot.status === 'running';
       if (isRunning && (await this.isLimitHit(bot, version, held, now))) return;
       await this.tryExits(version, params, held, now);
-      if (isRunning) await this.tryEntry(bot, version, params, held, now);
+      if (isRunning) await this.tryEntry(bot, version, params, now);
     } catch (error) {
       // 호출 한도는 잠시 뒤 풀려요. 멈추지 않고 다음 주기에 다시 봐요
       if (isRateLimited(error)) {
@@ -280,7 +280,6 @@ export class BotRunnerService {
     bot: Bot,
     version: BotVersion,
     params: DayTradingParams,
-    held: Position[],
     now: Date,
   ): Promise<void> {
     const nowKst = kstTime(now);
@@ -292,7 +291,9 @@ export class BotRunnerService {
       botEnd: bot.tradingEnd < params.exitAt ? bot.tradingEnd : params.exitAt,
     });
     if (!isWindow || !this.engineState.canEnter(bot.id)) return;
-    if (held.length >= version.maxPositions) return;
+    // 진입 주문이 아직 체결되지 않은 포지션도 세요. 안 세면 체결을 기다리는 동안 같은 종목을 또 사요
+    const open = await this.positions.findOpenByBot(bot.id);
+    if (open.length >= version.maxPositions) return;
     const budget = await this.fund.entryBudget(bot.id, {
       type: version.orderSizeType,
       value: version.orderSizeValue,
@@ -307,7 +308,7 @@ export class BotRunnerService {
     );
     const candidate = await this.findCandidate(
       params,
-      new Set([...held.map(({ symbol }) => symbol), ...cooling]),
+      new Set([...open.map(({ symbol }) => symbol), ...cooling]),
     );
     if (!candidate) return;
     const { symbol, price, evaluation } = candidate;

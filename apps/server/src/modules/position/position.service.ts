@@ -73,6 +73,10 @@ export class PositionService {
     return this.positions.findHeldByBot(botId);
   }
 
+  findOpenByBot(botId: number): Promise<Position[]> {
+    return this.positions.findOpenByBot(botId);
+  }
+
   findClosedSymbolsSince(botId: number, since: Date): Promise<string[]> {
     return this.positions.findClosedSymbolsSince(botId, since);
   }

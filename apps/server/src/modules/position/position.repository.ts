@@ -77,6 +77,14 @@ export class PositionRepository {
     });
   }
 
+  // 봇의 열린 포지션. 진입 주문이 아직 체결되지 않은(수량 0) 포지션도 넣어요
+  findOpenByBot(botId: number): Promise<Position[]> {
+    return this.positions.find({
+      where: { botId, status: 'open' },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+  }
+
   // since 이후 닫힌 봇 포지션의 종목 (재진입 대기)
   async findClosedSymbolsSince(botId: number, since: Date): Promise<string[]> {
     const closed = await this.positions.find({
