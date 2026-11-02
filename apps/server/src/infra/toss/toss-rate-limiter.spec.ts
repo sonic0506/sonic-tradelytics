@@ -33,11 +33,20 @@ describe('TossRateLimiter', () => {
   });
 
   it('응답 헤더가 더 적게 남았다고 하면 그 값을 따라요', () => {
-    limiter.update('ORDER_INFO', 3, 0);
+    limiter.update('ORDER_INFO', 3, 1);
 
-    expect(limiter.tryAcquire('ORDER_INFO')).toBe(false);
-    now = 334; // 초당 3 → 약 0.33초에 1개
     expect(limiter.tryAcquire('ORDER_INFO')).toBe(true);
+    expect(limiter.tryAcquire('ORDER_INFO')).toBe(false);
+  });
+
+  // 토스는 1초 단위로 세는 것으로 보여요. 0.33초 뒤 채운 1개로 보내면 같은 1초 안이라 429예요
+  it('응답 헤더가 0개 남았다고 하면 1초 동안 보내지 않아요', () => {
+    limiter.update('MARKET_DATA_CHART', 20, 0);
+    now = 999;
+    expect(limiter.tryAcquire('MARKET_DATA_CHART')).toBe(false);
+
+    now = 1000;
+    expect(limiter.tryAcquire('MARKET_DATA_CHART')).toBe(true);
   });
 
   it('429를 받으면 Retry-After 동안 막아요', () => {

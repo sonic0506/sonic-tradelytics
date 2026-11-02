@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
 
+import {
+  TossApiError,
+  TossRateLimitedError,
+} from '@/infra/toss/toss.errors.js';
 import { type Bot, BotService, type BotVersion } from '@/modules/bot/index.js';
 import { DecisionService } from '@/modules/decision/index.js';
 import { EngineStateService } from '@/modules/engine-state/index.js';
@@ -275,6 +279,23 @@ describe('BotRunnerService', () => {
     expect(state.canEnter(7)).toBe(false);
     expect(bots.setStatus).toHaveBeenCalledWith(7, 'paused', 'bot_error');
     expect(risk.record.mock.lastCall?.slice(0, 2)).toEqual(['bot_error', 7]);
+  });
+
+  it.each([
+    [
+      '토스 429',
+      new TossApiError(429, 'rate-limit-exceeded', '요청 한도 초과'),
+    ],
+    ['한도 대기 초과', new TossRateLimitedError('MARKET_DATA_CHART')],
+  ])('%s는 봇을 멈추지 않고 이번 주기만 건너뛰어요', async (_, error) => {
+    scanner.intradayStats.mockRejectedValueOnce(error);
+
+    await runner.cycle(now);
+
+    expect(orders.enter).not.toHaveBeenCalled();
+    expect(bots.setStatus).not.toHaveBeenCalled();
+    expect(risk.record).not.toHaveBeenCalled();
+    expect(state.canEnter(7)).toBe(true);
   });
 
   it('순위를 받지 못하면 이전 후보로 계속해요', async () => {

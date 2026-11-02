@@ -30,5 +30,15 @@ export class TossRateLimitedError extends Error {
   }
 }
 
+const TOO_MANY_REQUESTS = 429;
+
+// 호출 한도 오류(보내기 전 한도 부족 또는 토스 429). 잠시 뒤 풀리는 오류예요
+export function isRateLimited(error: unknown): boolean {
+  return (
+    error instanceof TossRateLimitedError ||
+    (error instanceof TossApiError && error.status === TOO_MANY_REQUESTS)
+  );
+}
+
 // engine 설정(TOSS_* 환경 변수)이 비어 있어요
 export class TossConfigError extends Error {}

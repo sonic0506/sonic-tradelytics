@@ -67,11 +67,13 @@ export class TossRateLimiter {
     return this.acquire(group, maxWaitMs - wait);
   }
 
-  // 응답 헤더로 한도와 남은 양을 맞춰요. 서버가 더 적게 남았다고 하면 그 값을 따라요
+  // 응답 헤더로 한도와 남은 양을 맞춰요. 서버가 더 적게 남았다고 하면 그 값을 따라요.
+  // 0개면 1초 동안 막아요: 토스는 1초 단위로 세는 것으로 보여서, 조금씩 다시 채워 보내면 같은 1초 안이라 429예요
   update(group: TossGroup, limit: number, remaining: number): void {
     const bucket = this.refill(group);
     bucket.limit = limit;
     bucket.tokens = Math.min(bucket.tokens, remaining, limit);
+    if (remaining <= 0) this.block(group, TossRateLimiter.MS_PER_SECOND);
   }
 
   // 429: Retry-After 동안 그 그룹을 막아요

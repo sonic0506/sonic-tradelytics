@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { kstAt, kstDate, kstTime } from '@/common/time/kst-date.js';
+import { isRateLimited } from '@/infra/toss/toss.errors.js';
 import {
   type Bot,
   BotService,
@@ -165,6 +166,11 @@ export class BotRunnerService {
       await this.tryExits(version, params, held, now);
       if (isRunning) await this.tryEntry(bot, version, params, held, now);
     } catch (error) {
+      // 호출 한도는 잠시 뒤 풀려요. 멈추지 않고 다음 주기에 다시 봐요
+      if (isRateLimited(error)) {
+        this.logger.warn(`봇 ${bot.id} 이번 주기 건너뜀: ${String(error)}`);
+        return;
+      }
       this.logger.error(`봇 ${bot.id} 주기 예외: ${String(error)}`);
       this.engineState.blockBot(bot.id, 'bot_error');
       await this.bots.setStatus(bot.id, 'paused', 'bot_error');
