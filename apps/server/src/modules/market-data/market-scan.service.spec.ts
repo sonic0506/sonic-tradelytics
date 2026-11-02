@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import type { z } from 'zod';
 
 import { TossClient } from '@/infra/toss/toss.client.js';
+import { TossRateLimitedError } from '@/infra/toss/toss.errors.js';
 
 import { MarketCalendarService } from './market-calendar.service.js';
 import { MarketScanService } from './market-scan.service.js';
@@ -100,8 +101,66 @@ describe('MarketScanService', () => {
     await service.intradayStats('005930', now + 59_000);
     expect(calls('/api/v1/candles')).toHaveLength(2);
 
+    // 1분이 지나면 새 봉만 한 번 받아요
     await service.intradayStats('005930', now + 60_000);
-    expect(calls('/api/v1/candles')).toHaveLength(4);
+    expect(calls('/api/v1/candles')).toHaveLength(3);
+  });
+
+  it('새 봉만 받아 들고 있던 봉과 합쳐요', async () => {
+    respond(({ query }) =>
+      query?.count === 200
+        ? { candles: [candle('09:02', 10_000), candle('09:01', 10_000)] }
+        : {
+            candles: [
+              candle('09:04', 13_000),
+              candle('09:03', 13_000),
+              candle('09:02', 10_000),
+            ],
+          },
+    );
+    const now = Date.parse('2026-10-30T09:02:10+09:00');
+    await service.intradayStats('005930', now);
+
+    const stats = await service.intradayStats('005930', now + 120_000);
+
+    // 09:02 봉 뒤로 3분 + 겹쳐 받는 2개
+    expect(calls('/api/v1/candles').at(-1)?.[0].query).toMatchObject({
+      count: 5,
+      before: undefined,
+    });
+    expect(stats).toEqual({ openPrice: 10_000, vwap: 11_500 });
+  });
+
+  it('새 봉이 들고 있던 봉과 이어지지 않으면 처음부터 다시 받아요', async () => {
+    respond(({ query }) =>
+      query?.count === 200
+        ? { candles: [candle('12:00', 10_000), candle('08:59', 9_000)] }
+        : { candles: [candle('12:30', 13_000)] },
+    );
+    const now = Date.parse('2026-10-30T09:02:10+09:00');
+    await service.intradayStats('005930', now);
+
+    await service.intradayStats('005930', now + 60_000);
+
+    expect(calls('/api/v1/candles').map(([call]) => call.query?.count)).toEqual(
+      [200, 2, 200],
+    );
+  });
+
+  it('호출 한도에 걸리면 1분 전 값을 쓰고, 처음 받는 종목이면 던져요', async () => {
+    respond(() => ({ candles: [candle('09:01', 10_000)] }));
+    const now = Date.parse('2026-10-30T10:00:00+09:00');
+    await service.intradayStats('005930', now);
+    toss.request.mockRejectedValue(
+      new TossRateLimitedError('MARKET_DATA_CHART'),
+    );
+
+    await expect(
+      service.intradayStats('005930', now + 60_000),
+    ).resolves.toEqual({ openPrice: 10_000, vwap: 10_000 });
+    await expect(service.intradayStats('000660', now)).rejects.toThrow(
+      TossRateLimitedError,
+    );
   });
 
   it('정규장이 아니면 1분봉을 받지 않아요', async () => {

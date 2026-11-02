@@ -147,6 +147,11 @@ export class TossClient {
     if (response.status === HttpStatus.TOO_MANY_REQUESTS) {
       const retryAfter = Number(response.headers.get('retry-after') ?? 1);
       this.limiter.block(group, retryAfter * TossClient.MS_PER_SECOND);
+      // 어느 그룹이 어떤 한도에 걸렸는지 남겨요 (토스 실제 한도 확인용)
+      const header = (name: string) => response.headers.get(name) ?? '-';
+      this.logger.warn(
+        `429 ${group} ${method} ${path} ${JSON.stringify(query ?? {})} limit=${header('x-ratelimit-limit')} remaining=${header('x-ratelimit-remaining')} reset=${header('x-ratelimit-reset')} retry-after=${header('retry-after')}`,
+      );
     }
     throw error;
   }
