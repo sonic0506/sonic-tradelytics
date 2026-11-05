@@ -57,6 +57,7 @@ describe('BotRunnerService', () => {
     enter: vi.fn<OrderService['enter']>(),
     exit: vi.fn<OrderService['exit']>(),
     exitState: vi.fn<OrderService['exitState']>(),
+    cancelStaleEntries: vi.fn<OrderService['cancelStaleEntries']>(),
     unprotectedStopPrice: vi.fn<OrderService['unprotectedStopPrice']>(),
     liquidate: vi.fn<OrderService['liquidate']>(),
   };
@@ -380,6 +381,14 @@ describe('BotRunnerService', () => {
         reason: 'rule_exit',
         quantity: 4,
       });
+    });
+
+    it('주기마다 제한 시간이 지난 진입 주문을 취소해요', async () => {
+      collector.snapshot.mockReturnValue(snapshot(10_300));
+
+      await runner.cycle(now);
+
+      expect(orders.cancelStaleEntries).toHaveBeenCalledWith(bot.id, now);
     });
 
     it('손절이 걸리지 않았고 발동가에 닿으면 직접 손절해요', async () => {

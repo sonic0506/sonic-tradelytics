@@ -25,6 +25,8 @@ import { type StopSummary, TossBrokerService } from './toss-broker.service.js';
 const RESEND_WINDOW_MS = 480_000;
 // 거부된 손절을 다시 걸 때까지, 발동된 손절의 체결 보고를 기다리는 시간
 const STOP_RETRY_MS = 60_000;
+// 이 시간 안에 체결되지 않은 진입 주문은 취소해요. 오래된 판단으로 뒤늦게 사지 않게요
+const ENTRY_ORDER_TTL_MS = 60_000;
 const MINUTE_MS = 60_000;
 
 type DecisionRecord = Parameters<DecisionService['record']>[0];
@@ -577,6 +579,31 @@ export class OrderService {
       Promise.resolve(0),
     );
     return scored;
+  }
+
+  // 제한 시간이 지난 미체결 진입 주문을 취소해요. 결과(CANCELED)는 재동기화로 반영돼요. 일부 체결이면 나머지만 취소돼요
+  async cancelStaleEntries(botId: number, now: Date): Promise<void> {
+    const open = await this.orders.findOpenBotOrders(botId);
+    const stale = open.filter(
+      ({ side, status, createdAt }) =>
+        side === 'BUY' &&
+        status !== 'PENDING_CANCEL' &&
+        now.getTime() - createdAt.getTime() >= ENTRY_ORDER_TTL_MS,
+    );
+    await stale.reduce<Promise<void>>(
+      (previous, { id, brokerOrderId }) =>
+        previous.then(async () => {
+          if (brokerOrderId === null) return;
+          try {
+            await this.broker.cancel(brokerOrderId);
+          } catch (error) {
+            this.logger.warn(
+              `order ${id}: 진입 주문 취소 응답을 못 받았어요(${String(error)})`,
+            );
+          }
+        }),
+      Promise.resolve(),
+    );
   }
 
   // 일시정지·청산·킬 스위치: 봇 미체결 주문을 취소해요. 결과(CANCELED)는 재동기화로 반영돼요. 취소하지 못한 수를 돌려줘요

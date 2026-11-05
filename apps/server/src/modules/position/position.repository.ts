@@ -103,7 +103,13 @@ export class PositionRepository {
   ): Promise<(string | null)[]> {
     const closed = await this.positions.find({
       select: { id: true, exitReason: true },
-      where: { botId, status: 'closed', closedAt: MoreThan(since) },
+      // 체결 없이 끝난 진입은 거래가 아니에요. 세면 연속 손절이 끊겨요
+      where: {
+        botId,
+        status: 'closed',
+        closedAt: MoreThan(since),
+        exitReason: Not('not_filled'),
+      },
       order: { closedAt: 'DESC' },
       take,
     });

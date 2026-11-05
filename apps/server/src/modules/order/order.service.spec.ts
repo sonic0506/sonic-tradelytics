@@ -1221,6 +1221,50 @@ describe('OrderService', () => {
       expect(broker.cancel.mock.calls).toEqual([['o-1'], ['o-3']]);
     });
 
+    describe('진입 주문 제한 시간', () => {
+      const entry = (secondsAgo: number, fields: Partial<BrokerOrder> = {}) =>
+        known({
+          side: 'BUY',
+          status: 'PENDING',
+          brokerOrderId: 'o-1',
+          createdAt: new Date(now.getTime() - secondsAgo * 1000),
+          ...fields,
+        });
+
+      it('60초가 지난 미체결 매수만 취소해요', async () => {
+        orders.findOpenBotOrders.mockResolvedValue([
+          entry(60),
+          entry(59, { brokerOrderId: 'o-2' }),
+          entry(90, { brokerOrderId: 'o-3', side: 'SELL' }),
+        ]);
+        broker.cancel.mockResolvedValue(true);
+
+        await service.cancelStaleEntries(7, now);
+
+        expect(orders.findOpenBotOrders).toHaveBeenCalledWith(7);
+        expect(broker.cancel.mock.calls).toEqual([['o-1']]);
+      });
+
+      it('취소 중인 주문은 다시 취소하지 않아요', async () => {
+        orders.findOpenBotOrders.mockResolvedValue([
+          entry(90, { status: 'PENDING_CANCEL' }),
+        ]);
+
+        await service.cancelStaleEntries(7, now);
+
+        expect(broker.cancel).not.toHaveBeenCalled();
+      });
+
+      it('취소 응답을 못 받아도 봇을 멈추지 않고 다음 주기에 다시 봐요', async () => {
+        orders.findOpenBotOrders.mockResolvedValue([entry(90)]);
+        broker.cancel.mockRejectedValue(new Error('timeout'));
+
+        await expect(
+          service.cancelStaleEntries(7, now),
+        ).resolves.toBeUndefined();
+      });
+    });
+
     it('보유 포지션마다 시장가로 청산하고 팔지 못한 수를 돌려줘요', async () => {
       const held = Object.assign({
         id: 2,

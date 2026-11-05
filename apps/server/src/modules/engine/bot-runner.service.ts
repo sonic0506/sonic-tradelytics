@@ -164,6 +164,7 @@ export class BotRunnerService {
       const held = await this.positions.findHeldByBot(bot.id);
       const isRunning = bot.status === 'running';
       if (isRunning && (await this.isLimitHit(bot, version, held, now))) return;
+      await this.orders.cancelStaleEntries(bot.id, now);
       await this.tryExits(version, params, held, now);
       if (isRunning) await this.tryEntry(bot, version, params, now);
     } catch (error) {
