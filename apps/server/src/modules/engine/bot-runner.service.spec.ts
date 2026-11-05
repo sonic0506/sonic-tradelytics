@@ -57,6 +57,7 @@ describe('BotRunnerService', () => {
     enter: vi.fn<OrderService['enter']>(),
     exit: vi.fn<OrderService['exit']>(),
     exitState: vi.fn<OrderService['exitState']>(),
+    unprotectedStopPrice: vi.fn<OrderService['unprotectedStopPrice']>(),
     liquidate: vi.fn<OrderService['liquidate']>(),
   };
   const risk = {
@@ -132,6 +133,7 @@ describe('BotRunnerService', () => {
     fund.entryBudget.mockResolvedValue(49_950);
     fund.activeAllocation.mockResolvedValue(null);
     orders.exitState.mockResolvedValue({ hasOpenOrders: false, takenSteps: 0 });
+    orders.unprotectedStopPrice.mockResolvedValue(null);
     const moduleRef = await Test.createTestingModule({
       providers: [
         BotRunnerService,
@@ -380,7 +382,40 @@ describe('BotRunnerService', () => {
       });
     });
 
+    it('손절이 걸리지 않았고 발동가에 닿으면 직접 손절해요', async () => {
+      collector.snapshot.mockReturnValue(snapshot(10_180));
+      orders.unprotectedStopPrice.mockResolvedValue(10_200);
+
+      await runner.cycle(now);
+
+      expect(exitRequest()).toMatchObject({
+        reason: 'stop_loss',
+        quantity: 4,
+      });
+    });
+
+    it('시세가 없어도 손절이 걸렸는지는 맞춰요', async () => {
+      collector.snapshot.mockReturnValue(undefined);
+
+      await runner.cycle(now);
+
+      expect(orders.unprotectedStopPrice).toHaveBeenCalled();
+      expect(orders.exit).not.toHaveBeenCalled();
+    });
+
     it('미체결 주문이 있으면 결과를 기다려요', async () => {
+      collector.snapshot.mockReturnValue(snapshot(10_520));
+      orders.exitState.mockResolvedValue({
+        hasOpenOrders: true,
+        takenSteps: 0,
+      });
+
+      await runner.cycle(now);
+
+      expect(orders.unprotectedStopPrice).not.toHaveBeenCalled();
+    });
+
+    it('미체결 주문이 있으면 팔지 않고 결과를 기다려요', async () => {
       collector.snapshot.mockReturnValue(snapshot(10_520));
       orders.exitState.mockResolvedValue({
         hasOpenOrders: true,

@@ -21,6 +21,7 @@ import type {
   PlaceResult,
   PlaceStop,
   StopResult,
+  StopSummary,
 } from './toss-broker.service.js';
 
 interface PaperOrder extends Omit<PlaceOrder, 'clientOrderId'> {
@@ -177,6 +178,11 @@ export class PaperBrokerService {
       isTriggered: triggeredOrderId !== null,
       triggeredOrderId,
     });
+  }
+
+  // 모의 체결은 손절 응답을 잃지 않아요. 재시작 전 손절은 start()가 다시 맡아요
+  listStops(): Promise<StopSummary[]> {
+    return Promise.resolve([]);
   }
 
   listOrders(symbol: string, from: string): Promise<BrokerOrderSummary[]> {

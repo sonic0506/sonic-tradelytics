@@ -190,6 +190,41 @@ describe('TossBrokerService', () => {
     });
   });
 
+  it('복구 후보로 OPEN·CLOSED 조건주문 중 SINGLE만 모아요', async () => {
+    respond({
+      conditionalOrders: [
+        {
+          conditionalOrderId: 'c-1',
+          type: 'SINGLE',
+          quantity: '3',
+          createdAt: '2026-10-29T09:30:00+09:00',
+          first: { triggerPrice: '68000' },
+        },
+        {
+          conditionalOrderId: 'c-2',
+          type: 'OCO',
+          quantity: '3',
+          createdAt: '2026-10-29T09:30:00+09:00',
+          first: { triggerPrice: '68000' },
+        },
+      ],
+    });
+
+    const result = await broker.listStops('005930');
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      conditionalOrderId: 'c-1',
+      quantity: 3,
+      triggerPrice: 68_000,
+      createdAt: new Date('2026-10-29T00:30:00Z'),
+    });
+    expect(toss.request.mock.calls.map(([options]) => options.query)).toEqual([
+      { status: 'OPEN', symbol: '005930', limit: 100 },
+      { status: 'CLOSED', symbol: '005930', limit: 100 },
+    ]);
+  });
+
   it('손절 취소가 받아들여지면 true, 이미 발동돼 4xx면 false예요', async () => {
     respond(undefined);
     await expect(broker.cancelStop('c-1')).resolves.toBe(true);

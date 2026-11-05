@@ -155,13 +155,14 @@ export type ExitSignal =
   | { action: 'hold' }
   | {
       action: 'sell';
-      reason: 'time_exit' | 'vwap_break' | 'take_profit';
+      reason: 'time_exit' | 'stop_loss' | 'vwap_break' | 'take_profit';
       // 지금 보유 수량 중 팔 비율 (0~1]
       ratio: number;
       check: RuleCheck;
     };
 
-// 청산 판단. 장 마감 전 청산 → VWAP 이탈 → 분할 익절 순서로 봐요. 손절은 조건주문이 맡아요 (POL-RISK-11)
+// 청산 판단. 장 마감 전 청산 → 손절 → VWAP 이탈 → 분할 익절 순서로 봐요.
+// 손절은 조건주문이 맡아요 (POL-RISK-11). 조건주문이 걸리지 않았을 때만 여기서 봐요
 export function evaluateExit(
   params: DayTradingParams,
   state: {
@@ -172,6 +173,8 @@ export function evaluateExit(
     // 이미 실행한 익절 단계 수
     takenSteps: number;
     nowKst: string;
+    // 조건주문이 걸리지 않은 포지션의 손절가. 걸려 있으면 null
+    unprotectedStopPrice: number | null;
   },
 ): ExitSignal {
   if (state.nowKst >= params.exitAt)
@@ -183,6 +186,20 @@ export function evaluateExit(
         rule: 'exit_at',
         value: minutesOf(state.nowKst),
         threshold: minutesOf(params.exitAt),
+      },
+    };
+  if (
+    state.unprotectedStopPrice !== null &&
+    state.price <= state.unprotectedStopPrice
+  )
+    return {
+      action: 'sell',
+      reason: 'stop_loss',
+      ratio: 1,
+      check: {
+        rule: 'stop_loss',
+        value: state.price,
+        threshold: state.unprotectedStopPrice,
       },
     };
   const belowVwap = round(-pctChange(state.vwap, state.price));

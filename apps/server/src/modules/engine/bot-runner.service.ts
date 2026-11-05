@@ -46,6 +46,7 @@ interface Candidate {
 // 규칙 청산 신호 → positions.exit_reason (F2)
 const EXIT_REASON = {
   time_exit: 'market_close',
+  stop_loss: 'stop_loss',
   vwap_break: 'rule_exit',
   take_profit: 'take_profit',
 } as const satisfies Record<
@@ -232,7 +233,8 @@ export class BotRunnerService {
     return true;
   }
 
-  // ⑦ 청산 판단. 미체결 주문이 있는 포지션은 결과를 기다려요. 손절은 조건주문이 맡아요
+  // ⑦ 청산 판단. 미체결 주문이 있는 포지션은 결과를 기다려요.
+  // 손절은 조건주문이 맡아요. 걸리지 않았으면 주기마다 다시 걸고, 그동안은 여기서 손절해요
   private async tryExits(
     version: BotVersion,
     params: DayTradingParams,
@@ -244,12 +246,15 @@ export class BotRunnerService {
       (previous, position) =>
         previous.then(async () => {
           if (position.quantity === 0) return;
-          const price = this.collector.snapshot(position.symbol)?.price;
-          if (price === undefined) return;
           const { hasOpenOrders, takenSteps } = await this.orders.exitState(
             position.id,
           );
           if (hasOpenOrders) return;
+          const unprotectedStopPrice = await this.orders.unprotectedStopPrice(
+            position.id,
+          );
+          const price = this.collector.snapshot(position.symbol)?.price;
+          if (price === undefined) return;
           // VWAP를 모르면 VWAP 이탈은 보지 않아요
           const stats = await this.scanner.intradayStats(position.symbol);
           const signal = evaluateExit(params, {
@@ -258,6 +263,7 @@ export class BotRunnerService {
             avgPrice: position.costBasis / position.quantity,
             takenSteps,
             nowKst,
+            unprotectedStopPrice,
           });
           if (signal.action === 'hold') return;
           await this.orders.exit({

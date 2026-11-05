@@ -90,7 +90,28 @@ describe('day-trading.rule', () => {
       avgPrice: 10_000,
       takenSteps: 0,
       nowKst: '10:00:00',
+      unprotectedStopPrice: null,
     };
+
+    it('손절이 걸리지 않았고 발동가에 닿으면 전량 팔아요', () => {
+      const exposed = { ...held, unprotectedStopPrice: 9_800 };
+      expect(
+        evaluateExit(params, { ...exposed, price: 9_810, vwap: 9_810 }),
+      ).toEqual({
+        action: 'hold',
+      });
+      expect(evaluateExit(params, { ...exposed, price: 9_800 })).toMatchObject({
+        action: 'sell',
+        reason: 'stop_loss',
+        ratio: 1,
+      });
+    });
+
+    it('손절이 걸려 있으면 발동가 아래여도 증권사에 맡겨요', () => {
+      expect(evaluateExit(params, { ...held, price: 9_990 })).toEqual({
+        action: 'hold',
+      });
+    });
 
     it('조건이 없으면 보유해요', () => {
       expect(evaluateExit(params, held)).toEqual({ action: 'hold' });

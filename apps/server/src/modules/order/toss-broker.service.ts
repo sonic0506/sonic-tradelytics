@@ -53,6 +53,20 @@ const stopDetailSchema = z.object({
   first: z.object({ triggeredOrderId: z.string().nullable().optional() }),
 });
 
+const stopListSchema = z.object({
+  conditionalOrders: z.array(
+    z.object({
+      conditionalOrderId: z.string(),
+      type: z.string(),
+      quantity: z.coerce.number(),
+      createdAt: z.coerce.date(),
+      first: z.object({
+        triggerPrice: z.coerce.number().nullable().optional(),
+      }),
+    }),
+  ),
+});
+
 // 손절 조건주문 요청 (POL-RISK-11): SINGLE + 시장가 매도
 export interface PlaceStop {
   clientOrderId: string;
@@ -68,6 +82,14 @@ export type StopResult =
   | { outcome: 'rejected'; code: string }
   | { outcome: 'unknown'; reason: string };
 
+// 응답을 못 받은 손절을 찾을 때 비교하는 값
+export interface StopSummary {
+  conditionalOrderId: string;
+  quantity: number;
+  triggerPrice: number | null;
+  createdAt: Date;
+}
+
 // 발동돼 주문이 나간 상태 (ConditionalOrderDetailResponse.status)
 const TRIGGERED_STATUSES = new Set(['ORDERING', 'ORDERED', 'COMPLETED']);
 
@@ -81,6 +103,7 @@ export class TossBrokerService {
   // 판단용 주문이라 한도를 오래 기다리지 않아요 (NFR-03)
   private static readonly ORDER_WAIT_MS = 1000;
   private static readonly LOOKUP_WAIT_MS = 5000;
+  private static readonly STOP_PAGE_SIZE = 100;
 
   constructor(private readonly toss: TossClient) {}
 
@@ -191,6 +214,32 @@ export class TossBrokerService {
       isTriggered: TRIGGERED_STATUSES.has(detail.status),
       triggeredOrderId: detail.first.triggeredOrderId ?? null,
     };
+  }
+
+  // 그 종목의 SINGLE 조건주문 (응답 유실 복구 후보 찾기). 토스 앱에서 건 것도 함께 와요
+  async listStops(symbol: string): Promise<StopSummary[]> {
+    const pages = await Promise.all(
+      (['OPEN', 'CLOSED'] as const).map((status) =>
+        this.toss.request({
+          group: 'CONDITIONAL_ORDER_HISTORY',
+          path: '/api/v1/conditional-orders',
+          query: { status, symbol, limit: TossBrokerService.STOP_PAGE_SIZE },
+          account: true,
+          waitMs: TossBrokerService.LOOKUP_WAIT_MS,
+          result: stopListSchema,
+        }),
+      ),
+    );
+    // ponytail: 첫 페이지(최대 100건)만 봐요. 한 종목 조건주문이 100건을 넘으면 cursor로 더 읽어요
+    return pages
+      .flatMap(({ conditionalOrders }) => conditionalOrders)
+      .filter(({ type }) => type === 'SINGLE')
+      .map(({ conditionalOrderId, quantity, createdAt, first }) => ({
+        conditionalOrderId,
+        quantity,
+        triggerPrice: first.triggerPrice ?? null,
+        createdAt,
+      }));
   }
 
   // 그 날(KST) 이후 접수된 그 종목 주문 (응답 유실 복구 후보 찾기)

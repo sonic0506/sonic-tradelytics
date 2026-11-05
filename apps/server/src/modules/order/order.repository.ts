@@ -157,6 +157,32 @@ export class OrderRepository {
     return this.orders.findOneBy({ brokerOrderId });
   }
 
+  async linkedConditionalOrderIds(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const linked = await this.protectives.find({
+      select: { id: true, brokerConditionalOrderId: true },
+      where: { brokerConditionalOrderId: In(ids) },
+      take: ids.length,
+    });
+    return new Set(
+      linked.flatMap(
+        ({ brokerConditionalOrderId }) => brokerConditionalOrderId ?? [],
+      ),
+    );
+  }
+
+  // 발동된 손절의 주문이 아직 체결 보고로 들어오지 않았을 수 있는 동안
+  hasRecentTriggeredProtective(
+    positionId: number,
+    since: Date,
+  ): Promise<boolean> {
+    return this.protectives.existsBy({
+      positionId,
+      status: 'triggered',
+      closedAt: MoreThanOrEqual(since),
+    });
+  }
+
   findLiveProtective(positionId: number): Promise<ProtectiveOrder | null> {
     return this.protectives.findOneBy({
       positionId,
