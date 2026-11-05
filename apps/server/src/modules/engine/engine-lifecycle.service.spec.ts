@@ -14,6 +14,7 @@ import { NotificationService } from '@/modules/notification/index.js';
 import { OrderService } from '@/modules/order/index.js';
 
 import { BotRunnerService } from './bot-runner.service.js';
+import { ConnectionMonitorService } from './connection-monitor.service.js';
 import { EngineAlreadyRunningException } from './engine.exception.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
 import { EngineScheduleService } from './engine-schedule.service.js';
@@ -54,6 +55,10 @@ describe('EngineLifecycleService', () => {
     stop: vi.fn<StatusReporterService['stop']>(),
     report: vi.fn<StatusReporterService['report']>(),
   };
+  const connectionMonitor = {
+    start: vi.fn<ConnectionMonitorService['start']>(),
+    stop: vi.fn<ConnectionMonitorService['stop']>(),
+  };
   const schedule = {
     start: vi.fn<EngineScheduleService['start']>(),
     stop: vi.fn<EngineScheduleService['stop']>(),
@@ -83,6 +88,7 @@ describe('EngineLifecycleService', () => {
         { provide: MarketCalendarService, useValue: calendar },
         { provide: NotificationService, useValue: notifications },
         { provide: StatusReporterService, useValue: statusReporter },
+        { provide: ConnectionMonitorService, useValue: connectionMonitor },
         { provide: EngineScheduleService, useValue: schedule },
         { provide: OrderService, useValue: orders },
         { provide: BotRunnerService, useValue: botRunner },

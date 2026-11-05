@@ -15,6 +15,7 @@ import { RiskModule } from '@/modules/risk/index.js';
 
 import { BatchRunRepository } from './batch-run.repository.js';
 import { BotRunnerService } from './bot-runner.service.js';
+import { ConnectionMonitorService } from './connection-monitor.service.js';
 import { EngineLifecycleService } from './engine-lifecycle.service.js';
 import { EngineScheduleService } from './engine-schedule.service.js';
 import { BatchRun } from './entities/batch-run.entity.js';
@@ -38,6 +39,7 @@ import { StatusReporterService } from './status-reporter.service.js';
   ],
   providers: [
     BotRunnerService,
+    ConnectionMonitorService,
     EngineLifecycleService,
     EngineScheduleService,
     BatchRunRepository,

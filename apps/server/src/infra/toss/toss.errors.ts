@@ -40,5 +40,19 @@ export function isRateLimited(error: unknown): boolean {
   );
 }
 
+const UNAUTHORIZED = 401;
+const SERVER_ERROR = 500;
+
+// 토스가 요청을 처리하지 못한 오류예요(타임아웃, 5xx, 토큰 무효, 미등록 IP). 주문 거부 같은 4xx와 429는 토스가 답한 거예요
+export function isUnreachable(error: unknown): boolean {
+  if (error instanceof TossNoResponseError) return true;
+  return (
+    error instanceof TossApiError &&
+    (error.status >= SERVER_ERROR ||
+      error.status === UNAUTHORIZED ||
+      error.code === 'ip-not-allowed')
+  );
+}
+
 // engine 설정(TOSS_* 환경 변수)이 비어 있어요
 export class TossConfigError extends Error {}

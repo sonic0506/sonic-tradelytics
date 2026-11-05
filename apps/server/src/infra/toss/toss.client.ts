@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { env } from '@/config/env.js';
 
 import {
+  isUnreachable,
   TossApiError,
   TossConfigError,
   TossNoResponseError,
@@ -77,6 +78,7 @@ export class TossClient {
   private token: StoredToken | undefined;
   // 동시에 여러 호출이 토큰을 기다려도 발급은 한 번만 해요
   private issuing: Promise<string> | undefined;
+  private unreachable: string | undefined;
 
   constructor() {
     if (!env.TOSS_CLIENT_ID || !env.TOSS_CLIENT_SECRET)
@@ -91,7 +93,21 @@ export class TossClient {
   async request<S extends z.ZodType>(
     options: TossRequest<S>,
   ): Promise<z.infer<S>> {
-    return this.send(options, false);
+    try {
+      const result = await this.send(options, false);
+      this.unreachable = undefined;
+      return result;
+    } catch (error) {
+      if (isUnreachable(error)) this.unreachable = String(error);
+      else if (error instanceof TossApiError) this.unreachable = undefined;
+      throw error;
+    }
+  }
+
+  // 마지막 호출이 토스에 닿지 못했으면 그 이유예요. 응답을 받으면 지워요
+  // ponytail: 호출이 없으면 값이 그대로예요. 장중에는 시세·봇 주기가 계속 불러서 곧 바뀌어요
+  unreachableReason(): string | undefined {
+    return this.unreachable;
   }
 
   // engine 시작 순서 2번: 저장된 토큰을 읽고, 없거나 만료가 가까우면 발급해요

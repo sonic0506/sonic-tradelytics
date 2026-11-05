@@ -80,7 +80,7 @@ engine이 5초마다 쓰는 [`engine_statuses`](./data-model.md#engine_statuses)
 
 | 필드 | 설명 |
 | --- | --- |
-| `state` | `running` `stopping` `halted` (`halted`는 전체 정지: 킬 스위치·토큰·기록 실패) |
+| `state` | `running` `stopping` `halted` (`halted`는 전체 정지: 킬 스위치·토큰·기록 실패·토스 연결 끊김) |
 | `haltReasons` | 전체 정지 사유 코드 목록 |
 | `heartbeatAt` | engine 마지막 기록 시각. **30초 넘게 오래되면 web이 "엔진 응답 없음"으로 표시**해요 |
 | `staleSymbols` | 시세가 끊긴 종목 (`feed_stale`) |

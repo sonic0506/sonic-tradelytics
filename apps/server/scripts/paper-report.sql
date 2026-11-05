@@ -28,7 +28,9 @@ batches AS (
 ),
 risks AS (
   SELECT occurred_at::date AS d, count(*) AS n FROM risk_events
-  WHERE kind IN ('bot_error', 'record_fail') GROUP BY 1
+  WHERE kind IN ('bot_error', 'record_fail', 'feed_stale') GROUP BY 1
+  -- 11/5 10:03부터 장 마감까지 토스 접속 장애(미등록 IP). 감지를 넣기 전이라 기록이 없어요
+  UNION ALL SELECT DATE '2026-11-05', 1
 ),
 pos AS (
   SELECT opened_at::date AS d, count(*) AS n, sum(realized_pnl) AS pnl, sum(total_fees) AS fees,

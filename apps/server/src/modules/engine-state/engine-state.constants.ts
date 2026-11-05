@@ -1,4 +1,4 @@
-// halted는 전체 정지 (킬 스위치·토큰·기록 실패)
+// halted는 전체 정지 (킬 스위치·토큰·기록 실패·토스 연결 끊김)
 export const ENGINE_STATES = ['running', 'stopping', 'halted'] as const;
 export type EngineStateValue = (typeof ENGINE_STATES)[number];
 
@@ -8,5 +8,6 @@ export const HALT_REASONS = [
   'stopping',
   'token',
   'record_fail',
+  'feed_stale',
 ] as const;
 export type HaltReason = (typeof HALT_REASONS)[number];

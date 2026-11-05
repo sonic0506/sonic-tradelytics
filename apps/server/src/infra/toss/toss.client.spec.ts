@@ -211,4 +211,50 @@ describe('TossClient', () => {
 
     await expect(getBuyingPower()).rejects.toThrow(TossNoResponseError);
   });
+
+  describe('토스에 닿지 못하는 상태', () => {
+    const answer = (status: number, code: string): void => {
+      server.use(
+        http.get(`${BASE}/api/v1/buying-power`, () =>
+          HttpResponse.json({ error: { code } }, { status }),
+        ),
+      );
+    };
+    const fail = (): Promise<unknown> =>
+      getBuyingPower().catch((error: unknown) => error);
+
+    it('허용되지 않은 IP면 이유를 알려 주고, 성공하면 지워요', async () => {
+      answer(403, 'ip-not-allowed');
+      await fail();
+      expect(client.unreachableReason()).toContain('ip-not-allowed');
+
+      server.use(
+        http.get(`${BASE}/api/v1/buying-power`, () =>
+          HttpResponse.json({ result: { cashBuyingPower: '1' } }),
+        ),
+      );
+      await getBuyingPower();
+      expect(client.unreachableReason()).toBeUndefined();
+    });
+
+    it('5xx도 닿지 못한 것으로 봐요', async () => {
+      answer(503, 'unavailable');
+      await fail();
+      expect(client.unreachableReason()).toContain('503');
+    });
+
+    it('주문 거부 같은 4xx와 429는 토스가 답한 것이라 상태를 지워요', async () => {
+      answer(503, 'unavailable');
+      await fail();
+      answer(400, 'invalid-request');
+      await fail();
+      expect(client.unreachableReason()).toBeUndefined();
+
+      answer(503, 'unavailable');
+      await fail();
+      answer(429, 'rate-limit-exceeded');
+      await fail();
+      expect(client.unreachableReason()).toBeUndefined();
+    });
+  });
 });

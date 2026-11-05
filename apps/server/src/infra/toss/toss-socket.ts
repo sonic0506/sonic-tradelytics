@@ -73,6 +73,10 @@ export class TossSocket {
     this.sendDeclaration();
   }
 
+  isConnected(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN;
+  }
+
   close(): void {
     this.isClosed = true;
     clearTimeout(this.retry);

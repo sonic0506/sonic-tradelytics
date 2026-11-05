@@ -168,4 +168,17 @@ describe('TossSocket', () => {
 
     expect(FakeSocket.instances).toHaveLength(1);
   });
+
+  it('열려 있을 때만 연결된 것으로 알려 줘요', async () => {
+    expect(socket.isConnected()).toBe(false);
+
+    const opened = await connect();
+    expect(socket.isConnected()).toBe(false);
+
+    opened.open();
+    expect(socket.isConnected()).toBe(true);
+
+    opened.drop();
+    expect(socket.isConnected()).toBe(false);
+  });
 });
