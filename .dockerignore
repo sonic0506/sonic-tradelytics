@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/dist
+**/coverage
+**/.env*
+**/.toss-token.json
+apps/web/*
+!apps/web/package.json
+spikes
+docs
+assets
+deploy

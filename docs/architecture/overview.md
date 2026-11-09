@@ -69,3 +69,14 @@ DART API  ◀──  │ DartClient (장전 점검용 공시 목록)            
 ## 배포
 
 고정 IP VM 1대에 Docker Compose로 `api`, `engine`, `web`, `postgres`를 띄워요. 토스 허용 IP에 이 VM의 IP를 등록해요. 관리 화면 접근은 [ADR-0006](./adr/0006-network-level-access-control.md)을 따라요.
+
+파일은 [`deploy/compose.yaml`](../../deploy/compose.yaml)과 [`apps/server/Dockerfile`](../../apps/server/Dockerfile)이에요 (api·engine이 같은 이미지).
+
+1. `apps/server/.env.example`을 `deploy/.env`로 복사하고(커밋하지 않아요) 채워요: `POSTGRES_PASSWORD`, `NODE_ENV=production`, `DATABASE_URL=postgres://postgres:<비밀번호>@postgres:5432/tradelytics`, 운영용 토스 키(개발 키와 달라야 해요, R-014)
+2. `docker compose -f deploy/compose.yaml up -d --build`
+3. 순서: `postgres`(준비 확인) → `migrate`(스키마 맞추고 끝남) → `engine`·`api`. migration이 실패하면 둘 다 뜨지 않아요
+4. `engine`·`api`·`postgres`는 서버가 재부팅되거나 프로세스가 죽으면 다시 떠요(`restart: unless-stopped`). engine은 단일 실행 잠금이 있어 겹쳐 뜨지 않고, 토큰 파일은 `engine-data` 볼륨에 둬 재시작해도 다시 발급하지 않아요
+5. 실전 봇은 `LIVE_BOTS_ENABLED=true`를 넣어야 돌아요. 처음에는 비워 두고 engine이 장중에 끊김 없이 붙는지부터 봐요
+6. api는 서버 안(`127.0.0.1:3000`)에만 열려요. web은 아직 api 프록시·인증이 없어 compose에 없어요
+
+배포 중 engine을 다시 띄우면 그동안 판단이 멈춰요. 장중에는 다시 띄우지 않아요.

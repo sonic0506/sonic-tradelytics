@@ -1,0 +1,71 @@
+# 운영 서버(고정 IP VM) 한 대에 postgres, migrate, engine, api를 띄워요 (docs/learning/10-deploy-and-access.md)
+#   cp apps/server/.env.example deploy/.env  # 값을 채우고 POSTGRES_PASSWORD를 더해요
+#   docker compose -f deploy/compose.yaml up -d --build
+# ponytail: web은 아직 api를 부르는 프록시·인증이 없어 빠져 있어요. 붙일 때 서비스를 더해요
+name: sonic-tradelytics
+
+x-server: &server
+  image: sonic-tradelytics-server
+  env_file: .env
+  logging:
+    driver: json-file
+    options: { max-size: 20m, max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?deploy/.env에 POSTGRES_PASSWORD가 필요해요}
+      POSTGRES_DB: tradelytics
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 12
+
+  # 매번 올릴 때 스키마를 먼저 맞춰요. 실패하면 engine·api가 뜨지 않아요
+  migrate:
+    <<: *server
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    command:
+      [
+        "node",
+        "/app/node_modules/typeorm/cli.js",
+        "migration:run",
+        "-d",
+        "dist/infra/database/data-source.js",
+      ]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  engine:
+    <<: *server
+    restart: unless-stopped
+    command: ["node", "dist/engine.js"]
+    environment:
+      # 토큰을 볼륨에 둬서 재시작해도 다시 발급하지 않아요 (R-014)
+      TOSS_TOKEN_FILE: /data/toss-token.json
+    volumes:
+      - engine-data:/data
+    # 종료 순서(신규 주문 막기 → 봇·배치 멈춤 → 상태 기록)를 마칠 시간을 줘요
+    stop_grace_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  api:
+    <<: *server
+    restart: unless-stopped
+    # 서버 밖으로 열지 않아요. 접근은 Tailscale로 해요 (ADR-0006)
+    ports:
+      - 127.0.0.1:3000:3000
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:
+  engine-data:
