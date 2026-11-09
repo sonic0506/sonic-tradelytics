@@ -112,14 +112,24 @@ describe('EngineLifecycleService', () => {
   describe('BotRunner (시작 순서 10번)', () => {
     afterEach(() => {
       env.BROKER_MODE = 'toss';
+      env.LIVE_BOTS_ENABLED = false;
     });
 
-    it('실전 모드에서는 M5 전이라 봇을 돌리지 않아요', async () => {
+    it('실전 모드에서는 LIVE_BOTS_ENABLED가 없으면 봇을 돌리지 않아요', async () => {
       lock.acquire.mockResolvedValue(true);
 
       await service.onApplicationBootstrap();
 
       expect(botRunner.start).not.toHaveBeenCalled();
+    });
+
+    it('실전 모드에서 LIVE_BOTS_ENABLED를 켜면 배치 일정 뒤에 봇을 돌려요', async () => {
+      env.LIVE_BOTS_ENABLED = true;
+      lock.acquire.mockResolvedValue(true);
+
+      await service.onApplicationBootstrap();
+
+      expect(botRunner.start).toHaveBeenCalledAfter(schedule.start);
     });
 
     it('개발 점검 모드에서는 배치 일정 뒤에 봇을 돌리고, 종료할 때 가장 먼저 멈춰요', async () => {

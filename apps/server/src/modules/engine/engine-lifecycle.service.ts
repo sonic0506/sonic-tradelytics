@@ -76,9 +76,15 @@ export class EngineLifecycleService
     this.statusReporter.start();
     this.connectionMonitor.start();
     await this.schedule.start();
-    // 실제 돈으로 봇을 돌리는 건 M5(소액 실전)부터예요. 그 전에는 개발 점검(PaperBroker)에서만 봇이 주문해요
+    // 실전에서 봇이 실제 돈으로 주문하려면 LIVE_BOTS_ENABLED=true를 따로 켜야 해요 (M5 소액 실전)
     if (env.BROKER_MODE === 'paper') this.botRunner.start();
-    else this.logger.warn('실전 모드라 BotRunner를 켜지 않아요 (M5 전)');
+    else if (env.LIVE_BOTS_ENABLED) {
+      this.logger.warn('실전 모드에서 BotRunner를 켜요 (LIVE_BOTS_ENABLED)');
+      this.botRunner.start();
+    } else
+      this.logger.warn(
+        '실전 모드라 BotRunner를 켜지 않아요 (LIVE_BOTS_ENABLED=true가 아니에요)',
+      );
     this.logger.log('engine 시작');
   }
 
