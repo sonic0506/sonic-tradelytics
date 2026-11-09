@@ -1,5 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { kstAt } from '@/common/time/kst-date.js';
+import { BotService } from '@/modules/bot/index.js';
+import { QuoteQueryService } from '@/modules/market-data/index.js';
+
+import { type DailyPosition, dailyResults } from './daily-result.rule.js';
 import type { Position } from './entities/position.entity.js';
 import { PositionNotFoundException } from './position.exception.js';
 import { PositionRepository } from './position.repository.js';
@@ -27,7 +32,66 @@ export interface BotHoldings {
 export class PositionService {
   private readonly logger = new Logger(PositionService.name);
 
-  constructor(private readonly positions: PositionRepository) {}
+  constructor(
+    private readonly positions: PositionRepository,
+    private readonly bots: BotService,
+    private readonly quotes: QuoteQueryService,
+  ) {}
+
+  // 장후 배치: 실행 중인 봇과 그날 포지션이 있던 봇의 일일 손익을 bot_daily_results에 써요 (FR-PERF-03)
+  async recordDailyResults(tradeDate: string): Promise<void> {
+    const dayStart = kstAt(tradeDate, '00:00');
+    const positions = (
+      await this.positions.findForDailyResults(dayStart)
+    ).flatMap((position): DailyPosition[] =>
+      position.botId === null ? [] : [{ ...position, botId: position.botId }],
+    );
+    const trading = await this.bots.findTrading();
+    const tradingIds = new Set(trading.map(({ bot }) => bot.id));
+    const others = await this.bots.findWithVersions([
+      ...new Set(
+        positions
+          .map(({ botId }) => botId)
+          .filter((botId) => !tradingIds.has(botId)),
+      ),
+    ]);
+    const versions = new Map<number, number>();
+    for (const { bot, version } of [...trading, ...others])
+      if (version) versions.set(bot.id, version.id);
+      else
+        this.logger.warn(
+          `봇 ${bot.id}는 적용된 버전이 없어 일일 집계를 건너뛰어요`,
+        );
+
+    const held = [
+      ...new Set(
+        positions
+          .filter(({ status, quantity }) => status === 'open' && quantity > 0)
+          .map(({ symbol }) => symbol),
+      ),
+    ];
+    const prices = await this.quotes.pricesOf(held);
+    const unpriced = held.filter((symbol) => !prices.has(symbol));
+    if (unpriced.length > 0)
+      this.logger.warn(
+        `최근가가 없어 평가 손익을 0으로 둬요: ${unpriced.join(', ')}`,
+      );
+
+    const rows = dailyResults(
+      [...versions.keys()],
+      positions,
+      dayStart,
+      prices,
+    );
+    await this.positions.upsertDailyResults(
+      rows.flatMap((row) => {
+        const botVersionId = versions.get(row.botId);
+        return botVersionId === undefined
+          ? []
+          : [{ ...row, tradeDate, botVersionId }];
+      }),
+    );
+  }
 
   // 봇마다 since(그 배분의 확정 시각) 이후 실현 손익과 지금 보유분을 모아요
   async botHoldings(

@@ -7,6 +7,7 @@ import { BotService } from '@/modules/bot/index.js';
 import { FundService } from '@/modules/fund/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
 import { OrderService } from '@/modules/order/index.js';
+import { PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { type BatchKey, BatchRunRepository } from './batch-run.repository.js';
@@ -39,8 +40,9 @@ export class EngineScheduleService {
     orders: OrderService,
     bots: BotService,
     fund: FundService,
+    positions: PositionService,
   ) {
-    // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·장중 점검·집계)는 그 기능을 만들 때 더해요
+    // 지금 할 일이 있는 job만 등록해요. 나머지(재평가·장중 점검)는 그 기능을 만들 때 더해요
     this.jobs = [
       // 토큰·오늘 캘린더 확인, 하루 손실 한도로 멈춘 봇 재개 (POL-RISK-02)
       {
@@ -62,13 +64,14 @@ export class EngineScheduleService {
           await fund.allocate(fundable.map(({ id }) => id));
         },
       },
-      // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)
+      // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)하고 봇별 일일 손익을 남겨요 (FR-PERF-03)
       {
         job: 'post_close',
         time: '15:40',
         run: async () => {
           await accountSync.syncAll();
           await orders.scoreClosedPositions();
+          await positions.recordDailyResults(kstDate());
         },
       },
     ];

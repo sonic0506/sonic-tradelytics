@@ -10,6 +10,7 @@ import {
   type Repository,
 } from 'typeorm';
 
+import { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import { Position } from './entities/position.entity.js';
 
 @Injectable()
@@ -43,6 +44,27 @@ export class PositionRepository {
       ],
       take: PositionRepository.MAX_FUND_ROWS,
     });
+  }
+
+  // 일일 집계용: 봇의 열린 포지션과 since 이후 닫힌 포지션
+  findForDailyResults(since: Date): Promise<Position[]> {
+    return this.positions.find({
+      where: [
+        { botId: Not(IsNull()), status: 'open' },
+        { botId: Not(IsNull()), closedAt: MoreThanOrEqual(since) },
+      ],
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+  }
+
+  // 같은 날 다시 돌리면 덮어써요
+  async upsertDailyResults(
+    rows: Omit<BotDailyResult, 'bot' | 'botVersion' | 'createdAt'>[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    await this.txHost.tx
+      .getRepository(BotDailyResult)
+      .upsert(rows, ['botId', 'tradeDate']);
   }
 
   async addFees(id: number, fees: number): Promise<void> {

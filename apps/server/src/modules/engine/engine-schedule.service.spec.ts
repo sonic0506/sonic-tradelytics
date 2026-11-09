@@ -6,6 +6,7 @@ import { type Bot, BotService } from '@/modules/bot/index.js';
 import { FundService } from '@/modules/fund/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
 import { OrderService } from '@/modules/order/index.js';
+import { PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { BatchRunRepository } from './batch-run.repository.js';
@@ -32,6 +33,9 @@ describe('EngineScheduleService', () => {
   };
   const bots = { findFundable: vi.fn<BotService['findFundable']>() };
   const fund = { allocate: vi.fn<FundService['allocate']>() };
+  const positions = {
+    recordDailyResults: vi.fn<PositionService['recordDailyResults']>(),
+  };
   let schedule: EngineScheduleService;
 
   const MINUTE_MS = 60_000;
@@ -68,6 +72,7 @@ describe('EngineScheduleService', () => {
         { provide: OrderService, useValue: orders },
         { provide: BotService, useValue: bots },
         { provide: FundService, useValue: fund },
+        { provide: PositionService, useValue: positions },
       ],
     }).compile();
     schedule = moduleRef.get(EngineScheduleService);
@@ -96,7 +101,7 @@ describe('EngineScheduleService', () => {
     expect(fund.allocate).toHaveBeenCalledWith([7, 8]);
   });
 
-  it('15:40에 post_close로 오늘 체결을 최종 동기화하고 판단을 채점해요', async () => {
+  it('15:40에 post_close로 오늘 체결을 최종 동기화하고 판단을 채점한 뒤 일일 손익을 남겨요', async () => {
     await schedule.start();
 
     await vi.advanceTimersByTimeAsync(339 * MINUTE_MS);
@@ -105,6 +110,10 @@ describe('EngineScheduleService', () => {
     await vi.advanceTimersByTimeAsync(MINUTE_MS);
     expect(accountSync.syncAll).toHaveBeenCalledOnce();
     expect(orders.scoreClosedPositions).toHaveBeenCalledOnce();
+    expect(positions.recordDailyResults).toHaveBeenCalledWith('2026-10-29');
+    expect(positions.recordDailyResults).toHaveBeenCalledAfter(
+      orders.scoreClosedPositions,
+    );
     expect(finished()).toContainEqual(['post_close', 'ok']);
   });
 

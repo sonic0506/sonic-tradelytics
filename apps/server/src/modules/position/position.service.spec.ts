@@ -1,5 +1,8 @@
 import { Test } from '@nestjs/testing';
 
+import { type Bot, BotService, type BotVersion } from '@/modules/bot/index.js';
+import { QuoteQueryService } from '@/modules/market-data/index.js';
+
 import type { Position } from './entities/position.entity.js';
 import { PositionNotFoundException } from './position.exception.js';
 import { PositionRepository } from './position.repository.js';
@@ -12,7 +15,14 @@ describe('PositionService', () => {
     createManual: vi.fn<PositionRepository['createManual']>(),
     findForFunds: vi.fn<PositionRepository['findForFunds']>(),
     update: vi.fn<PositionRepository['update']>(),
+    findForDailyResults: vi.fn<PositionRepository['findForDailyResults']>(),
+    upsertDailyResults: vi.fn<PositionRepository['upsertDailyResults']>(),
   };
+  const bots = {
+    findTrading: vi.fn<BotService['findTrading']>(),
+    findWithVersions: vi.fn<BotService['findWithVersions']>(),
+  };
+  const quotes = { pricesOf: vi.fn<QuoteQueryService['pricesOf']>() };
   let service: PositionService;
   const at = new Date('2026-10-29T01:00:00Z');
 
@@ -44,6 +54,8 @@ describe('PositionService', () => {
       providers: [
         PositionService,
         { provide: PositionRepository, useValue: positions },
+        { provide: BotService, useValue: bots },
+        { provide: QuoteQueryService, useValue: quotes },
       ],
     }).compile();
     service = moduleRef.get(PositionService);
@@ -236,5 +248,72 @@ describe('PositionService', () => {
 
     await expect(service.openManual('005930', at)).resolves.toBe(created);
     expect(positions.createManual).toHaveBeenCalledWith('005930', at);
+  });
+
+  describe('recordDailyResults', () => {
+    const withVersion = (botId: number, versionId: number | null) => ({
+      bot: Object.assign({ id: botId }) as Bot,
+      version:
+        versionId === null
+          ? null
+          : (Object.assign({ id: versionId }) as BotVersion),
+    });
+
+    it('실행 중인 봇과 그날 포지션이 닫힌 봇의 일일 손익을 지금 버전과 함께 남겨요', async () => {
+      positions.findForDailyResults.mockResolvedValue([
+        position({
+          botId: 8,
+          status: 'closed',
+          realizedPnl: 700,
+          totalFees: 40,
+          closedAt: new Date('2026-11-09T06:15:00Z'),
+        }),
+        position({ botId: 7, quantity: 2, costBasis: 20_000 }),
+      ]);
+      bots.findTrading.mockResolvedValue([withVersion(7, 70)]);
+      bots.findWithVersions.mockResolvedValue([withVersion(8, 80)]);
+      quotes.pricesOf.mockResolvedValue(new Map([['005930', 10_100]]));
+
+      await service.recordDailyResults('2026-11-09');
+
+      expect(positions.findForDailyResults).toHaveBeenCalledWith(
+        new Date('2026-11-08T15:00:00Z'),
+      );
+      expect(bots.findWithVersions).toHaveBeenCalledWith([8]);
+      expect(positions.upsertDailyResults).toHaveBeenCalledWith([
+        {
+          botId: 7,
+          tradeDate: '2026-11-09',
+          botVersionId: 70,
+          realizedPnl: 0,
+          unrealizedPnl: 200,
+          fees: 0,
+          closedTrades: 0,
+        },
+        {
+          botId: 8,
+          tradeDate: '2026-11-09',
+          botVersionId: 80,
+          realizedPnl: 700,
+          unrealizedPnl: 0,
+          fees: 40,
+          closedTrades: 1,
+        },
+      ]);
+    });
+
+    it('적용된 버전이 없는 봇과 직접 거래 포지션은 빼요', async () => {
+      positions.findForDailyResults.mockResolvedValue([
+        position({ botId: null, quantity: 1, costBasis: 10_000 }),
+      ]);
+      bots.findTrading.mockResolvedValue([withVersion(7, null)]);
+      bots.findWithVersions.mockResolvedValue([]);
+      quotes.pricesOf.mockResolvedValue(new Map());
+
+      await service.recordDailyResults('2026-11-09');
+
+      expect(quotes.pricesOf).toHaveBeenCalledWith([]);
+      expect(positions.upsertDailyResults).toHaveBeenCalledWith([]);
+    });
   });
 });
