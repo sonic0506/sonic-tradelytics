@@ -214,6 +214,8 @@ Node는 한 스레드라 봇이 많아도 동시에 하나씩 돌아요. 규칙 
 
 **통과 기준 확인**: `docker exec -i sonic-tradelytics-db psql -U postgres -d tradelytics_paper -v ON_ERROR_STOP=1 < apps/server/scripts/paper-report.sql`. 거래일별 배치, 봇 오류, 주문 반복, 미청산, 근거 기록과 연속 통과 일수를 보여 줘요. 배치 사이의 짧은 재시작은 DB에 남지 않으니 무중단은 engine 로그와 함께 봐요.
 
+**상한 초과 주문 (M5 기준)**: `apps/server/scripts/over-cap-report.sql`은 검증 구간 봇이 매수 주문을 낸 순간의 노출액(그 주문 + 이미 든 포지션의 남은 수량)을 상한(`VERIFICATION_CAP`)과 비교해 거래일별로 세요. 읽기만 해서 운영 DB에서도 같은 명령(DB 이름만 바꿔서)으로 돌려요.
+
 **리플레이(장 밖에서 미리 점검)**: 지난 장 하루치 1분봉으로 BotRunner·PaperBroker·OrderService를 실제 Postgres(Testcontainers) 위에서 10초 간격으로 다시 돌려요. 진입·분할 익절·VWAP 이탈·15:15 청산·손절 조건주문 순서·채점까지 하루 흐름을 몇십 초 안에 봐요. 시세는 그 날 거래대금 상위 50종목의 1분봉이라 실제 호가보다 거칠어요.
 
 1. 그 날 장 마감 뒤, engine 토큰이 살아 있을 때 받아요(토큰을 새로 발급하지 않아요): `node --env-file=.env scripts/replay-fetch.mjs 2026-10-30 /tmp/replay.json`
