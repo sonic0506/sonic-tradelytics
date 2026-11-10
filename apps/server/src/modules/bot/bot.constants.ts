@@ -11,6 +11,24 @@ export type RiskProfile = (typeof RISK_PROFILES)[number];
 export const BOT_STAGES = ['verifying', 'released'] as const;
 export type BotStage = (typeof BOT_STAGES)[number];
 
+// 상한 해제 기준 (POL-RISK-13). MDD 기준은 봇의 누적 손실 한도 절반이라 버전마다 달라요
+export const RELEASE_CRITERION_KEYS = [
+  'period',
+  'closed_trades',
+  'net_pnl',
+  'profit_factor',
+  'mdd',
+] as const;
+export type ReleaseCriterionKey = (typeof RELEASE_CRITERION_KEYS)[number];
+export const RELEASE_THRESHOLDS = {
+  // 거래일
+  period: 10,
+  closedTrades: 30,
+  // 원 (초과)
+  netPnl: 0,
+  profitFactor: 1.5,
+} as const;
+
 export const BOT_STATUSES = [
   'ready',
   'running',

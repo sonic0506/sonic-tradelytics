@@ -7,9 +7,12 @@ import {
   botActivity,
   BotNotFoundException,
   BotService,
+  type BotVersion,
   isResting,
   nextRunDate,
   notRestingReasons,
+  releaseCriteria,
+  type ReleaseCriterion,
 } from '@/modules/bot/index.js';
 import { FundQueryService } from '@/modules/fund/index.js';
 import {
@@ -21,7 +24,10 @@ import { PositionService } from '@/modules/position/index.js';
 import type { BotOverview, BotOverviewDetail } from './dto/bot-overview.dto.js';
 
 // controller의 @ApiErrors가 쓰도록 다시 내보내요 (composition controller는 feature를 직접 가져오지 않아요)
-export { BotNotFoundException } from '@/modules/bot/index.js';
+export {
+  BotNotFoundException,
+  ReleaseCriteriaNotMetException,
+} from '@/modules/bot/index.js';
 
 // "HH:mm:ss" → "HH:mm"
 const HH_MM = 5;
@@ -74,6 +80,47 @@ export class BotOverviewService {
     };
   }
 
+  // 상한 해제 (FR-BOT-06). 화면과 같은 계산으로 기준을 다시 확인해요
+  async release(id: number): Promise<void> {
+    const bot = await this.bots.findById(id);
+    if (!bot) throw new BotNotFoundException(id);
+    if (bot.stage === 'released') return;
+    const [[withVersion], funds] = await Promise.all([
+      this.bots.findWithVersions([id]),
+      this.funds.viewsOf([id]),
+    ]);
+    const criteria = await this.releaseCriteriaOf(
+      bot,
+      withVersion?.version ?? null,
+      funds.get(id)?.amount,
+      new Date(),
+    );
+    await this.bots.release(id, criteria);
+  }
+
+  // 검증 구간 봇의 상한 해제 기준 (POL-RISK-13). 풀린 봇, 버전·투자금이 아직 없는 봇은 빈 목록이에요
+  private async releaseCriteriaOf(
+    bot: Bot,
+    version: BotVersion | null,
+    amount: number | undefined,
+    now: Date,
+  ): Promise<ReleaseCriterion[]> {
+    if (bot.stage !== 'verifying' || !version || amount === undefined)
+      return [];
+    const start = await this.bots.verificationStart(bot.id);
+    if (!start) return [];
+    const [tradingDays, closedPnls] = await Promise.all([
+      this.calendars.countOpenDays(kstDate(start), kstDate(now)),
+      this.positions.closedPnlsSince(bot.id, start),
+    ]);
+    return releaseCriteria({
+      tradingDays,
+      closedPnls,
+      amount,
+      totalLossPct: version.totalLossPct,
+    });
+  }
+
   private async overviews(bots: Bot[], now: Date): Promise<BotOverview[]> {
     const ids = bots.map(({ id }) => id);
     const today = kstDate(now);
@@ -97,8 +144,18 @@ export class BotOverviewService {
       versions.map(({ bot, version }) => [bot.id, version]),
     );
     const isTradingDay = day?.isOpen ?? false;
+    const criteria = await Promise.all(
+      bots.map((bot) =>
+        this.releaseCriteriaOf(
+          bot,
+          versionOf.get(bot.id) ?? null,
+          funds.get(bot.id)?.amount,
+          now,
+        ),
+      ),
+    );
 
-    return bots.map((bot) => {
+    return bots.map((bot, index) => {
       const own = held.filter(({ botId }) => botId === bot.id);
       const unrealizedPnl = own.reduce((sum, position) => {
         const price = prices.get(position.symbol);
@@ -141,6 +198,7 @@ export class BotOverviewService {
         activity,
         notRestingReasons: reasons,
         resting: isResting(bot.status, reasons),
+        releaseCriteria: criteria[index] ?? [],
         nextRunAt:
           runDate === null
             ? null

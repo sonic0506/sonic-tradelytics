@@ -10,11 +10,15 @@ import {
   dayTradingParamsSchema,
   type RuleFieldMeta,
 } from './bot.constants.js';
-import { BotParamsInvalidException } from './bot.exception.js';
+import {
+  BotParamsInvalidException,
+  ReleaseCriteriaNotMetException,
+} from './bot.exception.js';
 import { BotRepository } from './bot.repository.js';
 import type { DayTradingParams } from './day-trading.rule.js';
 import type { Bot } from './entities/bot.entity.js';
 import type { BotVersion } from './entities/bot-version.entity.js';
+import type { ReleaseCriterion } from './release.rule.js';
 
 // 봇 설정과 지금 적용된 버전(1회 주문 금액 등). 적용된 버전이 없으면 null
 export interface BotWithVersion {
@@ -122,6 +126,25 @@ export class BotService {
     fields: Parameters<BotRepository['update']>[1],
   ): Promise<void> {
     return this.bots.update(id, fields);
+  }
+
+  // 지금 검증 구간이 시작된 시각: 마지막으로 적용된 판단 변경(또는 첫) 버전의 적용 시각.
+  // 위험만 줄이는 버전은 검증 기록을 이어 써요 (POL-RISK-13). 적용된 버전이 없으면 null
+  async verificationStart(botId: number): Promise<Date | null> {
+    const versions = await this.bots.findAppliedVersions([botId]);
+    return (
+      versions.find(({ changeKind }) => changeKind !== 'risk_only')
+        ?.appliedAt ?? null
+    );
+  }
+
+  // 상한 해제 (FR-BOT-06). 기준은 부르는 쪽이 계산해 넘기고, 하나라도 미달이면 422예요.
+  // 이미 풀린 봇은 그대로 둬요
+  async release(id: number, criteria: ReleaseCriterion[]): Promise<void> {
+    const failed = criteria.filter(({ passed }) => !passed);
+    if (criteria.length === 0 || failed.length > 0)
+      throw new ReleaseCriteriaNotMetException(failed.map(({ key }) => key));
+    await this.bots.markReleased(id);
   }
 
   findById(id: number): Promise<Bot | null> {

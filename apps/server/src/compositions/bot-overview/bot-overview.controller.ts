@@ -1,4 +1,13 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
 import { ApiErrors } from '@/common/exceptions/api-errors.js';
@@ -8,6 +17,7 @@ import { PageQueryDto } from '@/common/pagination/page-query.dto.js';
 import {
   BotNotFoundException,
   BotOverviewService,
+  ReleaseCriteriaNotMetException,
 } from './bot-overview.service.js';
 import { BotDetailDto } from './dto/bot-detail.dto.js';
 import { BotListItemDto, BotPageDto } from './dto/bot-list-item.dto.js';
@@ -29,5 +39,13 @@ export class BotOverviewController {
   @Get(':id')
   async find(@Param('id', ParseIntPipe) id: number): Promise<BotDetailDto> {
     return BotDetailDto.fromDetail(await this.overview.find(id));
+  }
+
+  /** 상한 해제 (FR-BOT-06). 기준(POL-RISK-13)을 모두 넘은 검증 구간 봇만 풀려요. 이미 풀린 봇은 그대로 204예요 */
+  @ApiErrors(BotNotFoundException, ReleaseCriteriaNotMetException)
+  @Post(':id/release')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async release(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.overview.release(id);
   }
 }

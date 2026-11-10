@@ -204,7 +204,8 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - `waiting_funds`면 사유와 부족 금액 (FR-BOT-10)
 - `statusReason.code`는 `bots.status_reason` 그대로예요(`daily_stop`·`total_stop`·`streak_pause`·`rate_cap`·`kill_switch`·`bot_error`·`insufficient_funds`·`pause`·`liquidate` 등). 화면 문구는 web이 만들어요
 - 오늘 손익은 오늘 연 포지션의 실현 손익 + 보유분 평가 손익(`quote_caches` 최근가를 아는 종목)이에요
-- M4 현재(4b-2a): 상한 해제 기준(`releaseProgress`·`releaseCriteria`), 자금 대기 부족 금액(`fundShortfall`)은 아직 계산하지 않아 `null`·빈 목록이에요. `releasedAt`·`endedAt`·`waitingSince`는 기록하는 컬럼이 없어 `null`이에요. 종목 이름을 저장하지 않아 `holdings[].symbolName`은 종목 코드예요
+- 상한 해제 기준(`releaseCriteria`, 목록은 통과 수 `releaseProgress`)은 검증 구간 봇만 줘요. 검증 구간은 마지막으로 적용된 판단 변경(또는 첫) 버전의 적용 시각부터예요. 거래일은 장 일정의 개장일 수, 청산 거래·순손익·손익비는 그 뒤 청산 포지션(한 주도 체결되지 않은 것 제외), MDD는 청산 순서 누적 손익의 고점 대비 하락을 확정 투자금 대비 %로 재요. 손실 거래가 없으면 손익비 `value`는 `null`이고 이긴 거래가 있을 때만 통과예요. 버전·확정 투자금이 없거나 상한이 풀린 봇은 빈 목록·`null`이에요
+- M4 현재(4b-2b): 자금 대기 부족 금액(`fundShortfall`)은 아직 계산하지 않아 `null`이에요. `releasedAt`·`endedAt`·`waitingSince`는 기록하는 컬럼이 없어 `null`이에요. 종목 이름을 저장하지 않아 `holdings[].symbolName`은 종목 코드예요
 
 ### `PATCH /v1/bots/:id`
 
@@ -223,7 +224,7 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 
 ### `POST /v1/bots/:id/release`
 
-상한 해제 (FR-BOT-06). api가 기준을 계산해 모두 통과할 때만 `stage = released`로 바꿔요 (`RELEASE_CRITERIA_NOT_MET`). 투자금은 그대로이고, 늘리려면 쉬는 중에 `rebudget` 명령을 보내요 (POL-FUND-12). 기준 계산은 `GET /v1/bots/:id`와 같은 함수예요.
+상한 해제 (FR-BOT-06). api가 기준을 계산해 모두 통과할 때만 `stage = released`로 바꾸고 204예요 (`RELEASE_CRITERIA_NOT_MET` 422, `detail`에 미달 기준 키). 이미 풀린 봇은 그대로 204예요. 기준을 통과했을 때 알리는 것(FR-BOT-06)은 아직 없어요. 투자금은 그대로이고, 늘리려면 쉬는 중에 `rebudget` 명령을 보내요 (POL-FUND-12). 기준 계산은 `GET /v1/bots/:id`와 같은 함수예요.
 
 ### `GET /v1/bots/options`
 

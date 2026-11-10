@@ -7,3 +7,4 @@ export { BotService, type BotWithVersion } from './bot.service.js';
 export * from './day-trading.rule.js';
 export { Bot } from './entities/bot.entity.js';
 export { BotVersion } from './entities/bot-version.entity.js';
+export * from './release.rule.js';

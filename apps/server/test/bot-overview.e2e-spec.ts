@@ -17,6 +17,7 @@ describe('봇 목록·상세 (e2e)', () => {
   let dataSource: DataSource;
   let runningId: number;
   let readyId: number;
+  let snapshotId: number;
   const now = new Date('2026-10-30T11:00:00+09:00');
   const get = (path: string) =>
     request(app.getHttpServer()).get(path).set('Authorization', bearer(app));
@@ -75,6 +76,7 @@ describe('봇 목록·상세 (e2e)', () => {
       orderableCash: 210_000,
       runningBotsCashShare: 0,
     });
+    snapshotId = snapshot.id;
     await dataSource.getRepository(Allocation).save({
       botId: runningId,
       snapshotId: snapshot.id,
@@ -131,6 +133,8 @@ describe('봇 목록·상세 (e2e)', () => {
       resting: false,
       nextRunAt: new Date('2026-11-02T09:05:00+09:00').toISOString(),
       tradingHours: { start: '09:05', end: '15:20' },
+      // 검증 구간 첫날이라 MDD만 통과예요
+      releaseProgress: { passed: 1, total: 5 },
     });
     // 시작 전 봇은 확정 투자금·운영 상황이 없고, 다음 운영은 운용 시작일이에요
     expect(ready).toMatchObject({
@@ -140,6 +144,7 @@ describe('봇 목록·상세 (e2e)', () => {
       activity: null,
       resting: false,
       nextRunAt: new Date('2026-11-05T09:05:00+09:00').toISOString(),
+      releaseProgress: null,
     });
   });
 
@@ -160,7 +165,14 @@ describe('봇 목록·상세 (e2e)', () => {
         startPriority: 1,
         pendingReason: null,
       },
-      releaseCriteria: [],
+      releaseCriteria: [
+        { key: 'period', value: 1, threshold: 10, passed: false },
+        { key: 'closed_trades', value: 0, threshold: 30, passed: false },
+        { key: 'net_pnl', value: 0, threshold: 0, passed: false },
+        { key: 'profit_factor', value: null, threshold: 1.5, passed: false },
+        // 누적 한도 10%의 절반
+        { key: 'mdd', value: 0, threshold: 5, passed: true },
+      ],
       pendingVersion: null,
       notRestingReasons: ['holding', 'trading_hours'],
       settings: {
@@ -187,5 +199,117 @@ describe('봇 목록·상세 (e2e)', () => {
 
     const options = await get('/v1/bots/options').expect(200);
     expect(options.body).toHaveLength(2);
+  });
+
+  describe('POST /v1/bots/:id/release', () => {
+    const release = (id: number | string) =>
+      request(app.getHttpServer())
+        .post(`/v1/bots/${id}/release`)
+        .set('Authorization', bearer(app));
+
+    it('기준을 못 넘은 봇은 422이고 검증 구간에 그대로 있어요', async () => {
+      const response = await release(runningId).expect(422);
+
+      expect(response.body).toMatchObject({ code: 'RELEASE_CRITERIA_NOT_MET' });
+      expect(response.body.detail).toContain('closed_trades');
+      const bot = await dataSource
+        .getRepository(Bot)
+        .findOneByOrFail({ id: runningId });
+      expect(bot.stage).toBe('verifying');
+    });
+
+    it('없는 봇은 404예요', async () => {
+      const response = await release(999).expect(404);
+      expect(response.body).toMatchObject({ code: 'BOT_NOT_FOUND' });
+    });
+
+    it('10거래일·청산 30건·순손익·손익비·MDD를 모두 넘으면 상한을 풀고, 다시 불러도 204예요', async () => {
+      const bot = await dataSource.getRepository(Bot).save({
+        name: 'veteran',
+        type: 'day' as const,
+        riskProfile: 'neutral' as const,
+        budgetType: 'fixed' as const,
+        budgetAmount: 100_000,
+        tradingStart: '09:05',
+        tradingEnd: '15:20',
+        onPeriodEnd: 'liquidate' as const,
+        status: 'running' as const,
+        startPriority: 3,
+        periodStart: '2026-10-16',
+      });
+      const verifiedFrom = new Date('2026-10-16T08:00:00+09:00');
+      await dataSource.getRepository(BotVersion).save({
+        botId: bot.id,
+        version: 1,
+        changeKind: 'initial' as const,
+        params: {},
+        orderSizeType: 'fixed' as const,
+        orderSizeValue: 50_000,
+        splitCount: 1,
+        maxPositions: 2,
+        dailyLossPct: 4,
+        totalLossPct: 10,
+        onDailyLimit: 'liquidate' as const,
+        appliedAt: verifiedFrom,
+      });
+      await dataSource.getRepository(Allocation).save({
+        botId: bot.id,
+        snapshotId,
+        amount: 100_000,
+        capped: true,
+      });
+      // 10/16~10/29 평일 10일 + 10/30 = 11거래일
+      const weekdays = [
+        '16',
+        '19',
+        '20',
+        '21',
+        '22',
+        '23',
+        '26',
+        '27',
+        '28',
+        '29',
+      ];
+      await dataSource.getRepository(MarketCalendar).save(
+        weekdays.map((day) => ({
+          tradeDate: `2026-10-${day}`,
+          isOpen: true,
+          regularOpenAt: null,
+          regularCloseAt: null,
+          fetchedAt: now,
+        })),
+      );
+      // 이긴 거래 20건(+300), 진 거래 10건(-150): 순손익 4,500, 손익비 2
+      const closedAt = new Date('2026-10-29T15:15:00+09:00');
+      await dataSource.getRepository(Position).save(
+        Array.from({ length: 30 }, (_, index) => ({
+          botId: bot.id,
+          symbol: '000660',
+          status: 'closed' as const,
+          quantity: 0,
+          realizedPnl: index < 20 ? 300 : -150,
+          openedAt: verifiedFrom,
+          closedAt,
+          exitReason:
+            index < 20 ? ('take_profit' as const) : ('stop_loss' as const),
+        })),
+      );
+
+      const detail = await get(`/v1/bots/${bot.id}`).expect(200);
+      expect(
+        detail.body.releaseCriteria.every(
+          ({ passed }: { passed: boolean }) => passed,
+        ),
+      ).toBe(true);
+
+      await release(bot.id).expect(204);
+      await release(bot.id).expect(204);
+      const after = await get(`/v1/bots/${bot.id}`).expect(200);
+      expect(after.body).toMatchObject({
+        stage: 'released',
+        releaseCriteria: [],
+      });
+    });
   });
 });

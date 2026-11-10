@@ -4,6 +4,7 @@ import {
   noOpTransactionalModule,
   runInCls,
 } from '../../../test/setup/transactional.js';
+import { ReleaseCriteriaNotMetException } from './bot.exception.js';
 import { BotRepository } from './bot.repository.js';
 import { BotService } from './bot.service.js';
 import type { Bot } from './entities/bot.entity.js';
@@ -21,6 +22,7 @@ describe('BotService', () => {
     findAllNames: vi.fn<BotRepository['findAllNames']>(),
     findStartingAt: vi.fn<BotRepository['findStartingAt']>(),
     createWithVersion: vi.fn<BotRepository['createWithVersion']>(),
+    markReleased: vi.fn<BotRepository['markReleased']>(),
   };
   let service: BotService;
   let moduleRef: TestingModule;
@@ -182,6 +184,55 @@ describe('BotService', () => {
       await service.findStartingAt('09:05:00');
 
       expect(bots.findStartingAt).toHaveBeenCalledWith('09:05:00');
+    });
+  });
+
+  describe('상한 해제 (POL-RISK-13)', () => {
+    const version = (fields: Partial<BotVersion>) =>
+      Object.assign({ botId: 7, appliedAt: null }, fields) as BotVersion;
+
+    it('검증 구간은 마지막 판단 변경 버전부터이고, 위험만 줄인 버전은 기록을 이어 써요', async () => {
+      const decided = new Date('2026-11-02T00:00:00Z');
+      bots.findAppliedVersions.mockResolvedValue([
+        version({
+          changeKind: 'risk_only',
+          appliedAt: new Date('2026-11-05T00:00:00Z'),
+        }),
+        version({ changeKind: 'decision_change', appliedAt: decided }),
+        version({
+          changeKind: 'initial',
+          appliedAt: new Date('2026-10-30T00:00:00Z'),
+        }),
+      ]);
+
+      await expect(service.verificationStart(7)).resolves.toEqual(decided);
+    });
+
+    it('적용된 버전이 없으면 검증 구간도 없어요', async () => {
+      bots.findAppliedVersions.mockResolvedValue([]);
+
+      await expect(service.verificationStart(7)).resolves.toBeNull();
+    });
+
+    it('기준을 모두 넘으면 검증 구간을 끝내요', async () => {
+      await service.release(7, [
+        { key: 'period', value: 10, threshold: 10, passed: true },
+      ]);
+
+      expect(bots.markReleased).toHaveBeenCalledWith(7);
+    });
+
+    it('기준이 하나라도 미달이거나 계산할 기준이 없으면 422이고 단계를 바꾸지 않아요', async () => {
+      await expect(
+        service.release(7, [
+          { key: 'period', value: 10, threshold: 10, passed: true },
+          { key: 'closed_trades', value: 3, threshold: 30, passed: false },
+        ]),
+      ).rejects.toThrow(ReleaseCriteriaNotMetException);
+      await expect(service.release(7, [])).rejects.toThrow(
+        ReleaseCriteriaNotMetException,
+      );
+      expect(bots.markReleased).not.toHaveBeenCalled();
     });
   });
 });

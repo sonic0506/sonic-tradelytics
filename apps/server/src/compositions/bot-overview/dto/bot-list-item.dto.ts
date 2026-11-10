@@ -139,7 +139,14 @@ export class BotListItemDto {
     dto.stage = bot.stage;
     dto.releasedAt = null;
     dto.endedAt = null;
-    dto.releaseProgress = null;
+    dto.releaseProgress =
+      overview.releaseCriteria.length === 0
+        ? null
+        : {
+            passed: overview.releaseCriteria.filter(({ passed }) => passed)
+              .length,
+            total: overview.releaseCriteria.length,
+          };
     dto.capAmount = VERIFICATION_CAP;
     dto.budget = funds?.amount ?? null;
     dto.budgetSetting = {

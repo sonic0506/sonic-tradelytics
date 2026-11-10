@@ -38,6 +38,11 @@ export class PositionService {
     private readonly quotes: QuoteQueryService,
   ) {}
 
+  // since 이후 청산된 봇 포지션의 순손익, 청산 순서대로 (상한 해제 기준, POL-RISK-13)
+  closedPnlsSince(botId: number, since: Date): Promise<number[]> {
+    return this.positions.findClosedPnlsSince(botId, since);
+  }
+
   // 장후 배치: 실행 중인 봇과 그날 포지션이 있던 봇의 일일 손익을 bot_daily_results에 써요 (FR-PERF-03)
   async recordDailyResults(tradeDate: string): Promise<void> {
     const dayStart = kstAt(tradeDate, '00:00');

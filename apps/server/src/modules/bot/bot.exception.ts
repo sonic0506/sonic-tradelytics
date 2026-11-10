@@ -95,3 +95,19 @@ export class BotBudgetLockedException extends AppException {
     );
   }
 }
+
+// POL-RISK-13: 상한 해제 기준을 하나라도 못 넘었어요
+export class ReleaseCriteriaNotMetException extends AppException {
+  static readonly code = 'RELEASE_CRITERIA_NOT_MET';
+  static readonly status = HttpStatus.UNPROCESSABLE_ENTITY;
+  static readonly example =
+    '상한 해제 기준을 아직 못 넘었어요: closed_trades, profit_factor';
+
+  constructor(failed: string[]) {
+    super(
+      ReleaseCriteriaNotMetException.code,
+      ReleaseCriteriaNotMetException.status,
+      `상한 해제 기준을 아직 못 넘었어요: ${failed.join(', ')}`,
+    );
+  }
+}

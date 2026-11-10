@@ -4,6 +4,7 @@ import type {
   BotService,
   BotVersion,
   NotRestingReason,
+  ReleaseCriterion,
 } from '@/modules/bot/index.js';
 import type { BotFundsView } from '@/modules/fund/index.js';
 import type { Position } from '@/modules/position/index.js';
@@ -25,6 +26,8 @@ export interface BotOverview {
   notRestingReasons: NotRestingReason[];
   resting: boolean;
   nextRunAt: Date | null;
+  // 검증 구간이면 상한 해제 기준, 아니면 빈 목록
+  releaseCriteria: ReleaseCriterion[];
 }
 
 export interface BotOverviewDetail extends BotOverview {

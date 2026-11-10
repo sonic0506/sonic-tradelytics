@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { HOLDING_ACTIONS, type HoldingAction } from '@/modules/bot/index.js';
+import {
+  HOLDING_ACTIONS,
+  type HoldingAction,
+  RELEASE_CRITERION_KEYS,
+} from '@/modules/bot/index.js';
 
 import { BotListItemDto } from './bot-list-item.dto.js';
 import { type BotOverviewDetail, rate } from './bot-overview.dto.js';
@@ -40,9 +44,15 @@ export class BotFundsDto {
 }
 
 export class ReleaseCriterionDto {
+  @ApiProperty({ enum: RELEASE_CRITERION_KEYS })
   key: string;
+
+  /** 지금 값. 거래일·건수·원·손익비·MDD %. 손실 거래가 없어 손익비를 셀 수 없으면 null */
   value: number | null;
+
+  /** 기준 값. MDD는 누적 손실 한도의 절반(%)이에요 */
   threshold: number;
+
   passed: boolean;
 }
 
@@ -155,7 +165,7 @@ export class BotDetailDto extends BotListItemDto {
           pendingReason: null,
         }
       : null;
-    dto.releaseCriteria = [];
+    dto.releaseCriteria = detail.releaseCriteria;
     dto.ruleVersion = version
       ? {
           version: version.version,

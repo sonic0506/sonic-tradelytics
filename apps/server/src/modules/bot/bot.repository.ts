@@ -124,6 +124,11 @@ export class BotRepository {
     });
   }
 
+  // 검증 구간인 봇만 바꿔요
+  async markReleased(id: number): Promise<void> {
+    await this.bots.update({ id, stage: 'verifying' }, { stage: 'released' });
+  }
+
   async updateBudget(
     id: number,
     budget: Pick<Bot, 'budgetType' | 'budgetRatio' | 'budgetAmount'>,

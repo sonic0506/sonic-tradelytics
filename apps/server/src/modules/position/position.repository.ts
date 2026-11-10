@@ -7,6 +7,7 @@ import {
   MoreThan,
   MoreThanOrEqual,
   Not,
+  Or,
   type Repository,
 } from 'typeorm';
 
@@ -55,6 +56,22 @@ export class PositionRepository {
       ],
       take: PositionRepository.MAX_FUND_ROWS,
     });
+  }
+
+  // since 이후 청산된 봇 포지션의 순손익, 청산 순서대로 (상한 해제 기준). 한 주도 체결되지 않은 포지션은 빼요
+  async findClosedPnlsSince(botId: number, since: Date): Promise<number[]> {
+    const closed = await this.positions.find({
+      select: { id: true, realizedPnl: true },
+      where: {
+        botId,
+        status: 'closed',
+        closedAt: MoreThanOrEqual(since),
+        exitReason: Or(IsNull(), Not('not_filled')),
+      },
+      order: { closedAt: 'ASC', id: 'ASC' },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+    return closed.map(({ realizedPnl }) => realizedPnl);
   }
 
   // 같은 날 다시 돌리면 덮어써요
