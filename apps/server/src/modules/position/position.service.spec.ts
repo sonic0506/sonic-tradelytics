@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { type Bot, BotService, type BotVersion } from '@/modules/bot/index.js';
 import { QuoteQueryService } from '@/modules/market-data/index.js';
 
+import type { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import type { Position } from './entities/position.entity.js';
 import { PositionNotFoundException } from './position.exception.js';
 import { PositionRepository } from './position.repository.js';
@@ -17,6 +18,7 @@ describe('PositionService', () => {
     update: vi.fn<PositionRepository['update']>(),
     findForDailyResults: vi.fn<PositionRepository['findForDailyResults']>(),
     upsertDailyResults: vi.fn<PositionRepository['upsertDailyResults']>(),
+    findDailyResults: vi.fn<PositionRepository['findDailyResults']>(),
   };
   const bots = {
     findTrading: vi.fn<BotService['findTrading']>(),
@@ -314,6 +316,48 @@ describe('PositionService', () => {
 
       expect(quotes.pricesOf).toHaveBeenCalledWith([]);
       expect(positions.upsertDailyResults).toHaveBeenCalledWith([]);
+    });
+  });
+
+  it('봇 전체 일별 손익은 날짜마다 실현·평가 손익, 비용, 청산 수를 더해요', async () => {
+    const row = (fields: Partial<BotDailyResult>): BotDailyResult =>
+      Object.assign(
+        {
+          botId: 1,
+          botVersionId: 1,
+          tradeDate: '2026-11-10',
+          realizedPnl: 0,
+          unrealizedPnl: 0,
+          fees: 0,
+          closedTrades: 0,
+        },
+        fields,
+      ) as BotDailyResult;
+    positions.findDailyResults.mockResolvedValue([
+      row({
+        realizedPnl: -4_000,
+        unrealizedPnl: 500,
+        fees: 900,
+        closedTrades: 11,
+      }),
+      row({ botId: 2, realizedPnl: 1_000, fees: 100, closedTrades: 2 }),
+      row({
+        tradeDate: '2026-11-11',
+        realizedPnl: 1_621,
+        fees: 329,
+        closedTrades: 4,
+      }),
+    ]);
+
+    await expect(
+      service.dailyTotals('2026-11-10', '2026-11-11'),
+    ).resolves.toEqual([
+      { tradeDate: '2026-11-10', pnl: -2_500, fees: 1_000, closedTrades: 13 },
+      { tradeDate: '2026-11-11', pnl: 1_621, fees: 329, closedTrades: 4 },
+    ]);
+    expect(positions.findDailyResults).toHaveBeenCalledWith({
+      from: '2026-11-10',
+      to: '2026-11-11',
     });
   });
 });

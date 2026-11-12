@@ -21,6 +21,7 @@ import {
 } from '@/modules/market-data/index.js';
 import { PositionService } from '@/modules/position/index.js';
 
+import type { BotDailyResultDto } from './dto/bot-daily-result.dto.js';
 import type { BotOverview, BotOverviewDetail } from './dto/bot-overview.dto.js';
 
 // controller의 @ApiErrors가 쓰도록 다시 내보내요 (composition controller는 feature를 직접 가져오지 않아요)
@@ -81,6 +82,23 @@ export class BotOverviewService {
   }
 
   // 상한 해제 (FR-BOT-06). 화면과 같은 계산으로 기준을 다시 확인해요
+  // 봇 하나의 일별 손익과 그날 검증 구간이었는지 (FR-PERF-03, 10)
+  async dailyResults(
+    id: number,
+    range: { from?: string; to?: string },
+  ): Promise<BotDailyResultDto[]> {
+    const bot = await this.bots.findById(id);
+    if (!bot) throw new BotNotFoundException(id);
+    const rows = await this.positions.botDailyResults(id, range);
+    // ponytail: 해제 시각을 아직 저장하지 않아 지금 단계로 나눠요. 풀린 봇은 해제 전 날도 false예요. releasedAt이 생기면 그 날짜로 나눠요
+    const isVerifying = bot.stage === 'verifying';
+    return rows.map((row) => ({
+      tradeDate: row.tradeDate,
+      pnl: row.realizedPnl + row.unrealizedPnl,
+      verifying: isVerifying,
+    }));
+  }
+
   async release(id: number): Promise<void> {
     const bot = await this.bots.findById(id);
     if (!bot) throw new BotNotFoundException(id);

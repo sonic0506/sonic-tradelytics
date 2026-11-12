@@ -5,6 +5,7 @@ import { BotService } from '@/modules/bot/index.js';
 import { QuoteQueryService } from '@/modules/market-data/index.js';
 
 import { type DailyPosition, dailyResults } from './daily-result.rule.js';
+import type { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import type { Position } from './entities/position.entity.js';
 import { PositionNotFoundException } from './position.exception.js';
 import { PositionRepository } from './position.repository.js';
@@ -17,6 +18,15 @@ export interface Fill {
   // 수수료 + 세금
   fees: number;
   at: Date;
+}
+
+// 봇 전체의 하루 손익 합계 (FR-PERF-01, 03)
+export interface DailyTotal {
+  tradeDate: string;
+  // 실현 + 평가 손익
+  pnl: number;
+  fees: number;
+  closedTrades: number;
 }
 
 // 봇 하나의 보유·실현 손익 (POL-FUND-02, 05)
@@ -41,6 +51,31 @@ export class PositionService {
   // since 이후 청산된 봇 포지션의 순손익, 청산 순서대로 (상한 해제 기준, POL-RISK-13)
   closedPnlsSince(botId: number, since: Date): Promise<number[]> {
     return this.positions.findClosedPnlsSince(botId, since);
+  }
+
+  // 봇 전체 일별 손익을 날짜마다 더해요. 직접 거래는 bot_daily_results에 없어서 빠져요
+  async dailyTotals(from: string, to: string): Promise<DailyTotal[]> {
+    const totals = new Map<string, DailyTotal>();
+    for (const row of await this.positions.findDailyResults({ from, to })) {
+      const total = totals.get(row.tradeDate) ?? {
+        tradeDate: row.tradeDate,
+        pnl: 0,
+        fees: 0,
+        closedTrades: 0,
+      };
+      total.pnl += row.realizedPnl + row.unrealizedPnl;
+      total.fees += row.fees;
+      total.closedTrades += row.closedTrades;
+      totals.set(row.tradeDate, total);
+    }
+    return [...totals.values()];
+  }
+
+  botDailyResults(
+    botId: number,
+    range: { from?: string; to?: string },
+  ): Promise<BotDailyResult[]> {
+    return this.positions.findDailyResults({ botId, ...range });
   }
 
   // 장후 배치: 실행 중인 봇과 그날 포지션이 있던 봇의 일일 손익을 bot_daily_results에 써요 (FR-PERF-03)

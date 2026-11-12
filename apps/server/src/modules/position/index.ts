@@ -6,6 +6,7 @@ export * from './position.constants.js';
 export { PositionModule } from './position.module.js';
 export {
   type BotHoldings,
+  type DailyTotal,
   type Fill,
   PositionService,
 } from './position.service.js';

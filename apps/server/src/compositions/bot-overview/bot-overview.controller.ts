@@ -19,6 +19,10 @@ import {
   BotOverviewService,
   ReleaseCriteriaNotMetException,
 } from './bot-overview.service.js';
+import {
+  BotDailyResultListDto,
+  BotDailyResultQueryDto,
+} from './dto/bot-daily-result.dto.js';
 import { BotDetailDto } from './dto/bot-detail.dto.js';
 import { BotListItemDto, BotPageDto } from './dto/bot-list-item.dto.js';
 
@@ -39,6 +43,16 @@ export class BotOverviewController {
   @Get(':id')
   async find(@Param('id', ParseIntPipe) id: number): Promise<BotDetailDto> {
     return BotDetailDto.fromDetail(await this.overview.find(id));
+  }
+
+  /** 봇의 일별 손익(실현 + 장 마감 평가)과 그날 검증 구간이었는지 (FR-PERF-03, 10). 날짜순, 장후 배치 전이라 오늘 행은 없어요 */
+  @ApiErrors(BotNotFoundException)
+  @Get(':id/daily-results')
+  async findDailyResults(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: BotDailyResultQueryDto,
+  ): Promise<BotDailyResultListDto> {
+    return { items: await this.overview.dailyResults(id, query) };
   }
 
   /** 상한 해제 (FR-BOT-06). 기준(POL-RISK-13)을 모두 넘은 검증 구간 봇만 풀려요. 이미 풀린 봇은 그대로 204예요 */

@@ -241,7 +241,7 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 
 ### `GET /v1/bots/:id/daily-results?from&to`
 
-일별 손익과 누적 곡선 (FR-PERF-03). `bot_daily_results`를 날짜순으로 줘요. 각 날짜에 그날 버전과 검증 구간 여부를 붙여, web이 검증 구간과 상한 해제 이후를 나눠 그려요 (FR-PERF-10). 기간 필터(일·주·월·전체)는 web이 `from`으로 바꿔 보내요.
+일별 손익과 누적 곡선 (FR-PERF-03). `bot_daily_results`를 날짜순으로 줘요. 각 날짜에 그날 버전과 검증 구간 여부를 붙여, web이 검증 구간과 상한 해제 이후를 나눠 그려요 (FR-PERF-10). 기간 필터(일·주·월·전체)는 web이 `from`으로 바꿔 보내요. 해제 시각을 아직 저장하지 않아서, 지금은 봇의 현재 단계로 모든 날을 나눠요(풀린 봇은 해제 전 날도 `verifying = false`). 해제 시각을 저장하면 그 날짜로 나눠요.
 
 ### `GET /v1/positions`
 

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Bot, BotModule, BotVersion } from '@/modules/bot/index.js';
 import { MarketDataQueryModule } from '@/modules/market-data/index.js';
 
+import { DailyResultController } from './daily-result.controller.js';
 import { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import { Position } from './entities/position.entity.js';
 import { PositionRepository } from './position.repository.js';
@@ -16,6 +17,7 @@ import { PositionService } from './position.service.js';
     BotModule,
     MarketDataQueryModule,
   ],
+  controllers: [DailyResultController],
   providers: [PositionService, PositionRepository],
   exports: [PositionService],
 })

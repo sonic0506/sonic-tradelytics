@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
 import {
+  And,
   In,
   IsNull,
+  LessThanOrEqual,
   MoreThan,
   MoreThanOrEqual,
   Not,
@@ -72,6 +74,26 @@ export class PositionRepository {
       take: PositionRepository.MAX_FUND_ROWS,
     });
     return closed.map(({ realizedPnl }) => realizedPnl);
+  }
+
+  // 일별 손익 화면용 (FR-PERF-03). 거래일 오름차순
+  findDailyResults(filter: {
+    botId?: number;
+    from?: string;
+    to?: string;
+  }): Promise<BotDailyResult[]> {
+    const range = [
+      ...(filter.from ? [MoreThanOrEqual(filter.from)] : []),
+      ...(filter.to ? [LessThanOrEqual(filter.to)] : []),
+    ];
+    return this.txHost.tx.getRepository(BotDailyResult).find({
+      where: {
+        ...(filter.botId === undefined ? {} : { botId: filter.botId }),
+        ...(range.length ? { tradeDate: And(...range) } : {}),
+      },
+      order: { tradeDate: 'ASC', botId: 'ASC' },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
   }
 
   // 같은 날 다시 돌리면 덮어써요
