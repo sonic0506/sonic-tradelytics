@@ -11,6 +11,7 @@ describe('dailyResults', () => {
     realizedPnl: 0,
     totalFees: 0,
     closedAt: new Date('2026-11-09T15:15:00+09:00'),
+    exitReason: 'rule_exit',
     ...fields,
   });
 
@@ -34,6 +35,17 @@ describe('dailyResults', () => {
         closedTrades: 2,
       },
     ]);
+  });
+
+  it('한 주도 체결되지 않고 닫힌 포지션은 거래로 세지 않아요', () => {
+    const rows = dailyResults(
+      [1],
+      [position({ exitReason: 'not_filled' }), position({ realizedPnl: 500 })],
+      dayStart,
+      new Map(),
+    );
+
+    expect(rows[0]).toMatchObject({ realizedPnl: 500, closedTrades: 1 });
   });
 
   it('전날 닫힌 포지션은 세지 않아요', () => {
