@@ -10,6 +10,11 @@ import {
   EngineStatus,
   EngineStatusService,
 } from '@/modules/engine-state/index.js';
+import {
+  BotDailyResult,
+  PositionModule,
+  PositionService,
+} from '@/modules/position/index.js';
 import { RiskEvent, RiskModule, RiskService } from '@/modules/risk/index.js';
 
 import { createTestApp, resetDatabase } from './setup/test-app.js';
@@ -30,6 +35,7 @@ describe('engine 기록 (e2e)', () => {
     app = await createTestApp([
       BatchStorageModule,
       EngineStateModule,
+      PositionModule,
       RiskModule,
     ]);
     dataSource = app.get(DataSource);
@@ -90,5 +96,13 @@ describe('engine 기록 (e2e)', () => {
     const rows = await dataSource.getRepository(BatchRun).find({ take: 10 });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ result: 'ok', error: null });
+  });
+
+  // 11/10 장 마감 배치가 BotDailyResult 메타데이터가 없어 실패했어요(forFeature 누락)
+  it('일일 집계는 거래가 없어도 bot_daily_results에 쓸 수 있어요', async () => {
+    expect(dataSource.hasMetadata(BotDailyResult)).toBe(true);
+    await expect(
+      app.get(PositionService).recordDailyResults('2026-11-10'),
+    ).resolves.toBeUndefined();
   });
 });
