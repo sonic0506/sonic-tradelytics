@@ -16,3 +16,15 @@ export const EXIT_REASONS = [
   'not_filled',
 ] as const;
 export type ExitReason = (typeof EXIT_REASONS)[number];
+
+// 투자 내역 화면의 상태 (api.md GET /v1/positions): 보유 중 · 미체결 · 청산 완료 · 취소(not_filled)
+export const POSITION_VIEWS = [
+  'holding',
+  'pending',
+  'closed',
+  'canceled',
+] as const;
+export type PositionView = (typeof POSITION_VIEWS)[number];
+
+export const POSITION_RESULTS = ['profit', 'loss'] as const;
+export type PositionResult = (typeof POSITION_RESULTS)[number];

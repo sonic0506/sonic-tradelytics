@@ -8,11 +8,16 @@ import {
   BotNotFoundException,
   BotService,
   type BotVersion,
+  BotVersionUnchangedException,
   isResting,
   nextRunDate,
   notRestingReasons,
   releaseCriteria,
   type ReleaseCriterion,
+  toTimeOfDay,
+  type VersionChange,
+  versionChange,
+  type VersionValues,
 } from '@/modules/bot/index.js';
 import { FundQueryService } from '@/modules/fund/index.js';
 import {
@@ -23,10 +28,19 @@ import { PositionService } from '@/modules/position/index.js';
 
 import type { BotDailyResultDto } from './dto/bot-daily-result.dto.js';
 import type { BotOverview, BotOverviewDetail } from './dto/bot-overview.dto.js';
+import type {
+  BotVersionItemDto,
+  CreateBotVersionDto,
+  CreatedBotVersionDto,
+  VersionPreviewDto,
+} from './dto/bot-version.dto.js';
 
 // controller의 @ApiErrors가 쓰도록 다시 내보내요 (composition controller는 feature를 직접 가져오지 않아요)
 export {
   BotNotFoundException,
+  BotParamsInvalidException,
+  BotVersionPendingException,
+  BotVersionUnchangedException,
   ReleaseCriteriaNotMetException,
 } from '@/modules/bot/index.js';
 
@@ -97,6 +111,119 @@ export class BotOverviewService {
       pnl: row.realizedPnl + row.unrealizedPnl,
       verifying: isVerifying,
     }));
+  }
+
+  // 규칙 값 버전 목록, 최신이 앞이에요. 바뀐 값은 바로 앞 버전과 비교해요 (FR-BOT-03)
+  async versions(id: number): Promise<BotVersionItemDto[]> {
+    if (!(await this.bots.findById(id))) throw new BotNotFoundException(id);
+    const versions = await this.bots.findVersions(id);
+    return versions.map((version, index) => {
+      const previous = versions[index + 1];
+      return {
+        version: version.version,
+        changeKind: version.changeKind,
+        changes: previous
+          ? versionChange(this.valuesOf(previous), this.valuesOf(version))
+              .changes
+          : [],
+        createdAt: version.createdAt,
+        appliedAt: version.appliedAt,
+      };
+    });
+  }
+
+  // 저장하면 어떻게 되는지 (FR-BOT-11). 저장하지 않아요
+  async previewVersion(
+    id: number,
+    request: CreateBotVersionDto,
+  ): Promise<VersionPreviewDto> {
+    const { bot, change, canApplyNow } = await this.versionPlan(id, request);
+    return {
+      changeKind: change.changeKind,
+      applyTiming: canApplyNow ? 'now' : 'when_resting',
+      reconfirmsAtCap:
+        change.changeKind === 'decision_change' && bot.stage === 'released',
+      changes: change.changes,
+    };
+  }
+
+  // 새 버전을 추가해요. 쉬는 중(또는 시작 전)이면 바로 적용하고, 아니면 engine이 쉬는 중이 된 뒤 적용해요 (POL-RISK-13)
+  async addVersion(
+    id: number,
+    request: CreateBotVersionDto,
+  ): Promise<CreatedBotVersionDto> {
+    const { change, canApplyNow, next } = await this.versionPlan(id, request);
+    if (change.changeKind === null) throw new BotVersionUnchangedException();
+    const saved = await this.bots.addVersion(
+      id,
+      {
+        ...next,
+        changeKind: change.changeKind,
+        orderSizeType: 'fixed',
+      },
+      canApplyNow ? new Date() : null,
+    );
+    return {
+      version: saved.version,
+      changeKind: saved.changeKind,
+      appliedAt: saved.appliedAt,
+    };
+  }
+
+  private async versionPlan(
+    id: number,
+    request: CreateBotVersionDto,
+  ): Promise<{
+    bot: Bot;
+    next: VersionValues;
+    change: VersionChange;
+    canApplyNow: boolean;
+  }> {
+    const bot = await this.bots.findById(id);
+    if (!bot) throw new BotNotFoundException(id);
+    const [overview] = await this.overviews([bot], new Date());
+    const current = overview?.version;
+    if (!overview || !current) throw new BotNotFoundException(id);
+    const exitAt = request.params.exitAt;
+    const params = this.bots.parseParams({
+      ...current.params,
+      ...request.params,
+      ...(typeof exitAt === 'string' ? { exitAt: toTimeOfDay(exitAt) } : {}),
+    });
+    const next: VersionValues = {
+      params: Object.fromEntries(Object.entries(params)),
+      orderSizeValue: request.orderAmount ?? current.orderSizeValue,
+      splitCount: request.splitCount ?? current.splitCount,
+      maxPositions: request.maxPositions ?? current.maxPositions,
+      dailyLossPct: request.lossStop?.first ?? current.dailyLossPct,
+      totalLossPct: request.lossStop?.total ?? current.totalLossPct,
+      stopStreak: request.stopStreak ?? current.stopStreak,
+      onDailyLimit: request.onDailyLimit ?? current.onDailyLimit,
+    };
+    // 시작 전·자금 대기·종료 봇은 매매하지 않아 바로 적용해요
+    const isTrading = bot.status === 'running' || bot.status === 'paused';
+    return {
+      bot,
+      next,
+      change: versionChange(this.valuesOf(current), next),
+      canApplyNow: !isTrading || overview.resting,
+    };
+  }
+
+  // 저장된 규칙 값에 기본값을 채워 새 값과 같은 모양으로 비교해요
+  private valuesOf(version: BotVersion): VersionValues {
+    return {
+      params: Object.fromEntries(
+        Object.entries(this.bots.parseParams(version.params)),
+      ),
+      orderSizeValue: version.orderSizeValue,
+      splitCount: version.splitCount,
+      maxPositions: version.maxPositions,
+      dailyLossPct: version.dailyLossPct,
+      totalLossPct: version.totalLossPct,
+      stopStreak: version.stopStreak,
+      onDailyLimit: version.onDailyLimit,
+    };
   }
 
   async release(id: number): Promise<void> {

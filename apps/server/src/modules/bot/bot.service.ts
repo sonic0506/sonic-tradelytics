@@ -12,6 +12,7 @@ import {
 } from './bot.constants.js';
 import {
   BotParamsInvalidException,
+  BotVersionPendingException,
   ReleaseCriteriaNotMetException,
 } from './bot.exception.js';
 import { BotRepository } from './bot.repository.js';
@@ -145,6 +146,52 @@ export class BotService {
     if (criteria.length === 0 || failed.length > 0)
       throw new ReleaseCriteriaNotMetException(failed.map(({ key }) => key));
     await this.bots.markReleased(id);
+  }
+
+  // 규칙 값 버전 목록, 최신이 앞이에요 (FR-BOT-03)
+  findVersions(botId: number): Promise<BotVersion[]> {
+    return this.bots.findVersions(botId);
+  }
+
+  // 새 버전을 추가해요. appliedAt이 있으면 바로 적용하고, 판단 변경이면 검증 구간으로 돌아가요 (POL-RISK-13)
+  @Transactional()
+  async addVersion(
+    botId: number,
+    fields: Omit<
+      BotVersion,
+      'id' | 'botId' | 'bot' | 'version' | 'createdAt' | 'appliedAt'
+    >,
+    appliedAt: Date | null,
+  ): Promise<BotVersion> {
+    const versions = await this.bots.findVersions(botId);
+    if (versions.some((version) => version.appliedAt === null))
+      throw new BotVersionPendingException(botId);
+    const saved = await this.bots.addVersion({
+      ...fields,
+      botId,
+      version: (versions[0]?.version ?? 0) + 1,
+      appliedAt,
+    });
+    if (appliedAt && fields.changeKind === 'decision_change')
+      await this.bots.markVerifying([botId]);
+    return saved;
+  }
+
+  // 쉬는 중인 봇들의 적용 대기 버전을 적용해요 (engine 장후 배치, POL-RISK-13)
+  @Transactional()
+  async applyPendingVersions(botIds: number[], at: Date): Promise<number> {
+    const pending = [...(await this.findPendingVersions(botIds)).values()];
+    if (pending.length === 0) return 0;
+    await this.bots.applyVersions(
+      pending.map(({ id }) => id),
+      at,
+    );
+    const decisions = pending.filter(
+      ({ changeKind }) => changeKind === 'decision_change',
+    );
+    if (decisions.length > 0)
+      await this.bots.markVerifying(decisions.map(({ botId }) => botId));
+    return pending.length;
   }
 
   findById(id: number): Promise<Bot | null> {

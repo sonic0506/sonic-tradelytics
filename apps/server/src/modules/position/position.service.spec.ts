@@ -1,7 +1,10 @@
 import { Test } from '@nestjs/testing';
 
 import { type Bot, BotService, type BotVersion } from '@/modules/bot/index.js';
-import { QuoteQueryService } from '@/modules/market-data/index.js';
+import {
+  MarketCalendarQueryService,
+  QuoteQueryService,
+} from '@/modules/market-data/index.js';
 
 import type { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import type { Position } from './entities/position.entity.js';
@@ -19,6 +22,13 @@ describe('PositionService', () => {
     findForDailyResults: vi.fn<PositionRepository['findForDailyResults']>(),
     upsertDailyResults: vi.fn<PositionRepository['upsertDailyResults']>(),
     findDailyResults: vi.fn<PositionRepository['findDailyResults']>(),
+    findHeldOrOpenedSince: vi.fn<PositionRepository['findHeldOrOpenedSince']>(),
+    findClosedBetween: vi.fn<PositionRepository['findClosedBetween']>(),
+    findHistory: vi.fn<PositionRepository['findHistory']>(),
+    findWithBot: vi.fn<PositionRepository['findWithBot']>(),
+  };
+  const calendars = {
+    recentOpenDays: vi.fn<MarketCalendarQueryService['recentOpenDays']>(),
   };
   const bots = {
     findTrading: vi.fn<BotService['findTrading']>(),
@@ -58,6 +68,7 @@ describe('PositionService', () => {
         { provide: PositionRepository, useValue: positions },
         { provide: BotService, useValue: bots },
         { provide: QuoteQueryService, useValue: quotes },
+        { provide: MarketCalendarQueryService, useValue: calendars },
       ],
     }).compile();
     service = moduleRef.get(PositionService);
@@ -250,6 +261,155 @@ describe('PositionService', () => {
 
     await expect(service.openManual('005930', at)).resolves.toBe(created);
     expect(positions.createManual).toHaveBeenCalledWith('005930', at);
+  });
+
+  describe('history', () => {
+    it('상태를 정하지 않으면 보유 중을 첫 페이지 맨 위에 모두 넣고 전체 수에 더해요', async () => {
+      const held = position({ id: 9, quantity: 3 });
+      const closed = position({ id: 8, status: 'closed' });
+      positions.findHistory.mockImplementation((filter) =>
+        Promise.resolve(
+          filter.views?.includes('holding') ? [[held], 1] : [[closed], 5],
+        ),
+      );
+
+      const first = await service.history({ symbol: '005930' }, 0, 20);
+      const second = await service.history({ symbol: '005930' }, 20, 20);
+
+      expect(first).toEqual({ holdings: [held], rows: [closed], total: 6 });
+      expect(second.holdings).toEqual([]);
+      expect(positions.findHistory).toHaveBeenCalledWith(
+        { symbol: '005930', views: ['pending', 'closed', 'canceled'] },
+        20,
+        20,
+      );
+    });
+
+    it('상태를 정하면 그 상태만 페이지로 나눠요', async () => {
+      positions.findHistory.mockResolvedValue([[], 0]);
+
+      await expect(
+        service.history({ views: ['canceled'] }, 0, 20),
+      ).resolves.toEqual({ holdings: [], rows: [], total: 0 });
+      expect(positions.findHistory).toHaveBeenCalledOnce();
+    });
+
+    it('요약용은 필터에 맞는 포지션을 모두 읽어요', async () => {
+      positions.findHistory.mockResolvedValue([[position({})], 1]);
+
+      await expect(service.historyAll({})).resolves.toHaveLength(1);
+      expect(positions.findHistory).toHaveBeenCalledWith(
+        {},
+        0,
+        expect.any(Number),
+      );
+    });
+
+    it('펼친 줄 포지션이 없으면 POSITION_NOT_FOUND예요', async () => {
+      positions.findWithBot.mockResolvedValue(null);
+
+      await expect(service.findWithBot(1)).rejects.toBeInstanceOf(
+        PositionNotFoundException,
+      );
+    });
+  });
+
+  describe('todayPnl', () => {
+    const now = new Date('2026-11-12T13:00:00+09:00');
+
+    it('오늘 연 포지션의 실현 손익과 보유분 평가 손익을 봇·직접 거래마다 더해요', async () => {
+      positions.findHeldOrOpenedSince.mockResolvedValue([
+        position({
+          botId: 7,
+          status: 'closed',
+          realizedPnl: 500,
+          openedAt: new Date('2026-11-12T09:30:00+09:00'),
+        }),
+        // 어제 연 보유분: 실현 손익은 빼고 평가 손익만 더해요
+        position({
+          botId: 7,
+          quantity: 2,
+          costBasis: 20_000,
+          realizedPnl: 999,
+          openedAt: new Date('2026-11-11T10:00:00+09:00'),
+        }),
+        position({
+          botId: null,
+          symbol: '000660',
+          quantity: 1,
+          costBasis: 100_000,
+          openedAt: new Date('2026-11-12T10:00:00+09:00'),
+        }),
+      ]);
+      quotes.pricesOf.mockResolvedValue(new Map([['005930', 10_500]]));
+
+      const today = await service.todayPnl(now);
+
+      expect(positions.findHeldOrOpenedSince).toHaveBeenCalledWith(
+        new Date('2026-11-12T00:00:00+09:00'),
+      );
+      // 직접 거래 종목은 최근가가 없어 평가 손익 0
+      expect(today.byOwner).toEqual(
+        new Map<number | null, number>([
+          [7, 1_500],
+          [null, 0],
+        ]),
+      );
+      expect(today.holdingSymbolCount).toBe(2);
+    });
+  });
+
+  describe('recentBotStats', () => {
+    it('최근 30거래일 청산으로 승률을, 오늘을 뺀 최근 7거래일 기록으로 일별 손익을 줘요', async () => {
+      calendars.recentOpenDays.mockImplementation((_until, count) =>
+        Promise.resolve(
+          count === 8
+            ? ['2026-11-12', '2026-11-11', '2026-11-10']
+            : ['2026-11-12', '2026-11-11', '2026-11-10', '2026-11-09'],
+        ),
+      );
+      positions.findClosedBetween.mockResolvedValue([
+        position({ botId: 7, realizedPnl: 300 }),
+        position({ botId: 7, realizedPnl: -100 }),
+        position({ botId: null, realizedPnl: 50 }),
+      ]);
+      const daily = (tradeDate: string, realizedPnl: number) =>
+        Object.assign({
+          botId: 8,
+          tradeDate,
+          realizedPnl,
+          unrealizedPnl: 10,
+        }) as BotDailyResult;
+      positions.findDailyResults.mockResolvedValue([
+        daily('2026-11-10', 100),
+        daily('2026-11-11', -200),
+      ]);
+
+      const stats = await service.recentBotStats('2026-11-12');
+
+      expect(positions.findClosedBetween).toHaveBeenCalledWith({
+        start: new Date('2026-11-09T00:00:00+09:00'),
+      });
+      expect(positions.findDailyResults).toHaveBeenCalledWith({
+        from: '2026-11-10',
+        to: '2026-11-11',
+      });
+      expect(stats.get(7)).toEqual({ winRate30d: 0.5, last7Days: [] });
+      expect(stats.get(8)).toEqual({
+        winRate30d: null,
+        last7Days: [110, -190],
+      });
+    });
+
+    it('지난 개장일을 모르면 일별 기록을 읽지 않아요', async () => {
+      calendars.recentOpenDays.mockResolvedValue([]);
+      positions.findClosedBetween.mockResolvedValue([]);
+
+      await expect(service.recentBotStats('2026-11-12')).resolves.toEqual(
+        new Map(),
+      );
+      expect(positions.findDailyResults).not.toHaveBeenCalled();
+    });
   });
 
   describe('recordDailyResults', () => {

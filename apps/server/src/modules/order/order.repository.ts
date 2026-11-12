@@ -18,8 +18,17 @@ import { ProtectiveOrder } from './entities/protective-order.entity.js';
 import {
   LIVE_PROTECTIVE_ORDER_STATUSES,
   OPEN_ORDER_STATUSES,
+  type OrderOrigin,
   type OrderSide,
 } from './order.constants.js';
+
+// 체결 주문 목록 필터 (api.md GET /v1/orders)
+export interface FilledOrderFilter {
+  start?: Date;
+  end?: Date;
+  botIds?: number[];
+  origins?: OrderOrigin[];
+}
 
 export type ProtectiveFields = Omit<
   ProtectiveOrder,
@@ -46,6 +55,8 @@ export type OrderEventFields = Pick<
 export class OrderRepository {
   // 봇들의 미체결 주문은 많아야 수십 건이에요
   private static readonly MAX_OPEN_ORDERS = 1000;
+  // ponytail: 투자 내역 한 페이지(최대 100개 + 보유 중)의 주문을 한 번에 읽어요
+  private static readonly MAX_POSITION_ORDERS = 10_000;
 
   constructor(
     private readonly txHost: TransactionHost<TransactionalAdapterTypeOrm>,
@@ -79,6 +90,23 @@ export class OrderRepository {
     });
   }
 
+  // 포지션들의 체결된 주문 (투자 내역의 진입·청산가, 비용)
+  findFilledByPositions(positionIds: number[]): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      where: { positionId: In(positionIds), filledQuantity: MoreThan(0) },
+      take: OrderRepository.MAX_POSITION_ORDERS,
+    });
+  }
+
+  // 포지션 하나의 모든 주문, 낸 순서대로 (투자 내역 펼친 줄)
+  findByPosition(positionId: number): Promise<BrokerOrder[]> {
+    return this.orders.find({
+      where: { positionId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+      take: OrderRepository.MAX_POSITION_ORDERS,
+    });
+  }
+
   // 봇 주문 중 미체결이고 토스에 접수된 것 (취소 대상). botId가 없으면 모든 봇
   findOpenBotOrders(botId?: number): Promise<BrokerOrder[]> {
     return this.orders.find({
@@ -93,6 +121,35 @@ export class OrderRepository {
   }
 
   // 그 날(YYYY-MM-DD)에 적용되는 수수료·세금률 (PaperBroker)
+  // 한 주라도 체결된 주문, 마지막 체결 시각 최신순. 포지션과 봇(이름)을 같이 읽어요
+  findFilledPage(
+    filter: FilledOrderFilter,
+    skip: number,
+    take: number,
+  ): Promise<[BrokerOrder[], number]> {
+    const query = this.orders
+      .createQueryBuilder('order')
+      .innerJoinAndSelect('order.position', 'position')
+      .leftJoinAndSelect('position.bot', 'bot')
+      .where('order.filledQuantity > 0')
+      .andWhere('order.filledAt IS NOT NULL')
+      .orderBy('order.filledAt', 'DESC')
+      .addOrderBy('order.id', 'DESC');
+    if (filter.start)
+      query.andWhere('order.filledAt >= :start', { start: filter.start });
+    if (filter.end)
+      query.andWhere('order.filledAt < :end', { end: filter.end });
+    if (filter.botIds?.length)
+      query.andWhere('position.botId IN (:...botIds)', {
+        botIds: filter.botIds,
+      });
+    if (filter.origins?.length)
+      query.andWhere('order.origin IN (:...origins)', {
+        origins: filter.origins,
+      });
+    return query.skip(skip).take(take).getManyAndCount();
+  }
+
   findFeeSchedule(date: string): Promise<FeeSchedule | null> {
     return this.fees.findOne({
       where: { effectiveFrom: LessThanOrEqual(date) },

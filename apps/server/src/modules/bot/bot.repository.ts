@@ -124,6 +124,33 @@ export class BotRepository {
     });
   }
 
+  // 봇의 모든 버전, 최신이 앞이에요
+  findVersions(botId: number): Promise<BotVersion[]> {
+    return this.versions.find({
+      where: { botId },
+      order: { version: 'DESC' },
+      take: BotRepository.MAX_VERSIONS_PER_BOT,
+    });
+  }
+
+  addVersion(
+    version: Omit<BotVersion, 'id' | 'bot' | 'createdAt'>,
+  ): Promise<BotVersion> {
+    return this.versions.save(this.versions.create(version));
+  }
+
+  async applyVersions(ids: number[], appliedAt: Date): Promise<void> {
+    await this.versions.update(
+      { id: In(ids), appliedAt: IsNull() },
+      { appliedAt },
+    );
+  }
+
+  // 판단 변경 버전을 적용하면 검증 구간으로 돌아가요 (POL-RISK-13)
+  async markVerifying(ids: number[]): Promise<void> {
+    await this.bots.update({ id: In(ids) }, { stage: 'verifying' });
+  }
+
   // 검증 구간인 봇만 바꿔요
   async markReleased(id: number): Promise<void> {
     await this.bots.update({ id, stage: 'verifying' }, { stage: 'released' });

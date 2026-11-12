@@ -2,6 +2,9 @@
 export const ORDER_ORIGINS = ['bot', 'protective', 'manual'] as const;
 export type OrderOrigin = (typeof ORDER_ORIGINS)[number];
 
+// 체결 목록의 기본 출처: 봇이 낸 주문만 (api.md GET /v1/orders)
+export const DEFAULT_LIST_ORIGINS = ['bot', 'protective'] as const;
+
 export const ORDER_SIDES = ['BUY', 'SELL'] as const;
 export type OrderSide = (typeof ORDER_SIDES)[number];
 

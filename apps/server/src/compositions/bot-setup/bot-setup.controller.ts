@@ -23,6 +23,10 @@ import {
   BudgetRatioExceededException,
   TradingHoursOutOfRangeException,
 } from './bot-setup.service.js';
+import {
+  AllocationPreviewDto,
+  AllocationPreviewRequestDto,
+} from './dto/allocation-preview.dto.js';
 import { BotDefaultsQueryDto } from './dto/bot-defaults-query.dto.js';
 import { BotDefaultsResponseDto } from './dto/bot-defaults-response.dto.js';
 import { CreateBotDto, CreatedBotDto } from './dto/create-bot.dto.js';
@@ -77,5 +81,15 @@ export class BotSetupController {
         end: bot.tradingEnd.slice(0, HH_MM),
       },
     };
+  }
+
+  /** 저장 전 예상 배분 (FR-BOT-05). 같은 시각에 시작하는 확정 전 봇들과 함께 engine 확정과 같은 계산을 해요. 저장하지 않아요(200) */
+  @ApiErrors(TradingHoursOutOfRangeException)
+  @Post('allocation-previews')
+  @HttpCode(HttpStatus.OK)
+  previewAllocation(
+    @Body() request: AllocationPreviewRequestDto,
+  ): Promise<AllocationPreviewDto> {
+    return this.setup.previewAllocation(request);
   }
 }

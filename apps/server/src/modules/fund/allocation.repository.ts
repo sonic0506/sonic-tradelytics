@@ -35,6 +35,15 @@ export class AllocationRepository {
     });
   }
 
+  // 가장 최근 배분과 그때 스냅샷
+  findLatest(): Promise<Allocation | null> {
+    return this.allocations.findOne({
+      where: {},
+      relations: { snapshot: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+  }
+
   findActiveByBot(botId: number): Promise<Allocation | null> {
     return this.allocations.findOneBy({ botId, releasedAt: IsNull() });
   }

@@ -3,6 +3,7 @@ import { TransactionHost } from '@nestjs-cls/transactional';
 import type { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
 import {
   And,
+  Brackets,
   In,
   IsNull,
   LessThan,
@@ -16,6 +17,17 @@ import {
 
 import { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import { Position } from './entities/position.entity.js';
+import type { PositionView } from './position.constants.js';
+import type { HistoryFilter } from './position.types.js';
+
+// 화면 상태 → 조건 (positionView와 같은 정의)
+const VIEW_CONDITIONS: Record<PositionView, string> = {
+  holding: "position.status = 'open' AND position.quantity > 0",
+  pending: "position.status = 'open' AND position.quantity = 0",
+  closed:
+    "position.status = 'closed' AND position.exitReason IS DISTINCT FROM 'not_filled'",
+  canceled: "position.status = 'closed' AND position.exitReason = 'not_filled'",
+};
 
 @Injectable()
 export class PositionRepository {
@@ -48,6 +60,69 @@ export class PositionRepository {
       ],
       take: PositionRepository.MAX_FUND_ROWS,
     });
+  }
+
+  // 오늘 손익용: 보유 중인 포지션과 since 이후에 연 포지션 (봇·직접 거래 모두)
+  findHeldOrOpenedSince(since: Date): Promise<Position[]> {
+    return this.positions.find({
+      select: {
+        id: true,
+        botId: true,
+        symbol: true,
+        status: true,
+        quantity: true,
+        costBasis: true,
+        realizedPnl: true,
+        openedAt: true,
+      },
+      where: [
+        { status: 'open', quantity: MoreThan(0) },
+        { openedAt: MoreThanOrEqual(since) },
+      ],
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+  }
+
+  // 투자 내역: 최신 진입순, 봇(이름·유형)을 같이 읽어요
+  findHistory(
+    filter: HistoryFilter,
+    skip: number,
+    take: number,
+  ): Promise<[Position[], number]> {
+    const query = this.positions
+      .createQueryBuilder('position')
+      .leftJoinAndSelect('position.bot', 'bot')
+      .orderBy('position.openedAt', 'DESC')
+      .addOrderBy('position.id', 'DESC');
+    if (filter.start)
+      query.andWhere('position.openedAt >= :start', { start: filter.start });
+    if (filter.end)
+      query.andWhere('position.openedAt < :end', { end: filter.end });
+    const { botIds, includeManual } = filter;
+    if (botIds?.length || includeManual)
+      query.andWhere(
+        new Brackets((owners) => {
+          if (botIds?.length)
+            owners.orWhere('position.botId IN (:...botIds)', { botIds });
+          if (includeManual) owners.orWhere('position.botId IS NULL');
+        }),
+      );
+    if (filter.symbol)
+      query.andWhere('position.symbol = :symbol', { symbol: filter.symbol });
+    if (filter.result === 'profit') query.andWhere('position.realizedPnl > 0');
+    if (filter.result === 'loss') query.andWhere('position.realizedPnl < 0');
+    if (filter.exitReasons?.length)
+      query.andWhere('position.exitReason IN (:...exitReasons)', {
+        exitReasons: filter.exitReasons,
+      });
+    const { views } = filter;
+    if (views?.length)
+      query.andWhere(
+        new Brackets((conditions) => {
+          for (const view of views) conditions.orWhere(VIEW_CONDITIONS[view]);
+        }),
+      );
+    return query.skip(skip).take(take).getManyAndCount();
   }
 
   // 일일 집계용: 봇의 열린 포지션과 since 이후 닫힌 포지션
@@ -201,6 +276,10 @@ export class PositionRepository {
       take,
     });
     return closed.map(({ exitReason }) => exitReason);
+  }
+
+  findWithBot(id: number): Promise<Position | null> {
+    return this.positions.findOne({ where: { id }, relations: { bot: true } });
   }
 
   findById(id: number): Promise<Position | null> {

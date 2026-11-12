@@ -1,15 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { kstAt } from '@/common/time/kst-date.js';
+import { kstAt, kstDate } from '@/common/time/kst-date.js';
 import { BotService } from '@/modules/bot/index.js';
-import { QuoteQueryService } from '@/modules/market-data/index.js';
+import {
+  MarketCalendarQueryService,
+  QuoteQueryService,
+} from '@/modules/market-data/index.js';
 
-import { type TradeStats, tradeStats } from './bot-stat.rule.js';
+import { type TradeStats, tradeStats, winRate } from './bot-stat.rule.js';
 import { type DailyPosition, dailyResults } from './daily-result.rule.js';
 import type { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import type { Position } from './entities/position.entity.js';
 import { PositionNotFoundException } from './position.exception.js';
 import { PositionRepository } from './position.repository.js';
+import type { HistoryFilter } from './position.types.js';
 
 // 주문 하나에서 새로 늘어난 체결분
 export interface Fill {
@@ -38,6 +42,27 @@ export interface BotPerformance {
 }
 
 const DAY_MS = 86_400_000;
+// ponytail: 보유 중과 요약은 한 번에 읽어요. 거래가 아주 많아지면 요약을 SUM 쿼리로 바꿔요
+const MAX_HISTORY_ROWS = 10_000;
+// 홈 봇 카드: 승률은 최근 30거래일, 일별 손익은 오늘을 뺀 최근 7거래일 (api.md 홈)
+const WIN_RATE_DAYS = 30;
+const RECENT_DAYS = 7;
+
+// 오늘 손익 (FR-PERF-10). 키 null은 직접 거래예요
+export interface TodayPnl {
+  // 오늘 연 포지션의 실현 손익 + 보유분 평가 손익(최근가를 아는 종목만)
+  byOwner: Map<number | null, number>;
+  // 보유 중인 종목 수 (봇·직접 거래 합쳐 종목마다 한 번)
+  holdingSymbolCount: number;
+}
+
+// 홈 봇 카드의 최근 실적
+export interface RecentBotStats {
+  // 0~1. 청산이 없으면 null
+  winRate30d: number | null;
+  // 오래된 순. 기록이 없는 날은 빠져요
+  last7Days: number[];
+}
 
 // 봇 하나의 보유·실현 손익 (POL-FUND-02, 05)
 export interface BotHoldings {
@@ -56,11 +81,115 @@ export class PositionService {
     private readonly positions: PositionRepository,
     private readonly bots: BotService,
     private readonly quotes: QuoteQueryService,
+    private readonly calendars: MarketCalendarQueryService,
   ) {}
+
+  // 오늘 손익을 봇마다(직접 거래는 null) 모아요. 봇 상세의 오늘 손익과 같은 계산이에요
+  async todayPnl(now: Date): Promise<TodayPnl> {
+    const since = kstAt(kstDate(now), '00:00');
+    const positions = await this.positions.findHeldOrOpenedSince(since);
+    const held = positions.filter(
+      ({ status, quantity }) => status === 'open' && quantity > 0,
+    );
+    const prices = await this.quotes.pricesOf([
+      ...new Set(held.map(({ symbol }) => symbol)),
+    ]);
+    const byOwner = new Map<number | null, number>();
+    const add = (owner: number | null, pnl: number) =>
+      byOwner.set(owner, (byOwner.get(owner) ?? 0) + pnl);
+    for (const position of positions) {
+      if (position.openedAt >= since) add(position.botId, position.realizedPnl);
+      const price = prices.get(position.symbol);
+      if (position.status === 'open' && position.quantity > 0 && price)
+        add(position.botId, price * position.quantity - position.costBasis);
+    }
+    return {
+      byOwner,
+      holdingSymbolCount: new Set(held.map(({ symbol }) => symbol)).size,
+    };
+  }
+
+  // 봇마다 최근 30거래일 승률과 오늘을 뺀 최근 7거래일 일별 손익 (홈 봇 카드)
+  async recentBotStats(today: string): Promise<Map<number, RecentBotStats>> {
+    const [openDays, recentDays] = await Promise.all([
+      this.calendars.recentOpenDays(today, WIN_RATE_DAYS),
+      this.calendars.recentOpenDays(today, RECENT_DAYS + 1),
+    ]);
+    const past = recentDays.filter((day) => day < today).slice(0, RECENT_DAYS);
+    const [closed, daily] = await Promise.all([
+      this.positions.findClosedBetween({
+        start: kstAt(openDays.at(-1) ?? today, '00:00'),
+      }),
+      past.length === 0
+        ? Promise.resolve([])
+        : this.positions.findDailyResults({ from: past.at(-1), to: past[0] }),
+    ]);
+    const result = new Map<number, RecentBotStats>();
+    const statsOf = (botId: number) => {
+      const stats = result.get(botId) ?? { winRate30d: null, last7Days: [] };
+      result.set(botId, stats);
+      return stats;
+    };
+    const tradesByBot = new Map<number, number[]>();
+    for (const { botId, realizedPnl } of closed)
+      if (botId !== null)
+        tradesByBot.set(botId, [
+          ...(tradesByBot.get(botId) ?? []),
+          realizedPnl,
+        ]);
+    for (const [botId, pnls] of tradesByBot)
+      statsOf(botId).winRate30d = winRate(pnls);
+    for (const row of daily)
+      statsOf(row.botId).last7Days.push(row.realizedPnl + row.unrealizedPnl);
+    return result;
+  }
 
   // since 이후 청산된 봇 포지션의 순손익, 청산 순서대로 (상한 해제 기준, POL-RISK-13)
   closedPnlsSince(botId: number, since: Date): Promise<number[]> {
     return this.positions.findClosedPnlsSince(botId, since);
+  }
+
+  // 투자 내역 한 페이지. 상태를 정하지 않으면 보유 중은 페이지와 상관없이 첫 페이지 맨 위에 모두 넣어요 (FR-PERF-06)
+  async history(
+    filter: HistoryFilter,
+    skip: number,
+    size: number,
+  ): Promise<{ holdings: Position[]; rows: Position[]; total: number }> {
+    if (filter.views?.length) {
+      const [rows, total] = await this.positions.findHistory(
+        filter,
+        skip,
+        size,
+      );
+      return { holdings: [], rows, total };
+    }
+    const [[holdings], [rows, total]] = await Promise.all([
+      this.positions.findHistory(
+        { ...filter, views: ['holding'] },
+        0,
+        MAX_HISTORY_ROWS,
+      ),
+      this.positions.findHistory(
+        { ...filter, views: ['pending', 'closed', 'canceled'] },
+        skip,
+        size,
+      ),
+    ]);
+    return {
+      holdings: skip === 0 ? holdings : [],
+      rows,
+      total: total + holdings.length,
+    };
+  }
+
+  // 투자 내역 요약용: 필터에 맞는 포지션 모두
+  async historyAll(filter: HistoryFilter): Promise<Position[]> {
+    const [rows] = await this.positions.findHistory(
+      filter,
+      0,
+      MAX_HISTORY_ROWS,
+    );
+    return rows;
   }
 
   // 봇 전체 일별 손익을 날짜마다 더해요. 직접 거래는 bot_daily_results에 없어서 빠져요
@@ -245,6 +374,13 @@ export class PositionService {
     take: number,
   ): Promise<(string | null)[]> {
     return this.positions.recentExitReasons(botId, since, take);
+  }
+
+  // 투자 내역 펼친 줄 (봇 이름·유형 포함). 없으면 404
+  async findWithBot(positionId: number): Promise<Position> {
+    const position = await this.positions.findWithBot(positionId);
+    if (!position) throw new PositionNotFoundException(positionId);
+    return position;
   }
 
   find(positionId: number): Promise<Position | null> {

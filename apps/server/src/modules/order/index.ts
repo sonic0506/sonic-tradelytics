@@ -14,5 +14,7 @@ export type { ApplyResult, OrderReport } from './order.types.js';
 export { OrderQueryModule } from './order-query.module.js';
 export {
   type BotOpenOrders,
+  type FillTotals,
   OrderQueryService,
+  type TodayFills,
 } from './order-query.service.js';

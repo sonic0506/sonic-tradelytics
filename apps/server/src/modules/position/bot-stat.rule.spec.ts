@@ -3,7 +3,15 @@ import {
   maxDrawdownPct,
   returnRatePct,
   tradeStats,
+  winRate,
 } from './bot-stat.rule.js';
+
+describe('winRate', () => {
+  it('순손익이 0보다 큰 청산만 이긴 거래로 세고, 청산이 없으면 null이에요', () => {
+    expect(winRate([300, 0, -100])).toBe(0.33);
+    expect(winRate([])).toBeNull();
+  });
+});
 
 describe('tradeStats', () => {
   const trade = (

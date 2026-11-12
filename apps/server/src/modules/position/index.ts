@@ -4,6 +4,7 @@ export { BotDailyResult } from './entities/bot-daily-result.entity.js';
 export { ManualNote } from './entities/manual-note.entity.js';
 export { Position } from './entities/position.entity.js';
 export * from './position.constants.js';
+export { PositionNotFoundException } from './position.exception.js';
 export { PositionModule } from './position.module.js';
 export {
   type BotHoldings,
@@ -11,4 +12,8 @@ export {
   type DailyTotal,
   type Fill,
   PositionService,
+  type RecentBotStats,
+  type TodayPnl,
 } from './position.service.js';
+export type { HistoryFilter } from './position.types.js';
+export { positionView } from './position-view.rule.js';

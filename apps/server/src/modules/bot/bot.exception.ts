@@ -111,3 +111,34 @@ export class ReleaseCriteriaNotMetException extends AppException {
     );
   }
 }
+
+// 적용 대기 버전이 있으면 새 버전을 더 넣지 않아요 (POL-RISK-13)
+export class BotVersionPendingException extends AppException {
+  static readonly code = 'BOT_VERSION_PENDING';
+  static readonly status = HttpStatus.CONFLICT;
+  static readonly example =
+    'bot 1에 적용 대기 중인 버전이 있어요. 적용된 뒤에 다시 저장해요.';
+
+  constructor(botId: number) {
+    super(
+      BotVersionPendingException.code,
+      BotVersionPendingException.status,
+      `bot ${botId}에 적용 대기 중인 버전이 있어요. 적용된 뒤에 다시 저장해요.`,
+    );
+  }
+}
+
+// 지금 버전과 같은 값으로는 새 버전을 만들지 않아요
+export class BotVersionUnchangedException extends AppException {
+  static readonly code = 'BOT_VERSION_UNCHANGED';
+  static readonly status = HttpStatus.UNPROCESSABLE_ENTITY;
+  static readonly example = '지금 버전과 바뀐 값이 없어요.';
+
+  constructor() {
+    super(
+      BotVersionUnchangedException.code,
+      BotVersionUnchangedException.status,
+      BotVersionUnchangedException.example,
+    );
+  }
+}

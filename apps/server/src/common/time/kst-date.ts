@@ -31,3 +31,19 @@ const kstClockFormat = new Intl.DateTimeFormat('sv-SE', {
 export function kstTime(at: Date = new Date()): string {
   return kstClockFormat.format(at);
 }
+
+const DAY_MS = 86_400_000;
+
+// 거래일 기간(YYYY-MM-DD, 둘 다 포함)을 시각 구간 [start, end)로 바꿔요. 없는 쪽은 열려 있어요
+export function kstRange(
+  from?: string,
+  to?: string,
+): { start?: Date; end?: Date } {
+  return {
+    start: from === undefined ? undefined : kstAt(from, '00:00'),
+    end:
+      to === undefined
+        ? undefined
+        : new Date(kstAt(to, '00:00').getTime() + DAY_MS),
+  };
+}

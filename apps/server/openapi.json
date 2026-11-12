@@ -941,6 +941,437 @@
         ]
       }
     },
+    "/v1/allocation-previews": {
+      "post": {
+        "operationId": "BotSetupController_previewAllocation_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllocationPreviewRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocationPreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/allocation-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/allocation-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "TRADING_HOURS_OUT_OF_RANGE": {
+                    "summary": "운영 시간은 09:00~15:30 안이어야 해요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "운영 시간은 09:00~15:30 안이어야 해요.",
+                      "code": "TRADING_HOURS_OUT_OF_RANGE",
+                      "instance": "/v1/allocation-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "저장 전 예상 배분 (FR-BOT-05). 같은 시각에 시작하는 확정 전 봇들과 함께 engine 확정과 같은 계산을 해요. 저장하지 않아요(200)",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
+    "/v1/engine-status": {
+      "get": {
+        "operationId": "EngineStatusController_find_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineStatusResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/engine-status",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "ENGINE_STATUS_NOT_FOUND": {
+                    "summary": "engine이 아직 상태를 쓰지 않았어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "engine이 아직 상태를 쓰지 않았어요.",
+                      "code": "ENGINE_STATUS_NOT_FOUND",
+                      "instance": "/v1/engine-status",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "engine 상태와 오늘 장 일정 (모든 화면 머리 띠, 10초마다)",
+        "tags": [
+          "engine"
+        ]
+      }
+    },
+    "/v1/orders": {
+      "get": {
+        "operationId": "OrderController_findPage_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "페이지(1부터)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기(최대 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "botIds",
+            "required": false,
+            "in": "query",
+            "description": "봇 id (쉼표로 여러 개). 없으면 전체",
+            "schema": {
+              "example": "1,2",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origins",
+            "required": false,
+            "in": "query",
+            "description": "주문 출처 (쉼표로 여러 개). 기본값 bot,protective",
+            "schema": {
+              "example": "bot,protective",
+              "type": "string",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "bot",
+                  "protective",
+                  "manual"
+                ]
+              }
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 거래일 (YYYY-MM-DD, 포함). 마지막 체결 시각 기준",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilledOrderPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/orders",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/orders",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "체결된 주문 (FR-PERF-01, 04). 마지막 체결 시각 최신순, 기본으로 직접 거래는 빼요",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/v1/daily-results": {
+      "get": {
+        "operationId": "DailyResultController_findAll_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "시작 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "끝 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyResultListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/daily-results",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/daily-results",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "봇 전체의 일별 손익 합계 (FR-PERF-01, 03). 장후 배치 전이라 오늘 행은 없어요. 직접 거래는 빠져요",
+        "tags": [
+          "daily-results"
+        ]
+      }
+    },
     "/v1/bots/{id}/daily-results": {
       "get": {
         "operationId": "BotOverviewController_findDailyResults_v1",
@@ -1084,6 +1515,405 @@
         ]
       }
     },
+    "/v1/bots/{id}/versions": {
+      "get": {
+        "operationId": "BotOverviewController_findVersions_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BotVersionListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_400": {
+                    "summary": "Validation failed (numeric string is expected)",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "Validation failed (numeric string is expected)",
+                      "code": "HTTP_400",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_NOT_FOUND": {
+                    "summary": "봇 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "봇 1을(를) 찾을 수 없어요.",
+                      "code": "BOT_NOT_FOUND",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "규칙 값 버전 목록 (FR-BOT-03). 최신이 앞이고, 바뀐 값은 바로 앞 버전과 비교해요",
+        "tags": [
+          "bots"
+        ]
+      },
+      "post": {
+        "operationId": "BotOverviewController_addVersion_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBotVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedBotVersionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "규칙 값을 확인해 주세요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "규칙 값을 확인해 주세요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  },
+                  "HTTP_400": {
+                    "summary": "Validation failed (numeric string is expected)",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "Validation failed (numeric string is expected)",
+                      "code": "HTTP_400",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_NOT_FOUND": {
+                    "summary": "봇 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "봇 1을(를) 찾을 수 없어요.",
+                      "code": "BOT_NOT_FOUND",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_VERSION_PENDING": {
+                    "summary": "bot 1에 적용 대기 중인 버전이 있어요. 적용된 뒤에 다시 저장해요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Conflict",
+                      "status": 409,
+                      "detail": "bot 1에 적용 대기 중인 버전이 있어요. 적용된 뒤에 다시 저장해요.",
+                      "code": "BOT_VERSION_PENDING",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_VERSION_UNCHANGED": {
+                    "summary": "지금 버전과 바뀐 값이 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unprocessable Entity",
+                      "status": 422,
+                      "detail": "지금 버전과 바뀐 값이 없어요.",
+                      "code": "BOT_VERSION_UNCHANGED",
+                      "instance": "/v1/bots/1/versions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "새 규칙 값 버전 (FR-BOT-03, 11). 쉬는 중(또는 시작 전)이면 바로 적용하고, 아니면 쉬는 중이 된 뒤 적용해요 (POL-RISK-13)",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
+    "/v1/bots/{id}/version-previews": {
+      "post": {
+        "operationId": "BotOverviewController_previewVersion_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBotVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionPreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "규칙 값을 확인해 주세요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "규칙 값을 확인해 주세요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/bots/1/version-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  },
+                  "HTTP_400": {
+                    "summary": "Validation failed (numeric string is expected)",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "Validation failed (numeric string is expected)",
+                      "code": "HTTP_400",
+                      "instance": "/v1/bots/1/version-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bots/1/version-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "BOT_NOT_FOUND": {
+                    "summary": "봇 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "봇 1을(를) 찾을 수 없어요.",
+                      "code": "BOT_NOT_FOUND",
+                      "instance": "/v1/bots/1/version-previews",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "바꾸려는 값을 저장하면 어떻게 되는지 (FR-BOT-11). 변경 종류는 서버가 정하고, 저장하지 않아요",
+        "tags": [
+          "bots"
+        ]
+      }
+    },
     "/v1/bots/{id}/release": {
       "post": {
         "operationId": "BotOverviewController_release_v1",
@@ -1204,105 +2034,6 @@
         ]
       }
     },
-    "/v1/daily-results": {
-      "get": {
-        "operationId": "DailyResultController_findAll_v1",
-        "parameters": [
-          {
-            "name": "from",
-            "required": true,
-            "in": "query",
-            "description": "시작 거래일 (YYYY-MM-DD, 포함)",
-            "schema": {
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "required": true,
-            "in": "query",
-            "description": "끝 거래일 (YYYY-MM-DD, 포함)",
-            "schema": {
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyResultListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDto"
-                },
-                "examples": {
-                  "VALIDATION_FAILED": {
-                    "summary": "요청 값이 올바르지 않아요.",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Bad Request",
-                      "status": 400,
-                      "detail": "요청 값이 올바르지 않아요.",
-                      "code": "VALIDATION_FAILED",
-                      "instance": "/v1/daily-results",
-                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
-                      "errors": [
-                        {
-                          "field": "name",
-                          "messages": [
-                            "name should not be empty"
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDto"
-                },
-                "examples": {
-                  "HTTP_401": {
-                    "summary": "Unauthorized",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Unauthorized",
-                      "status": 401,
-                      "detail": "Unauthorized",
-                      "code": "HTTP_401",
-                      "instance": "/v1/daily-results",
-                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "봇 전체의 일별 손익 합계 (FR-PERF-01, 03). 장후 배치 전이라 오늘 행은 없어요. 직접 거래는 빠져요",
-        "tags": [
-          "daily-results"
-        ]
-      }
-    },
     "/v1/bot-stats": {
       "get": {
         "operationId": "BotStatsController_findAll_v1",
@@ -1399,6 +2130,654 @@
         "summary": "봇 비교 표 (FR-PERF-02). 봇마다 한 줄과 직접 거래 한 줄. 지표 정의는 F2 \"봇별 핵심 지표\"",
         "tags": [
           "bot-stats"
+        ]
+      }
+    },
+    "/v1/home": {
+      "get": {
+        "operationId": "HomeController_find_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/home",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "홈 대시보드: 계좌·오늘 손익·봇 카드·오늘 체결 (FR-PERF-01, 10). web이 5초마다 불러요",
+        "tags": [
+          "home"
+        ]
+      }
+    },
+    "/v1/positions": {
+      "get": {
+        "operationId": "HistoryController_findPage_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "페이지(1부터)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기(최대 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "botIds",
+            "required": false,
+            "in": "query",
+            "description": "봇 id (쉼표로 여러 개). manual을 넣으면 직접 거래 포함. 없으면 전체",
+            "schema": {
+              "pattern": "^(\\d+|manual)$",
+              "example": "1,manual",
+              "type": "string"
+            }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "description": "실현 손익 기준 이익·손실",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "profit",
+                "loss"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "화면 상태. 정하지 않으면 보유 중을 첫 페이지 맨 위에 모두 넣어요",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "holding",
+                "pending",
+                "closed",
+                "canceled"
+              ]
+            }
+          },
+          {
+            "name": "exitReasons",
+            "required": false,
+            "in": "query",
+            "description": "청산 사유 (쉼표로 여러 개)",
+            "schema": {
+              "example": "take_profit,stop_loss",
+              "type": "string",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "take_profit",
+                  "stop_loss",
+                  "time_exit",
+                  "market_close",
+                  "rule_exit",
+                  "loss_limit",
+                  "reeval",
+                  "manual",
+                  "kill_switch",
+                  "not_filled"
+                ]
+              }
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 진입일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 진입일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "required": false,
+            "in": "query",
+            "description": "종목 코드",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionHistoryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/positions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/positions",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "투자 내역 (FR-PERF-04~07). 최신 진입순, 상태를 정하지 않으면 보유 중을 첫 페이지 맨 위에 모두 넣어요",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/v1/position-summaries": {
+      "get": {
+        "operationId": "HistoryController_summary_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "페이지(1부터)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기(최대 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "botIds",
+            "required": false,
+            "in": "query",
+            "description": "봇 id (쉼표로 여러 개). manual을 넣으면 직접 거래 포함. 없으면 전체",
+            "schema": {
+              "pattern": "^(\\d+|manual)$",
+              "example": "1,manual",
+              "type": "string"
+            }
+          },
+          {
+            "name": "result",
+            "required": false,
+            "in": "query",
+            "description": "실현 손익 기준 이익·손실",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "profit",
+                "loss"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "화면 상태. 정하지 않으면 보유 중을 첫 페이지 맨 위에 모두 넣어요",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "holding",
+                "pending",
+                "closed",
+                "canceled"
+              ]
+            }
+          },
+          {
+            "name": "exitReasons",
+            "required": false,
+            "in": "query",
+            "description": "청산 사유 (쉼표로 여러 개)",
+            "schema": {
+              "example": "take_profit,stop_loss",
+              "type": "string",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "take_profit",
+                  "stop_loss",
+                  "time_exit",
+                  "market_close",
+                  "rule_exit",
+                  "loss_limit",
+                  "reeval",
+                  "manual",
+                  "kill_switch",
+                  "not_filled"
+                ]
+              }
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 진입일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 진입일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "required": false,
+            "in": "query",
+            "description": "종목 코드",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/position-summaries",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/position-summaries",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "투자 내역 상단 요약. botIds가 봇 하나면 그 봇의 자금, 아니면 필터에 맞는 포지션 전체 요약",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/v1/positions/{id}": {
+      "get": {
+        "operationId": "HistoryController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_400": {
+                    "summary": "Validation failed (numeric string is expected)",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "Validation failed (numeric string is expected)",
+                      "code": "HTTP_400",
+                      "instance": "/v1/positions/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/positions/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "POSITION_NOT_FOUND": {
+                    "summary": "position 1을(를) 찾을 수 없어요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Not Found",
+                      "status": 404,
+                      "detail": "position 1을(를) 찾을 수 없어요.",
+                      "code": "POSITION_NOT_FOUND",
+                      "instance": "/v1/positions/1",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "펼친 거래 한 줄: 주문, 진입 판단과 조건, 실제 결과, 채점, 판단 흐름 (FR-PERF-04, F3 근거 카드)",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/v1/accuracy-stats": {
+      "get": {
+        "operationId": "AccuracyController_find_v1",
+        "parameters": [
+          {
+            "name": "botIds",
+            "required": false,
+            "in": "query",
+            "description": "봇 id (쉼표로 여러 개). 없으면 전체",
+            "schema": {
+              "example": "1,2",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 거래일 (YYYY-MM-DD, 포함)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccuracyStatsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/accuracy-stats",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/accuracy-stats",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "정확도 분석 (FR-RAT-05, 06): 봇별 예측 채점 요약과 신뢰 점수 구간별 승률",
+        "tags": [
+          "accuracy-stats"
         ]
       }
     },
@@ -1638,76 +3017,6 @@
         "summary": "명령 처리 결과 (web이 0.5초 간격으로 확인해요)",
         "tags": [
           "commands"
-        ]
-      }
-    },
-    "/v1/engine-status": {
-      "get": {
-        "operationId": "EngineStatusController_find_v1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EngineStatusResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDto"
-                },
-                "examples": {
-                  "HTTP_401": {
-                    "summary": "Unauthorized",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Unauthorized",
-                      "status": 401,
-                      "detail": "Unauthorized",
-                      "code": "HTTP_401",
-                      "instance": "/v1/engine-status",
-                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDto"
-                },
-                "examples": {
-                  "ENGINE_STATUS_NOT_FOUND": {
-                    "summary": "engine이 아직 상태를 쓰지 않았어요.",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Not Found",
-                      "status": 404,
-                      "detail": "engine이 아직 상태를 쓰지 않았어요.",
-                      "code": "ENGINE_STATUS_NOT_FOUND",
-                      "instance": "/v1/engine-status",
-                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "engine 상태와 오늘 장 일정 (모든 화면 머리 띠, 10초마다)",
-        "tags": [
-          "engine"
         ]
       }
     },
@@ -2321,6 +3630,345 @@
           "id"
         ]
       },
+      "AllocationPreviewRequestDto": {
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "number",
+            "description": "투자금 다시 정하기(POL-FUND-12)면 그 봇 id. 그 봇의 지금 투자금은 반환한 것으로 봐요",
+            "minimum": 1
+          },
+          "budget": {
+            "$ref": "#/components/schemas/CreateBotBudgetDto"
+          },
+          "periodStart": {
+            "type": "string",
+            "description": "운용 시작일 (YYYY-MM-DD)",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "tradingStart": {
+            "type": "string",
+            "description": "운영 시작 시각 \"HH:mm\". 같은 시각에 시작하는 봇들과 함께 계산해요"
+          }
+        },
+        "required": [
+          "budget",
+          "periodStart",
+          "tradingStart"
+        ]
+      },
+      "PreviewBudgetDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "정률이면 비율(0~1], 정액이면 원"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "AllocationPreviewItemDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "description": "confirmed 확정 예정 · pending 보류 예정 · blocked 저장 불가(정률 합 100% 초과)",
+            "enum": [
+              "confirmed",
+              "pending",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null이면 지금 만들려는 봇"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "지금 만들려는 봇이면 null"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/PreviewBudgetDto"
+          },
+          "amount": {
+            "type": "number",
+            "nullable": true,
+            "description": "확정 예정 금액. 보류·저장 불가면 null"
+          }
+        },
+        "required": [
+          "outcome",
+          "botId",
+          "name",
+          "budget",
+          "amount"
+        ]
+      },
+      "AllocationPreviewDto": {
+        "type": "object",
+        "properties": {
+          "basedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "운용 자산을 읽은 시각. 아직 모르면 null"
+          },
+          "capital": {
+            "type": "number",
+            "nullable": true,
+            "description": "그때 운용 자산 = 주문 가능 금액 − 실행 중 봇의 현금 몫. 아직 모르면 null"
+          },
+          "startAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "함께 시작하는 시각"
+          },
+          "ratioTotal": {
+            "type": "number",
+            "description": "같은 시각 정률 봇 비율의 합 (1을 넘을 수 있어요)"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationPreviewItemDto"
+            }
+          }
+        },
+        "required": [
+          "basedAt",
+          "capital",
+          "startAt",
+          "ratioTotal",
+          "items"
+        ]
+      },
+      "MarketOpenDto": {
+        "type": "object",
+        "properties": {
+          "isTradingDay": {
+            "type": "boolean",
+            "description": "오늘 정규장이 열리는 날인지. engine이 오늘 일정을 아직 받지 않았으면 false"
+          },
+          "openAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "정규장 시작 시각"
+          },
+          "closeAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "정규장 끝 시각"
+          }
+        },
+        "required": [
+          "isTradingDay",
+          "openAt",
+          "closeAt"
+        ]
+      },
+      "EngineStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "description": "engine 상태. halted는 전체 정지(킬 스위치·토큰·기록 실패)",
+            "enum": [
+              "running",
+              "stopping",
+              "halted"
+            ],
+            "type": "string"
+          },
+          "haltReasons": {
+            "description": "전체 정지 사유 코드",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "heartbeatAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "engine 마지막 기록 시각. 30초 넘게 오래되면 \"엔진 응답 없음\"이에요"
+          },
+          "staleSymbols": {
+            "description": "시세가 끊긴 종목 (feed_stale)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketOpen": {
+            "description": "오늘 정규장",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarketOpenDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "haltReasons",
+          "heartbeatAt",
+          "staleSymbols",
+          "marketOpen"
+        ]
+      },
+      "FilledOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "bot",
+              "protective",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "filledAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "마지막 체결 시각"
+          },
+          "symbolCode": {
+            "type": "string"
+          },
+          "symbolName": {
+            "type": "string",
+            "description": "종목 이름을 아직 저장하지 않아 종목 코드예요"
+          },
+          "botName": {
+            "type": "string",
+            "nullable": true,
+            "description": "직접 거래면 null"
+          },
+          "filledQuantity": {
+            "type": "number"
+          },
+          "avgFillPrice": {
+            "type": "number",
+            "description": "평균 체결가"
+          },
+          "positionId": {
+            "type": "string",
+            "description": "투자 내역의 그 포지션 (GET /v1/positions/:id)"
+          }
+        },
+        "required": [
+          "side",
+          "origin",
+          "id",
+          "filledAt",
+          "symbolCode",
+          "symbolName",
+          "botName",
+          "filledQuantity",
+          "avgFillPrice",
+          "positionId"
+        ]
+      },
+      "PageMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "size": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "size",
+          "total"
+        ]
+      },
+      "FilledOrderPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilledOrderResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "DailyResultResponseDto": {
+        "type": "object",
+        "properties": {
+          "tradeDate": {
+            "type": "string",
+            "description": "거래일 (YYYY-MM-DD)"
+          },
+          "pnl": {
+            "type": "number",
+            "description": "그날 실현 손익(수수료·세금 차감) + 장 마감 평가 손익의 합"
+          },
+          "fees": {
+            "type": "number",
+            "description": "수수료 + 세금"
+          },
+          "closedTrades": {
+            "type": "number",
+            "description": "청산한 거래 수 (한 주도 체결되지 않은 진입은 빼요)"
+          }
+        },
+        "required": [
+          "tradeDate",
+          "pnl",
+          "fees",
+          "closedTrades"
+        ]
+      },
+      "DailyResultListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResultResponseDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "StatusReasonDto": {
         "type": "object",
         "properties": {
@@ -2567,25 +4215,6 @@
           "resting",
           "nextRunAt",
           "tradingHours"
-        ]
-      },
-      "PageMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number"
-          },
-          "size": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "page",
-          "size",
-          "total"
         ]
       },
       "BotPageDto": {
@@ -3134,45 +4763,207 @@
           "items"
         ]
       },
-      "DailyResultResponseDto": {
+      "RuleChangeDto": {
         "type": "object",
         "properties": {
-          "tradeDate": {
-            "type": "string",
-            "description": "거래일 (YYYY-MM-DD)"
+          "label": {
+            "type": "string"
           },
-          "pnl": {
-            "type": "number",
-            "description": "그날 실현 손익(수수료·세금 차감) + 장 마감 평가 손익의 합"
+          "from": {
+            "type": "string"
           },
-          "fees": {
-            "type": "number",
-            "description": "수수료 + 세금"
-          },
-          "closedTrades": {
-            "type": "number",
-            "description": "청산한 거래 수 (한 주도 체결되지 않은 진입은 빼요)"
+          "to": {
+            "type": "string"
           }
         },
         "required": [
-          "tradeDate",
-          "pnl",
-          "fees",
-          "closedTrades"
+          "label",
+          "from",
+          "to"
         ]
       },
-      "DailyResultListDto": {
+      "BotVersionItemDto": {
+        "type": "object",
+        "properties": {
+          "changeKind": {
+            "enum": [
+              "initial",
+              "decision_change",
+              "risk_only"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "changes": {
+            "description": "바로 앞 버전과 달라진 값. 첫 버전은 빈 목록",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleChangeDto"
+            }
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "appliedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "적용 대기면 null (POL-RISK-13)"
+          }
+        },
+        "required": [
+          "changeKind",
+          "version",
+          "changes",
+          "createdAt",
+          "appliedAt"
+        ]
+      },
+      "BotVersionListDto": {
         "type": "object",
         "properties": {
           "items": {
+            "description": "최신 버전이 앞이에요",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DailyResultResponseDto"
+              "$ref": "#/components/schemas/BotVersionItemDto"
             }
           }
         },
         "required": [
           "items"
+        ]
+      },
+      "VersionLossStopDto": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "number",
+            "description": "하루 손실 중지 %(양수)",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "total": {
+            "type": "number",
+            "description": "누적 손실 중지 %(양수)",
+            "maximum": 100,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "first",
+          "total"
+        ]
+      },
+      "CreateBotVersionDto": {
+        "type": "object",
+        "properties": {
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "바꿀 규칙 값 (GET /v1/bot-defaults의 rules 키). 보내지 않은 키는 지금 값 그대로, 시각은 \"HH:mm\""
+          },
+          "onDailyLimit": {
+            "enum": [
+              "liquidate",
+              "hold"
+            ],
+            "type": "string"
+          },
+          "orderAmount": {
+            "type": "number",
+            "description": "1회 주문 금액(원)",
+            "minimum": 1
+          },
+          "splitCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "maxPositions": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "lossStop": {
+            "$ref": "#/components/schemas/VersionLossStopDto"
+          },
+          "stopStreak": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "params"
+        ]
+      },
+      "VersionPreviewDto": {
+        "type": "object",
+        "properties": {
+          "changeKind": {
+            "nullable": true,
+            "description": "바뀐 값이 없으면 null",
+            "enum": [
+              "decision_change",
+              "risk_only"
+            ],
+            "type": "string"
+          },
+          "applyTiming": {
+            "description": "now 쉬는 중(또는 시작 전)이라 바로 · when_resting 쉬는 중이 된 뒤",
+            "enum": [
+              "now",
+              "when_resting"
+            ],
+            "type": "string"
+          },
+          "reconfirmsAtCap": {
+            "type": "boolean",
+            "description": "적용하면 상한이 풀린 봇이 검증 구간으로 돌아가 투자금을 검증 상한으로 다시 확정하는지"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleChangeDto"
+            }
+          }
+        },
+        "required": [
+          "changeKind",
+          "applyTiming",
+          "reconfirmsAtCap",
+          "changes"
+        ]
+      },
+      "CreatedBotVersionDto": {
+        "type": "object",
+        "properties": {
+          "changeKind": {
+            "enum": [
+              "initial",
+              "decision_change",
+              "risk_only"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "appliedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "바로 적용했으면 시각, 쉬는 중이 될 때까지 기다리면 null"
+          }
+        },
+        "required": [
+          "changeKind",
+          "version",
+          "appliedAt"
         ]
       },
       "BenchmarkDto": {
@@ -3285,6 +5076,948 @@
         "required": [
           "benchmark",
           "items"
+        ]
+      },
+      "HomeAccountDto": {
+        "type": "object",
+        "properties": {
+          "evaluationAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "주문 가능 금액 + 보유 평가금액. engine이 잔고를 아직 쓰지 않으면 null"
+          },
+          "orderableAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "주문 가능 금액. engine이 잔고를 아직 쓰지 않으면 null"
+          },
+          "holdingSymbolCount": {
+            "type": "number",
+            "description": "보유 중인 종목 수 (봇·직접 거래 합쳐 종목마다 한 번)"
+          },
+          "syncedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "engine이 계좌를 맞춘 시각. 아직이면 null"
+          }
+        },
+        "required": [
+          "evaluationAmount",
+          "orderableAmount",
+          "holdingSymbolCount",
+          "syncedAt"
+        ]
+      },
+      "HomeTodayPnlDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "오늘 연 포지션의 실현 손익 + 보유분 평가 손익. 직접 거래와 검증 구간 봇 포함 (FR-PERF-10)"
+          },
+          "rate": {
+            "type": "number",
+            "nullable": true,
+            "description": "amount ÷ 평가금액, %. 평가금액을 모르면 null"
+          }
+        },
+        "required": [
+          "amount",
+          "rate"
+        ]
+      },
+      "HomeBotCountsDto": {
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "number"
+          },
+          "paused": {
+            "type": "number"
+          },
+          "waitingFunds": {
+            "type": "number"
+          },
+          "stopped": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "running",
+          "paused",
+          "waitingFunds",
+          "stopped"
+        ]
+      },
+      "HomeBudgetSettingDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "ratio",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "정률이면 비율(0~1], 정액이면 원"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "HomeBotDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "scalping",
+              "day",
+              "swing",
+              "closing"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "running",
+              "paused",
+              "waiting_funds",
+              "stopped"
+            ],
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "verifying",
+              "released"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number",
+            "description": "지금 적용된 규칙 값 버전 번호. 없으면 0"
+          },
+          "todayPnl": {
+            "type": "number",
+            "description": "그 봇의 오늘 손익 (위 todayPnl과 같은 계산)"
+          },
+          "todayFills": {
+            "type": "number",
+            "description": "그 봇의 오늘 체결 주문 수"
+          },
+          "winRate30d": {
+            "type": "number",
+            "nullable": true,
+            "description": "최근 30거래일 청산 승률 (0~1). 청산이 없으면 null"
+          },
+          "budget": {
+            "type": "number",
+            "nullable": true,
+            "description": "확정 투자금. 확정 전(waiting_funds·ready)이면 null"
+          },
+          "budgetSetting": {
+            "description": "투자금 설정값",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HomeBudgetSettingDto"
+              }
+            ]
+          },
+          "last7Days": {
+            "description": "오늘을 뺀 최근 7거래일 일별 손익(실현 + 평가), 오래된 순. 기록이 없는 날은 빠져요",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "status",
+          "stage",
+          "id",
+          "name",
+          "version",
+          "todayPnl",
+          "todayFills",
+          "winRate30d",
+          "budget",
+          "budgetSetting",
+          "last7Days"
+        ]
+      },
+      "HomeFillsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "오늘 체결된 주문 수 (직접 거래 포함)"
+          },
+          "buy": {
+            "type": "number"
+          },
+          "sell": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "buy",
+          "sell"
+        ]
+      },
+      "HomeDto": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/HomeAccountDto"
+          },
+          "todayPnl": {
+            "$ref": "#/components/schemas/HomeTodayPnlDto"
+          },
+          "botCounts": {
+            "$ref": "#/components/schemas/HomeBotCountsDto"
+          },
+          "bots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomeBotDto"
+            }
+          },
+          "fills": {
+            "$ref": "#/components/schemas/HomeFillsDto"
+          }
+        },
+        "required": [
+          "account",
+          "todayPnl",
+          "botCounts",
+          "bots",
+          "fills"
+        ]
+      },
+      "PositionRowResponseDto": {
+        "type": "object",
+        "properties": {
+          "botType": {
+            "nullable": true,
+            "enum": [
+              "scalping",
+              "day",
+              "swing",
+              "closing"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "holding",
+              "pending",
+              "closed",
+              "canceled"
+            ],
+            "type": "string"
+          },
+          "exitReason": {
+            "nullable": true,
+            "enum": [
+              "take_profit",
+              "stop_loss",
+              "time_exit",
+              "market_close",
+              "rule_exit",
+              "loss_limit",
+              "reeval",
+              "manual",
+              "kill_switch",
+              "not_filled"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "enteredAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "진입 시각"
+          },
+          "exitedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "청산 시각. 열려 있으면 null"
+          },
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "직접 거래면 null (FR-PERF-07)"
+          },
+          "botName": {
+            "type": "string",
+            "nullable": true
+          },
+          "symbolCode": {
+            "type": "string"
+          },
+          "symbolName": {
+            "type": "string",
+            "description": "종목 이름을 아직 저장하지 않아 종목 코드예요"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "보유 중이면 지금 수량, 아니면 산 수량"
+          },
+          "entryPrice": {
+            "type": "number",
+            "description": "평균 매수 체결가. 체결이 없으면 0"
+          },
+          "exitPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "평균 매도 체결가. 판 적이 없으면 null"
+          },
+          "avgPrice": {
+            "type": "number",
+            "description": "보유분 평균 매수가 (보유 중이 아니면 entryPrice)"
+          },
+          "currentPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "보유 중이면 평가에 쓴 최근가. 최근가를 모르거나 보유 중이 아니면 null"
+          },
+          "evaluationAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "보유 중 평가금액"
+          },
+          "unrealizedPnl": {
+            "type": "number",
+            "nullable": true,
+            "description": "보유 중 평가 손익"
+          },
+          "unrealizedPnlRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "보유 중 평가 손익 ÷ 보유분 매수 금액, %"
+          },
+          "netPnl": {
+            "type": "number",
+            "description": "실현 손익(수수료·세금 차감) + 보유 중 평가 손익"
+          },
+          "netPnlRate": {
+            "type": "number",
+            "description": "netPnl ÷ 매수 체결 금액, %"
+          },
+          "quotedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "평가 가격을 받은 시각. 보유 중이 아니거나 최근가를 모르면 null"
+          }
+        },
+        "required": [
+          "botType",
+          "status",
+          "exitReason",
+          "id",
+          "enteredAt",
+          "exitedAt",
+          "botId",
+          "botName",
+          "symbolCode",
+          "symbolName",
+          "quantity",
+          "entryPrice",
+          "exitPrice",
+          "avgPrice",
+          "currentPrice",
+          "evaluationAmount",
+          "unrealizedPnl",
+          "unrealizedPnlRate",
+          "netPnl",
+          "netPnlRate",
+          "quotedAt"
+        ]
+      },
+      "PositionHistoryDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PositionRowResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          },
+          "quotedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "보유 중 평가에 쓴 가장 늦은 가격 시각. 보유 중이 없으면 null"
+          }
+        },
+        "required": [
+          "items",
+          "meta",
+          "quotedAt"
+        ]
+      },
+      "BotPnlShareDto": {
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "직접 거래면 null"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pnl": {
+            "type": "number",
+            "description": "실현 + 보유 중 평가 손익"
+          }
+        },
+        "required": [
+          "botId",
+          "name",
+          "pnl"
+        ]
+      },
+      "PositionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "overall",
+              "bot"
+            ],
+            "type": "string"
+          },
+          "tradeCount": {
+            "type": "number",
+            "description": "(overall) 보유 중 + 청산 완료 수"
+          },
+          "holdingCount": {
+            "type": "number"
+          },
+          "closedCount": {
+            "type": "number"
+          },
+          "netPnl": {
+            "type": "number",
+            "description": "(overall) 실현 손익 합(수수료·세금 차감)"
+          },
+          "unrealizedPnl": {
+            "type": "number",
+            "description": "(overall) 보유 중 평가 손익 합"
+          },
+          "cost": {
+            "type": "number",
+            "description": "(overall) 수수료 합"
+          },
+          "tax": {
+            "type": "number",
+            "description": "(overall) 세금 합"
+          },
+          "botPnls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BotPnlShareDto"
+            }
+          },
+          "budget": {
+            "type": "number",
+            "description": "(bot) 확정 투자금. 확정 전이면 0"
+          },
+          "usedAmount": {
+            "type": "number",
+            "description": "(bot) 사용 중 금액 = 보유 매수 금액 + 미체결 매수 금액"
+          },
+          "remainingBudget": {
+            "type": "number"
+          },
+          "capAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "(bot) 검증 구간이면 상한 금액, 아니면 null"
+          },
+          "cumulativePnl": {
+            "type": "number",
+            "description": "(bot) 확정 이후 실현 + 보유분 평가 손익"
+          },
+          "cumulativePnlRate": {
+            "type": "number",
+            "description": "(bot) cumulativePnl ÷ 확정 투자금, %"
+          },
+          "tradingDays": {
+            "type": "number",
+            "description": "(bot) 확정 이후 개장일 수"
+          },
+          "lossStopRemaining": {
+            "type": "number",
+            "description": "(bot) 누적 손실 한도까지 남은 금액"
+          },
+          "lossLimitPercent": {
+            "type": "number",
+            "description": "(bot) 누적 손실 한도, %"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "PositionOrderDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "description": "stop_condition은 손절 조건주문이 발동한 주문이에요",
+            "enum": [
+              "normal",
+              "stop_condition"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "filled",
+              "partial",
+              "pending",
+              "canceled"
+            ],
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "bot",
+              "protective",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "orderedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "avgPrice": {
+            "type": "number",
+            "nullable": true,
+            "description": "평균 체결가. 체결이 없으면 null"
+          },
+          "commission": {
+            "type": "number"
+          },
+          "tax": {
+            "type": "number"
+          },
+          "statusAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "체결·취소된 시각"
+          }
+        },
+        "required": [
+          "side",
+          "kind",
+          "status",
+          "origin",
+          "id",
+          "orderedAt",
+          "quantity",
+          "avgPrice",
+          "commission",
+          "tax",
+          "statusAt"
+        ]
+      },
+      "RuleConditionDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string",
+            "description": "\"기준 5% 이상\"처럼 비교 기준"
+          },
+          "value": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "label",
+          "rule",
+          "value",
+          "passed"
+        ]
+      },
+      "PredictionDto": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "targetPrice": {
+            "type": "number"
+          },
+          "targetRate": {
+            "type": "number",
+            "description": "판단 가격 대비 %, 소수 첫째 자리"
+          },
+          "stopPrice": {
+            "type": "number"
+          },
+          "stopRate": {
+            "type": "number"
+          },
+          "holdUntil": {
+            "type": "string",
+            "description": "\"15:20까지\"처럼 예상 보유. 예상 보유 시간이 없으면 빈 문자열"
+          }
+        },
+        "required": [
+          "direction",
+          "targetPrice",
+          "targetRate",
+          "stopPrice",
+          "stopRate",
+          "holdUntil"
+        ]
+      },
+      "EntryDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleConditionDto"
+            }
+          },
+          "prediction": {
+            "$ref": "#/components/schemas/PredictionDto"
+          }
+        },
+        "required": [
+          "decidedAt",
+          "price",
+          "score",
+          "conditions",
+          "prediction"
+        ]
+      },
+      "PositionOutcomeDto": {
+        "type": "object",
+        "properties": {
+          "exitPrice": {
+            "type": "number"
+          },
+          "holdingMinutes": {
+            "type": "number"
+          },
+          "highPrice": {
+            "type": "number",
+            "description": "보유 중 최고가. 기록이 없으면 진입·청산가 중 높은 값"
+          },
+          "highAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "최고가 시각. 아직 기록하지 않아 null"
+          },
+          "lowPrice": {
+            "type": "number"
+          },
+          "lowAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "exitPrice",
+          "holdingMinutes",
+          "highPrice",
+          "highAt",
+          "lowPrice",
+          "lowAt"
+        ]
+      },
+      "PositionScoringDto": {
+        "type": "object",
+        "properties": {
+          "actualDirection": {
+            "enum": [
+              "up",
+              "down",
+              "flat"
+            ],
+            "type": "string"
+          },
+          "directionHit": {
+            "type": "boolean"
+          },
+          "targetReachPct": {
+            "type": "number",
+            "description": "0~100"
+          },
+          "errorPct": {
+            "type": "number",
+            "description": "(청산가 − 목표가) ÷ 진입가, %"
+          }
+        },
+        "required": [
+          "actualDirection",
+          "directionHit",
+          "targetReachPct",
+          "errorPct"
+        ]
+      },
+      "TimelineItemDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "enter",
+              "reeval",
+              "exit"
+            ],
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "title",
+          "detail"
+        ]
+      },
+      "PositionDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "$ref": "#/components/schemas/PositionRowResponseDto"
+          },
+          "botVersion": {
+            "type": "number",
+            "nullable": true,
+            "description": "판단에 쓴 규칙 값 버전 번호. 직접 거래면 null"
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PositionOrderDto"
+            }
+          },
+          "entry": {
+            "nullable": true,
+            "description": "직접 거래거나 진입 판단이 없으면 null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EntryDecisionDto"
+              }
+            ]
+          },
+          "outcome": {
+            "nullable": true,
+            "description": "청산 전이면 null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PositionOutcomeDto"
+              }
+            ]
+          },
+          "scoring": {
+            "nullable": true,
+            "description": "채점 전이면 null",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PositionScoringDto"
+              }
+            ]
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "botVersion",
+          "orders",
+          "entry",
+          "outcome",
+          "scoring",
+          "timeline"
+        ]
+      },
+      "BotAccuracyDto": {
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scoredCount": {
+            "type": "number"
+          },
+          "directionHitRate": {
+            "type": "number",
+            "description": "방향 적중률 (0~1)"
+          },
+          "targetReachRate": {
+            "type": "number",
+            "description": "목표 도달률 평균 (0~1)"
+          },
+          "avgErrorPct": {
+            "type": "number",
+            "description": "평균 예측 오차, %"
+          }
+        },
+        "required": [
+          "botId",
+          "name",
+          "scoredCount",
+          "directionHitRate",
+          "targetReachRate",
+          "avgErrorPct"
+        ]
+      },
+      "AccuracySummaryDto": {
+        "type": "object",
+        "properties": {
+          "scoredCount": {
+            "type": "number",
+            "description": "채점된 예측 수 (진입·재평가 판단)"
+          },
+          "directionHitRate": {
+            "type": "number"
+          },
+          "targetReachRate": {
+            "type": "number"
+          },
+          "bots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BotAccuracyDto"
+            }
+          }
+        },
+        "required": [
+          "scoredCount",
+          "directionHitRate",
+          "targetReachRate",
+          "bots"
+        ]
+      },
+      "ScoreBucketDto": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "closedCount": {
+            "type": "number",
+            "description": "그 구간 진입 판단으로 청산한 수 (한 주도 체결되지 않은 진입은 빼요)"
+          },
+          "winRate": {
+            "type": "number",
+            "description": "순손익 > 0인 청산 비율 (0~1)"
+          }
+        },
+        "required": [
+          "min",
+          "max",
+          "closedCount",
+          "winRate"
+        ]
+      },
+      "AccuracyStatsDto": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/AccuracySummaryDto"
+          },
+          "scoreBuckets": {
+            "description": "신뢰 점수 구간별 청산 수와 승률, 높은 구간부터",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScoreBucketDto"
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "scoreBuckets"
         ]
       },
       "CommandBudgetDto": {
@@ -3423,80 +6156,6 @@
           "requestedAt",
           "handledAt",
           "error"
-        ]
-      },
-      "MarketOpenDto": {
-        "type": "object",
-        "properties": {
-          "isTradingDay": {
-            "type": "boolean",
-            "description": "오늘 정규장이 열리는 날인지. engine이 오늘 일정을 아직 받지 않았으면 false"
-          },
-          "openAt": {
-            "format": "date-time",
-            "type": "string",
-            "nullable": true,
-            "description": "정규장 시작 시각"
-          },
-          "closeAt": {
-            "format": "date-time",
-            "type": "string",
-            "nullable": true,
-            "description": "정규장 끝 시각"
-          }
-        },
-        "required": [
-          "isTradingDay",
-          "openAt",
-          "closeAt"
-        ]
-      },
-      "EngineStatusResponseDto": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "description": "engine 상태. halted는 전체 정지(킬 스위치·토큰·기록 실패)",
-            "enum": [
-              "running",
-              "stopping",
-              "halted"
-            ],
-            "type": "string"
-          },
-          "haltReasons": {
-            "description": "전체 정지 사유 코드",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "heartbeatAt": {
-            "format": "date-time",
-            "type": "string",
-            "description": "engine 마지막 기록 시각. 30초 넘게 오래되면 \"엔진 응답 없음\"이에요"
-          },
-          "staleSymbols": {
-            "description": "시세가 끊긴 종목 (feed_stale)",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "marketOpen": {
-            "description": "오늘 정규장",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MarketOpenDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "state",
-          "haltReasons",
-          "heartbeatAt",
-          "staleSymbols",
-          "marketOpen"
         ]
       },
       "RiskEventResponseDto": {

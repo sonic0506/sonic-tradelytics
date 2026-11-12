@@ -64,7 +64,9 @@ export class EngineScheduleService {
           await fund.allocate(fundable.map(({ id }) => id));
         },
       },
-      // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)하고 봇별 일일 손익을 남겨요 (FR-PERF-03)
+      // 오늘 CLOSED 전량으로 체결을 최종 확정한 뒤, 닫힌 포지션의 판단을 채점 (FR-RAT-02)하고 봇별 일일 손익을 남겨요 (FR-PERF-03).
+      // 끝으로 보유 종목이 없는 봇(장 마감 뒤라 쉬는 중)의 적용 대기 버전을 적용해요 (POL-RISK-13)
+      // ponytail: 장 마감 뒤 하루 한 번만 적용해요. 장중에 쉬는 중이 된 봇(하루 한도 도달 등)도 바로 적용하려면 BotRunner 주기에서 같은 검사를 해요
       {
         job: 'post_close',
         time: '15:40',
@@ -72,6 +74,14 @@ export class EngineScheduleService {
           await accountSync.syncAll();
           await orders.scoreClosedPositions();
           await positions.recordDailyResults(kstDate());
+          const held = new Set(
+            (await positions.findHeldByBot()).map(({ botId }) => botId),
+          );
+          const trading = await bots.findTrading();
+          await bots.applyPendingVersions(
+            trading.map(({ bot }) => bot.id).filter((id) => !held.has(id)),
+            new Date(),
+          );
         },
       },
     ];

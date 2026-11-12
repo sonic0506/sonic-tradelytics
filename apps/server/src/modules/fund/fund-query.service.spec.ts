@@ -11,6 +11,8 @@ import { FundQueryService } from './fund-query.service.js';
 describe('FundQueryService', () => {
   const allocations = {
     findActiveByBots: vi.fn<AllocationRepository['findActiveByBots']>(),
+    findActive: vi.fn<AllocationRepository['findActive']>(),
+    findLatest: vi.fn<AllocationRepository['findLatest']>(),
   };
   const positions = { botHoldings: vi.fn<PositionService['botHoldings']>() };
   const orders = {
@@ -79,5 +81,81 @@ describe('FundQueryService', () => {
   it('누적 손실 한도까지 남은 여유는 한도 금액에서 손실을 뺀 값이에요', () => {
     // 10만 원의 -10% = 10,000원, 지금 -3,000원
     expect(service.lossRoom(100_000, 10, -3_000)).toBe(7_000);
+  });
+
+  describe('previewAllocation', () => {
+    const fixed = (botId: number, amount: number) => ({
+      botId,
+      budget: { type: 'fixed' as const, amount },
+      startPriority: botId,
+      isVerifying: false,
+      fixedOrderSize: null,
+    });
+    const at = new Date('2026-11-12T00:00:00Z');
+
+    it('운용 자산 = 주문 가능 금액 − 살아 있는 배분의 현금 몫으로 계산하고, 다시 정하는 봇의 배분은 빼요', async () => {
+      allocations.findActive.mockResolvedValue([
+        Object.assign({
+          botId: 7,
+          amount: 100_000,
+          createdAt: at,
+        }) as Allocation,
+        Object.assign({
+          botId: 9,
+          amount: 50_000,
+          createdAt: at,
+        }) as Allocation,
+      ]);
+      positions.botHoldings.mockResolvedValue(new Map());
+      orders.openOrdersByBot.mockResolvedValue(new Map());
+
+      const preview = await service.previewAllocation(
+        [fixed(9, 150_000), fixed(10, 100_000)],
+        { cash: 400_000, at },
+        9,
+      );
+
+      expect(positions.botHoldings).toHaveBeenCalledWith([
+        { botId: 7, since: at },
+      ]);
+      // 400,000 − 봇 7 현금 몫 100,000 = 300,000
+      expect(preview).toEqual({
+        basedAt: at,
+        capital: 300_000,
+        outcomes: [
+          { botId: 9, status: 'allocated', amount: 150_000, capped: false },
+          { botId: 10, status: 'allocated', amount: 100_000, capped: false },
+        ],
+      });
+    });
+
+    it('주문 가능 금액을 모르면 마지막 배분 스냅샷 값을 쓰고, 그것도 없으면 비워요', async () => {
+      allocations.findActive.mockResolvedValue([]);
+      orders.openOrdersByBot.mockResolvedValue(new Map());
+      positions.botHoldings.mockResolvedValue(new Map());
+      allocations.findLatest.mockResolvedValueOnce(
+        Object.assign({
+          snapshot: Object.assign({
+            orderableCash: 50_000,
+            takenAt: at,
+          }) as AccountSnapshot,
+        }) as Allocation,
+      );
+
+      await expect(
+        service.previewAllocation([fixed(1, 100_000)], null),
+      ).resolves.toMatchObject({
+        basedAt: at,
+        capital: 50_000,
+        outcomes: [
+          { botId: 1, status: 'waiting', reason: 'insufficient_funds' },
+        ],
+      });
+
+      allocations.findLatest.mockResolvedValueOnce(null);
+      await expect(
+        service.previewAllocation([fixed(1, 100_000)], null),
+      ).resolves.toEqual({ basedAt: null, capital: null, outcomes: [] });
+    });
   });
 });

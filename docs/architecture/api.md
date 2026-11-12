@@ -133,6 +133,8 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 
 킬 스위치 버튼은 `POST /v1/commands`(`kind = kill`)를 불러요. 홈은 5초마다 다시 불러요.
 
+- M4 현재: engine이 잔고를 아직 `engine_statuses`에 쓰지 않아 `account.evaluationAmount`·`orderableAmount`와 `todayPnl.rate`는 `null`이에요. 승률·최근 7거래일은 engine이 받아 둔 장 일정(`market_calendars`)으로 거래일을 세요
+
 홈의 나머지 카드는 각자 엔드포인트를 불러요. 하나가 실패해도 다른 카드와 킬 스위치는 그대로 보여요.
 
 | 카드 | 엔드포인트 | 갱신 |
@@ -163,6 +165,7 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - 한 줄: 체결 시각, 종목 코드·이름, 봇 이름(직접 거래면 `null`), 방향(`BUY`·`SELL`), 체결 수량, 평균 체결가, 출처, `positionId`
 - 행을 누르면 투자 내역의 그 포지션(`GET /v1/positions/:id`)으로 가요
 - 체결 이력은 바꾸거나 지우는 경로가 없어요 (원칙 4)
+- M4 현재: 종목 이름을 저장하지 않아 `symbolName`은 종목 코드예요
 
 ## 봇 (F1)
 
@@ -177,6 +180,8 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - 운용 자산은 `engine_statuses`의 주문 가능 금액으로 [POL-FUND-02](../policy/fund-allocation.md#기본)를 계산해요. 실제 확정은 시작 시각 스냅샷으로 engine이 하므로 결과가 다를 수 있어서, 응답에 기준 시각을 넣어요
 - 계산은 `fund` feature의 순수 함수(`*.rule.ts`)를 engine과 같이 써요. 미리보기와 실제 확정이 같은 계산이에요
 - 생성이 아니라 계산이라 200이에요
+- 몸체: `budget`(`type`·`value`), `periodStart`, `tradingStart`(`HH:mm`), 선택 `botId`. 함께 계산하는 봇은 같은 시작 시각의 확정 전 봇이에요(이미 확정된 봇은 현금 몫으로 운용 자산에서 빠져요). 새 봇은 같은 시각 봇들 맨 뒤 순서, 검증 구간 상한으로 계산해요. 정률 합이 100%를 넘으면 새 봇 줄은 `blocked`예요
+- M4 현재: engine이 주문 가능 금액을 아직 쓰지 않아, 없으면 마지막 배분 스냅샷의 주문 가능 금액과 시각(`basedAt`)을 써요. 스냅샷도 없으면 `basedAt`·`capital`이 `null`이고 모든 줄이 `pending`이에요
 
 ### `POST /v1/bots`
 
@@ -219,6 +224,9 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 | `POST /v1/bots/:id/version-previews` | 바꾸려는 값을 보내면 `change_kind`(`decision_change`·`risk_only`)와 그 결과(검증 구간 재시작 여부, 상한으로 다시 확정되는지, 적용 시점 `applyTiming`: `now` 쉬는 중이라 바로 · `when_resting` 쉬는 중이 된 뒤)를 돌려줘요. 저장하지 않아요 (FR-BOT-11, 200) |
 | `POST /v1/bots/:id/versions` | 새 버전을 추가해요 (201). 봇이 쉬는 중이면 engine이 바로 적용해 `applied_at`이 차고, 아니면 `null`로 두었다가 쉬는 중이 되는 첫 시점에 적용해요 (POL-RISK-13) |
 
+- 몸체는 `params`(바꿀 규칙 값만, 시각은 `HH:mm`)와 선택 값 `orderAmount`·`splitCount`·`maxPositions`·`lossStop`·`stopStreak`·`onDailyLimit`이에요. 보내지 않은 값은 지금 버전 그대로예요. 바뀐 값이 없으면 저장은 422 `BOT_VERSION_UNCHANGED`, 미리보기는 `changeKind = null`이에요
+- 시작 전(`ready`·`waiting_funds`)·종료 봇은 매매하지 않아 바로 적용해요. 판단 변경 버전을 적용하면 상한이 풀린 봇은 `stage = verifying`으로 돌아가요(`reconfirmsAtCap`). 투자금을 상한으로 다시 확정하는 것은 다음 배분(반환 후 확정) 때예요
+- M4 현재: 적용 대기 버전은 engine 장후 배치(15:40)가 보유 종목이 없는 실행 중 봇에 적용해요. 장중에 쉬는 중이 된 봇은 그날 장후 배치까지 기다려요
 - `change_kind`는 서버가 정해요. 손실 한도 조이기, 연속 손절 횟수 줄이기, 1회 주문 금액 줄이기**만** 바뀌면 `risk_only`, 그 밖에 하나라도 바뀌면 `decision_change`예요. 위험을 늘리는 쪽으로 바꾸는 것도 `decision_change`예요
 - 적용 대기 버전이 있으면 새 버전을 더 넣지 않아요 (`BOT_VERSION_PENDING`). 대기 버전이 적용된 뒤에 다시 저장해요
 
@@ -262,10 +270,16 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - **상태**는 화면 값으로 바꿔 줘요: 보유 중(`open`, 수량 > 0), 미체결(`open`, 수량 0, 미체결 주문 있음), 청산 완료(`closed`), 취소(`closed`, `not_filled`)
 - 보유 중은 페이지와 상관없이 맨 위에 고정해요(첫 페이지에 모두 넣어요, FR-PERF-06). 평가 손익은 `quote_caches` 가격으로 계산하고 가격 기준 시각을 같이 줘요. web은 보유 중이 있으면 5초마다 다시 불러요
 - 정렬은 최신 진입순 하나예요
+- 상태를 정하지 않은 요청의 `meta.total`은 보유 중 수를 더한 값이에요. `result`(이익·손실)는 실현 손익으로 걸러요(보유 중 평가 손익은 보지 않아요)
+- 한 줄: 진입·청산가는 체결 평균가, `quantity`는 보유 중이면 지금 수량·아니면 산 수량, `netPnl`은 실현 손익 + 보유 중 평가 손익, `netPnlRate`는 매수 체결 금액 대비예요. 보유 중이면 `avgPrice`·`currentPrice`·`evaluationAmount`·`unrealizedPnl`·`unrealizedPnlRate`·`quotedAt`이 차요. 응답 맨 위 `quotedAt`은 가장 늦은 가격 시각이에요
+- M4 현재: 종목 이름을 저장하지 않아 `symbolName`은 종목 코드예요
 
 ### `GET /v1/position-summaries`
 
 내역 상단 요약. 쿼리는 `GET /v1/positions`와 같아요. `botIds`가 봇 하나면 봇별 탭 요약(확정 투자금, 사용 중 금액, 남은 한도, 누적 손익, 손실 중지까지 여유), 아니면 전체 탭 요약(거래 수, 순손익, 거래 비용, 봇별 손익 비중)을 줘요.
+
+- `kind`가 `overall`이면 전체 탭 필드(`tradeCount`·`holdingCount`·`closedCount`·`netPnl`·`unrealizedPnl`·`cost`(수수료)·`tax`·`botPnls`), `bot`이면 봇 탭 필드(`budget`·`usedAmount`·`remainingBudget`·`capAmount`·`cumulativePnl`·`cumulativePnlRate`·`tradingDays`·`lossStopRemaining`·`lossLimitPercent`)만 와요
+- 봇 탭 값은 `GET /v1/bots/:id`와 같은 계산이에요. 확정 전이면 금액이 0이에요
 
 ### `GET /v1/positions/:id`
 
@@ -276,6 +290,8 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 - 채점: 판단별 `prediction_scores` (FR-RAT-02). 아직 채점 전이면 비어 있어요
 - 실제 결과: 청산가, 보유 시간, 보유 중 최고·최저가
 - 직접 거래면 `manual_notes`
+- 근거 카드 조건은 규칙 id를 이름·기준·값 문장으로 바꿔 줘요(`bot` feature `rule-condition.rule.ts`, FR-RAT-07). 판단 흐름의 `title`·`detail`도 서버가 만들어요
+- M4 현재: 투자 내역 목록·요약·펼친 줄을 한 통합 API(`compositions/history/`)에 둬서 feature 6개를 가져와요(lint 경고). 보유 중 최고·최저가 시각을 기록하지 않아 `outcome.highAt`·`lowAt`은 `null`이고, 최고·최저가가 없으면 진입·청산가로 대신해요. `manual_notes`는 아직 응답에 없어요(Could)
 
 ## 근거 (F3)
 
@@ -308,6 +324,9 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 | `reeval` | 최초 판단 vs 재평가 판단 적중률 | Should |
 
 Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중에 필드를 더하는 것은 호환되는 변경이라 `/v2`가 필요 없어요.
+
+- 기간은 판단 시각(거래일), 봇은 판단의 버전으로 걸러요. `summary`는 채점된 진입·재평가 판단, `scoreBuckets`는 청산한 포지션의 진입 판단 점수로 세요(체결 없이 닫힌 진입은 빼요). 비율은 0~1이고 해당 건이 없으면 0이에요
+- M4 현재: `conditions`·`skipped`·`reeval`은 아직 없어요
 
 ## 직접 거래 (F4)
 
@@ -344,6 +363,7 @@ Should 섹션은 구현 전까지 응답에서 빠져요(필드 없음). 나중�
 | `BOT_NOT_RESTING` | 409 | 쉬는 중이 아닌 봇의 `rebudget`. 이유(`holding`·`pending_order`·`trading_hours`)를 `detail`에 |
 | `BUDGET_INSUFFICIENT` | 422 | `rebudget`의 새 금액을 확정할 운용 자산이 모자람 (POL-FUND-12). 기존 투자금은 그대로 |
 | `BOT_VERSION_PENDING` | 409 | 적용 대기 버전이 이미 있음 |
+| `BOT_VERSION_UNCHANGED` | 422 | 새 버전 값이 지금 버전과 같음 |
 | `RELEASE_CRITERIA_NOT_MET` | 422 | 상한 해제 기준 미달 (POL-RISK-13). 미달 기준 목록을 `detail`에 |
 | `COMMAND_NOT_ALLOWED` | 409 | 지금 봇 상태에서 받을 수 없는 명령 ([명령 표](#post-v1commands)) |
 | `MANUAL_NOTE_NOT_ALLOWED` | 422 | 봇 포지션에 직접 거래 메모 |

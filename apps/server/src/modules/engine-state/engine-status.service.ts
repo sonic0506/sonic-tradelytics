@@ -40,6 +40,11 @@ export class EngineStatusService {
     return { status, today };
   }
 
+  // engine이 쓴 상태. 한 번도 쓰지 않았으면 null (홈 계좌 카드)
+  find(): Promise<EngineStatus | null> {
+    return this.statuses.findCurrent();
+  }
+
   // ponytail: 주문 가능 금액·평가금액은 아직 잔고를 조회하지 않아 null이에요. 잔고 재동기화를 만들면 채워요
   async write(report: EngineStatusReport): Promise<void> {
     await this.statuses.save({

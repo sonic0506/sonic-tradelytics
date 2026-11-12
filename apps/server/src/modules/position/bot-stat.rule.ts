@@ -26,6 +26,12 @@ const round = (value: number) => Math.round(value * PRECISION) / PRECISION;
 const average = (values: number[]) =>
   values.reduce((sum, value) => sum + value, 0) / values.length;
 
+// 순손익 > 0인 청산 수 ÷ 청산 수 (0~1, 소수 둘째 자리). 청산이 없으면 null
+export function winRate(pnls: number[]): number | null {
+  if (pnls.length === 0) return null;
+  return round(pnls.filter((pnl) => pnl > 0).length / pnls.length);
+}
+
 // 청산 포지션으로 승률·손익비·보유 시간·비용을 재요. 손실 거래가 없거나 이긴 거래가 없으면 손익비는 null이에요
 export function tradeStats(trades: ClosedTrade[]): TradeStats {
   const cost = trades.reduce((sum, { fees }) => sum + fees, 0);
@@ -43,7 +49,7 @@ export function tradeStats(trades: ClosedTrade[]): TradeStats {
   const losses = pnls.filter((pnl) => pnl < 0);
   return {
     netPnl: pnls.reduce((sum, pnl) => sum + pnl, 0),
-    winRate: round(wins.length / trades.length),
+    winRate: winRate(pnls),
     profitFactor:
       wins.length === 0 || losses.length === 0
         ? null

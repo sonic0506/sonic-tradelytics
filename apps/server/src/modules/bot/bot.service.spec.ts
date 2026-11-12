@@ -4,7 +4,10 @@ import {
   noOpTransactionalModule,
   runInCls,
 } from '../../../test/setup/transactional.js';
-import { ReleaseCriteriaNotMetException } from './bot.exception.js';
+import {
+  BotVersionPendingException,
+  ReleaseCriteriaNotMetException,
+} from './bot.exception.js';
 import { BotRepository } from './bot.repository.js';
 import { BotService } from './bot.service.js';
 import type { Bot } from './entities/bot.entity.js';
@@ -23,6 +26,11 @@ describe('BotService', () => {
     findStartingAt: vi.fn<BotRepository['findStartingAt']>(),
     createWithVersion: vi.fn<BotRepository['createWithVersion']>(),
     markReleased: vi.fn<BotRepository['markReleased']>(),
+    findVersions: vi.fn<BotRepository['findVersions']>(),
+    addVersion: vi.fn<BotRepository['addVersion']>(),
+    applyVersions: vi.fn<BotRepository['applyVersions']>(),
+    markVerifying: vi.fn<BotRepository['markVerifying']>(),
+    findPendingVersions: vi.fn<BotRepository['findPendingVersions']>(),
   };
   let service: BotService;
   let moduleRef: TestingModule;
@@ -233,6 +241,88 @@ describe('BotService', () => {
         ReleaseCriteriaNotMetException,
       );
       expect(bots.markReleased).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('규칙 값 버전', () => {
+    const version = (fields: Partial<BotVersion>) =>
+      Object.assign(
+        { id: 1, botId: 7, version: 1, changeKind: 'initial' },
+        fields,
+      ) as BotVersion;
+    const fields = {
+      changeKind: 'decision_change' as const,
+      params: {},
+      orderSizeType: 'fixed' as const,
+      orderSizeValue: 50_000,
+      splitCount: 1,
+      maxPositions: 2,
+      dailyLossPct: 4,
+      totalLossPct: 10,
+      stopStreak: 3,
+      onDailyLimit: 'liquidate' as const,
+    };
+    const at = new Date('2026-11-12T06:40:00Z');
+
+    it('다음 번호로 추가하고, 바로 적용하는 판단 변경이면 검증 구간으로 돌려요', async () => {
+      bots.findVersions.mockResolvedValue([
+        version({ version: 2, appliedAt: at }),
+      ]);
+      bots.addVersion.mockImplementation((saved) =>
+        Promise.resolve(version(saved)),
+      );
+
+      await runInCls(moduleRef, () => service.addVersion(7, fields, at));
+
+      expect(bots.addVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ botId: 7, version: 3, appliedAt: at }),
+      );
+      expect(bots.markVerifying).toHaveBeenCalledWith([7]);
+    });
+
+    it('적용 대기로 두거나 위험만 줄이면 단계를 바꾸지 않아요', async () => {
+      bots.findVersions.mockResolvedValue([version({ appliedAt: at })]);
+      bots.addVersion.mockImplementation((saved) =>
+        Promise.resolve(version(saved)),
+      );
+
+      await runInCls(moduleRef, () => service.addVersion(7, fields, null));
+      await runInCls(moduleRef, () =>
+        service.addVersion(7, { ...fields, changeKind: 'risk_only' }, at),
+      );
+
+      expect(bots.markVerifying).not.toHaveBeenCalled();
+    });
+
+    it('적용 대기 버전이 있으면 BOT_VERSION_PENDING이에요', async () => {
+      bots.findVersions.mockResolvedValue([version({ appliedAt: null })]);
+
+      await expect(
+        runInCls(moduleRef, () => service.addVersion(7, fields, at)),
+      ).rejects.toBeInstanceOf(BotVersionPendingException);
+      expect(bots.addVersion).not.toHaveBeenCalled();
+    });
+
+    it('대기 버전을 적용하고 판단 변경 버전의 봇만 검증 구간으로 돌려요', async () => {
+      bots.findPendingVersions.mockResolvedValue([
+        version({ id: 5, botId: 7, changeKind: 'decision_change' }),
+        version({ id: 6, botId: 8, changeKind: 'risk_only' }),
+      ]);
+
+      await expect(
+        runInCls(moduleRef, () => service.applyPendingVersions([7, 8], at)),
+      ).resolves.toBe(2);
+      expect(bots.applyVersions).toHaveBeenCalledWith([5, 6], at);
+      expect(bots.markVerifying).toHaveBeenCalledWith([7]);
+    });
+
+    it('대기 버전이 없으면 아무것도 바꾸지 않아요', async () => {
+      bots.findPendingVersions.mockResolvedValue([]);
+
+      await expect(
+        runInCls(moduleRef, () => service.applyPendingVersions([7], at)),
+      ).resolves.toBe(0);
+      expect(bots.applyVersions).not.toHaveBeenCalled();
     });
   });
 });

@@ -22,4 +22,9 @@ export class MarketCalendarQueryService {
   countOpenDays(from: string, to: string): Promise<number> {
     return this.calendars.countOpen(from, to);
   }
+
+  // until까지(포함) 최근 개장일 count개, 최신이 앞이에요. engine이 받아 둔 날만 알아요
+  recentOpenDays(until: string, count: number): Promise<string[]> {
+    return this.calendars.findRecentOpen(until, count);
+  }
 }

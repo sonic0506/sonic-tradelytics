@@ -6,7 +6,7 @@ import { type Bot, BotService } from '@/modules/bot/index.js';
 import { FundService } from '@/modules/fund/index.js';
 import { MarketCalendarService } from '@/modules/market-data/index.js';
 import { OrderService } from '@/modules/order/index.js';
-import { PositionService } from '@/modules/position/index.js';
+import { type Position, PositionService } from '@/modules/position/index.js';
 import { RiskService } from '@/modules/risk/index.js';
 
 import { BatchRunRepository } from './batch-run.repository.js';
@@ -31,10 +31,15 @@ describe('EngineScheduleService', () => {
   const orders = {
     scoreClosedPositions: vi.fn<OrderService['scoreClosedPositions']>(),
   };
-  const bots = { findFundable: vi.fn<BotService['findFundable']>() };
+  const bots = {
+    findFundable: vi.fn<BotService['findFundable']>(),
+    findTrading: vi.fn<BotService['findTrading']>(),
+    applyPendingVersions: vi.fn<BotService['applyPendingVersions']>(),
+  };
   const fund = { allocate: vi.fn<FundService['allocate']>() };
   const positions = {
     recordDailyResults: vi.fn<PositionService['recordDailyResults']>(),
+    findHeldByBot: vi.fn<PositionService['findHeldByBot']>(),
   };
   let schedule: EngineScheduleService;
 
@@ -56,6 +61,8 @@ describe('EngineScheduleService', () => {
     vi.resetAllMocks();
     vi.useFakeTimers({ now: tenAm });
     runs.find.mockResolvedValue(null);
+    positions.findHeldByBot.mockResolvedValue([]);
+    bots.findTrading.mockResolvedValue([]);
     calendar.ensureToday.mockResolvedValue(tradingDay(true));
     bots.findFundable.mockResolvedValue([
       Object.assign({ id: 7 }) as Bot,
@@ -113,6 +120,25 @@ describe('EngineScheduleService', () => {
     expect(positions.recordDailyResults).toHaveBeenCalledWith('2026-10-29');
     expect(positions.recordDailyResults).toHaveBeenCalledAfter(
       orders.scoreClosedPositions,
+    );
+    expect(finished()).toContainEqual(['post_close', 'ok']);
+  });
+
+  it('post_close 끝에 보유 종목이 없는 실행 중 봇의 적용 대기 버전을 적용해요', async () => {
+    positions.findHeldByBot.mockResolvedValue([
+      Object.assign({ botId: 8 }) as Position,
+    ]);
+    bots.findTrading.mockResolvedValue([
+      { bot: Object.assign({ id: 7 }) as Bot, version: null },
+      { bot: Object.assign({ id: 8 }) as Bot, version: null },
+    ]);
+    await schedule.start();
+
+    await vi.advanceTimersByTimeAsync(340 * MINUTE_MS);
+
+    expect(bots.applyPendingVersions).toHaveBeenCalledWith(
+      [7],
+      expect.any(Date),
     );
     expect(finished()).toContainEqual(['post_close', 'ok']);
   });

@@ -18,8 +18,8 @@ import {
 } from './allocation.rule.js';
 import type { Allocation } from './entities/allocation.entity.js';
 import { FundRatioExceededException } from './fund.exception.js';
-import type { AllocationOutcome, BotBudget, BotFunds } from './fund.types.js';
-import { FundQueryService } from './fund-query.service.js';
+import type { AllocationOutcome, BotFunds } from './fund.types.js';
+import { FundQueryService, toBudget } from './fund-query.service.js';
 
 // rebudget 명령의 새 투자금 설정 (commands.budget)
 const budgetSchema = z.intersection(
@@ -253,18 +253,4 @@ function totalCashShare(funds: Map<number, BotFunds>): number {
 function isWithinTradingHours(start: string, end: string): boolean {
   const now = kstTime();
   return start <= now && now < end;
-}
-
-function toBudget({ bot, version }: BotWithVersion): BotBudget {
-  return {
-    botId: bot.id,
-    budget:
-      bot.budgetType === 'ratio'
-        ? { type: 'ratio', ratio: bot.budgetRatio ?? 0 }
-        : { type: 'fixed', amount: bot.budgetAmount ?? 0 },
-    startPriority: bot.startPriority,
-    isVerifying: bot.stage === 'verifying',
-    fixedOrderSize:
-      version?.orderSizeType === 'fixed' ? version.orderSizeValue : null,
-  };
 }

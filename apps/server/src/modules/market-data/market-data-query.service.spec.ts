@@ -11,6 +11,7 @@ describe('MarketDataQuery (장 일정·최근가 읽기)', () => {
     findByDate: vi.fn<MarketCalendarRepository['findByDate']>(),
     findNextOpen: vi.fn<MarketCalendarRepository['findNextOpen']>(),
     countOpen: vi.fn<MarketCalendarRepository['countOpen']>(),
+    findRecentOpen: vi.fn<MarketCalendarRepository['findRecentOpen']>(),
   };
   const quotes = {
     findBySymbols: vi.fn<QuoteCacheRepository['findBySymbols']>(),
@@ -56,5 +57,25 @@ describe('MarketDataQuery (장 일정·최근가 읽기)', () => {
     );
     await expect(quote.pricesOf([])).resolves.toEqual(new Map());
     expect(quotes.findBySymbols).toHaveBeenCalledOnce();
+  });
+
+  it('최근 개장일과 받은 시각이 있는 최근가도 repository 값 그대로 줘요', async () => {
+    calendars.findRecentOpen.mockResolvedValue(['2026-11-12', '2026-11-11']);
+    const cached = Object.assign({
+      symbol: '005930',
+      price: 70_000,
+      receivedAt: new Date('2026-11-12T01:00:00Z'),
+    }) as QuoteCache;
+    quotes.findBySymbols.mockResolvedValue([cached]);
+
+    await expect(calendar.recentOpenDays('2026-11-12', 2)).resolves.toEqual([
+      '2026-11-12',
+      '2026-11-11',
+    ]);
+    expect(calendars.findRecentOpen).toHaveBeenCalledWith('2026-11-12', 2);
+    await expect(quote.quotesOf(['005930'])).resolves.toEqual(
+      new Map([['005930', cached]]),
+    );
+    await expect(quote.quotesOf([])).resolves.toEqual(new Map());
   });
 });
