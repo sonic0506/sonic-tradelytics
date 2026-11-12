@@ -4,6 +4,7 @@ import { kstAt } from '@/common/time/kst-date.js';
 import { BotService } from '@/modules/bot/index.js';
 import { QuoteQueryService } from '@/modules/market-data/index.js';
 
+import { type TradeStats, tradeStats } from './bot-stat.rule.js';
 import { type DailyPosition, dailyResults } from './daily-result.rule.js';
 import type { BotDailyResult } from './entities/bot-daily-result.entity.js';
 import type { Position } from './entities/position.entity.js';
@@ -28,6 +29,15 @@ export interface DailyTotal {
   fees: number;
   closedTrades: number;
 }
+
+// 봇 비교 표 한 줄의 재료 (FR-PERF-02). 키 null은 직접 거래예요
+export interface BotPerformance {
+  trades: TradeStats;
+  // 기간 안 일별 손익(실현 + 평가), 날짜순. 직접 거래는 비어 있어요
+  dailyPnls: number[];
+}
+
+const DAY_MS = 86_400_000;
 
 // 봇 하나의 보유·실현 손익 (POL-FUND-02, 05)
 export interface BotHoldings {
@@ -69,6 +79,50 @@ export class PositionService {
       totals.set(row.tradeDate, total);
     }
     return [...totals.values()];
+  }
+
+  // 기간(거래일, 포함) 안에 청산한 거래와 일별 손익을 봇마다(직접 거래는 null) 모아요
+  async performance(range: {
+    from?: string;
+    to?: string;
+  }): Promise<Map<number | null, BotPerformance>> {
+    const [closed, daily] = await Promise.all([
+      this.positions.findClosedBetween({
+        start: range.from ? kstAt(range.from, '00:00') : undefined,
+        end: range.to
+          ? new Date(kstAt(range.to, '00:00').getTime() + DAY_MS)
+          : undefined,
+      }),
+      this.positions.findDailyResults(range),
+    ]);
+    const owners = new Set<number | null>([
+      ...closed.map(({ botId }) => botId),
+      ...daily.map(({ botId }) => botId),
+    ]);
+    return new Map(
+      [...owners].map((owner) => [
+        owner,
+        {
+          trades: tradeStats(
+            closed.flatMap((position) =>
+              position.botId === owner && position.closedAt
+                ? [
+                    {
+                      netPnl: position.realizedPnl,
+                      fees: position.totalFees,
+                      openedAt: position.openedAt,
+                      closedAt: position.closedAt,
+                    },
+                  ]
+                : [],
+            ),
+          ),
+          dailyPnls: daily
+            .filter(({ botId }) => botId === owner)
+            .map((row) => row.realizedPnl + row.unrealizedPnl),
+        },
+      ]),
+    );
   }
 
   botDailyResults(

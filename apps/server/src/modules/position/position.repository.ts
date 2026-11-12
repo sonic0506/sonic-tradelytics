@@ -5,6 +5,7 @@ import {
   And,
   In,
   IsNull,
+  LessThan,
   LessThanOrEqual,
   MoreThan,
   MoreThanOrEqual,
@@ -92,6 +93,31 @@ export class PositionRepository {
         ...(range.length ? { tradeDate: And(...range) } : {}),
       },
       order: { tradeDate: 'ASC', botId: 'ASC' },
+      take: PositionRepository.MAX_FUND_ROWS,
+    });
+  }
+
+  // 기간 안에 청산된 포지션(봇·직접 거래 모두). 한 주도 체결되지 않은 포지션은 빼요
+  findClosedBetween(range: { start?: Date; end?: Date }): Promise<Position[]> {
+    const closedAt = [
+      ...(range.start ? [MoreThanOrEqual(range.start)] : []),
+      ...(range.end ? [LessThan(range.end)] : []),
+    ];
+    return this.positions.find({
+      select: {
+        id: true,
+        botId: true,
+        realizedPnl: true,
+        totalFees: true,
+        openedAt: true,
+        closedAt: true,
+      },
+      where: {
+        status: 'closed',
+        exitReason: Or(IsNull(), Not('not_filled')),
+        ...(closedAt.length ? { closedAt: And(...closedAt) } : {}),
+      },
+      order: { closedAt: 'ASC', id: 'ASC' },
       take: PositionRepository.MAX_FUND_ROWS,
     });
   }

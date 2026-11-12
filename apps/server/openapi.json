@@ -1303,6 +1303,105 @@
         ]
       }
     },
+    "/v1/bot-stats": {
+      "get": {
+        "operationId": "BotStatsController_findAll_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "시작 거래일 (YYYY-MM-DD, 포함). 없으면 처음부터",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "끝 거래일 (YYYY-MM-DD, 포함). 없으면 지금까지",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BotStatListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "요청 값이 올바르지 않아요.",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Bad Request",
+                      "status": 400,
+                      "detail": "요청 값이 올바르지 않아요.",
+                      "code": "VALIDATION_FAILED",
+                      "instance": "/v1/bot-stats",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c",
+                      "errors": [
+                        {
+                          "field": "name",
+                          "messages": [
+                            "name should not be empty"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                },
+                "examples": {
+                  "HTTP_401": {
+                    "summary": "Unauthorized",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Unauthorized",
+                      "status": 401,
+                      "detail": "Unauthorized",
+                      "code": "HTTP_401",
+                      "instance": "/v1/bot-stats",
+                      "requestId": "5f1c2a0e-8d6b-4c3e-9a7f-2b4d6e8f0a1c"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "봇 비교 표 (FR-PERF-02). 봇마다 한 줄과 직접 거래 한 줄. 지표 정의는 F2 \"봇별 핵심 지표\"",
+        "tags": [
+          "bot-stats"
+        ]
+      }
+    },
     "/v1/commands": {
       "post": {
         "operationId": "CommandController_create_v1",
@@ -3073,6 +3172,118 @@
           }
         },
         "required": [
+          "items"
+        ]
+      },
+      "BenchmarkDto": {
+        "type": "object",
+        "properties": {
+          "kospi": {
+            "type": "number"
+          },
+          "kosdaq": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "kospi",
+          "kosdaq"
+        ]
+      },
+      "BotStatDto": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "nullable": true,
+            "enum": [
+              "verifying",
+              "released"
+            ],
+            "type": "string"
+          },
+          "botId": {
+            "type": "string",
+            "nullable": true,
+            "description": "봇 id. 직접 거래 줄이면 null (FR-MAN-05)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "returnRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "기간 순손익 ÷ 확정 투자금, %. 청산이 없거나 확정 투자금이 없으면 null"
+          },
+          "netPnl": {
+            "type": "number",
+            "nullable": true,
+            "description": "기간에 청산한 거래의 순손익(수수료·세금 차감). 청산이 없으면 null"
+          },
+          "winRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "순손익 > 0인 청산 수 ÷ 청산 수 (0~1)"
+          },
+          "profitFactor": {
+            "type": "number",
+            "nullable": true,
+            "description": "평균 순이익 ÷ 평균 순손실(절댓값). 이긴 거래나 진 거래가 없으면 null"
+          },
+          "mdd": {
+            "type": "number",
+            "nullable": true,
+            "description": "일별 손익 누적 곡선의 고점 대비 최대 하락, 확정 투자금 대비 %(양수)"
+          },
+          "avgHoldMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "진입~청산 평균, 분"
+          },
+          "tradeCount": {
+            "type": "number",
+            "description": "청산한 거래 수 (한 주도 체결되지 않은 진입은 빼요)"
+          },
+          "cost": {
+            "type": "number",
+            "description": "수수료 + 세금 합계"
+          }
+        },
+        "required": [
+          "stage",
+          "botId",
+          "name",
+          "returnRate",
+          "netPnl",
+          "winRate",
+          "profitFactor",
+          "mdd",
+          "avgHoldMinutes",
+          "tradeCount",
+          "cost"
+        ]
+      },
+      "BotStatListDto": {
+        "type": "object",
+        "properties": {
+          "benchmark": {
+            "nullable": true,
+            "description": "같은 기간 지수 수익률(%). 지수를 저장하기 전이라 지금은 null이에요 (FR-PERF-09)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BotStatDto"
+            }
+          }
+        },
+        "required": [
+          "benchmark",
           "items"
         ]
       },

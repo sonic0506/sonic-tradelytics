@@ -238,6 +238,9 @@ engine이 한 번도 켜지지 않아 행이 없으면 404 `ENGINE_STATUS_NOT_FO
 
 - 지표 정의는 [F2 핵심 지표](../product/features/f2-performance.md#봇별-핵심-지표)에만 있어요
 - MDD·수익률은 `bot_daily_results`, 승률·손익비·보유 시간·비용은 청산 `positions`으로 계산해요
+- 기간(`from`·`to`)은 거래일이고 둘 다 생략할 수 있어요. 청산 포지션은 `closed_at`이 그 기간(KST) 안인 것만 세고, `not_filled`는 빼요
+- 순손익·수익률은 기간에 청산한 포지션의 순손익으로 재요. 수익률·MDD는 지금 살아 있는 확정 투자금으로 나눠요(확정 전이면 `null`). 직접 거래 줄은 확정 투자금과 일별 기록이 없어 둘 다 `null`이에요
+- `benchmark`는 지수를 저장하기 전이라 지금은 `null`이에요 (FR-PERF-09, [미룬 것](#미룬-것))
 
 ### `GET /v1/bots/:id/daily-results?from&to`
 
